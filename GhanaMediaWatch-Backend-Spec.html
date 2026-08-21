@@ -1,0 +1,1112 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Full API and behaviour specification for the GhanaMediaWatch backend.">
+<style>
+  /* minimal reset — the hosted artifact gets this from its wrapper */
+  *,*::before,*::after{box-sizing:border-box}
+  body,h1,h2,h3,h4,h5,p,figure,blockquote,dl,dd{margin:0}
+  ul[class],ol[class]{list-style:none;margin:0;padding:0}
+  img,picture{max-width:100%;display:block}
+  table{border-collapse:collapse}
+  @media print{
+    .rail{display:none}
+    .wrap{grid-template-columns:minmax(0,1fr);max-width:none;padding:0}
+    .ep,.code,.tw,.must,.step{break-inside:avoid}
+    section{break-before:auto}
+    a{color:inherit;text-decoration:none}
+    body{background:#fff;font-size:10.5pt}
+  }
+</style>
+<title>GhanaMediaWatch Backend Spec</title>
+</head>
+<body>
+<style>
+  /* ─── tokens ─────────────────────────────────────────────────────────────
+     Light is the base. Neutrals carry a slight teal bias so they read as
+     chosen rather than inherited mid-grey. */
+  :root {
+    --ground:        #EEF1F0;
+    --panel:         #F7F9F8;
+    --panel-2:       #E3E8E7;
+    --rule:          #C7D0CE;
+    --rule-soft:     #DAE1DF;
+    --ink:           #101819;
+    --ink-2:         #3C4A4B;
+    --ink-3:         #647575;
+    --accent:        #0F6E6A;
+    --accent-ink:    #0B534F;
+    --accent-wash:   #DCEBE9;
+    --signal:        #B4531A;
+    --signal-wash:   #F7E7DA;
+    --ok:            #1A6B45;
+    --ok-wash:       #DCEDE4;
+    --warn:          #8A5E10;
+    --warn-wash:     #F5EBD5;
+    --danger:        #9E2A22;
+    --danger-wash:   #F7E1DF;
+    --code-bg:       #E7ECEB;
+    --shadow:        0 1px 2px rgba(16,24,25,.06), 0 8px 24px -16px rgba(16,24,25,.28);
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --measure: 70ch;
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px; --s8: 72px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1214;
+      --panel:       #141B1D;
+      --panel-2:     #1B2426;
+      --rule:        #2B383A;
+      --rule-soft:   #212C2E;
+      --ink:         #DFE7E6;
+      --ink-2:       #A8B7B6;
+      --ink-3:       #7A8B8A;
+      --accent:      #4FC4BC;
+      --accent-ink:  #7BD8D1;
+      --accent-wash: #12302F;
+      --signal:      #E0894F;
+      --signal-wash: #33200F;
+      --ok:          #56C68C;
+      --ok-wash:     #10301F;
+      --warn:        #D6A544;
+      --warn-wash:   #302511;
+      --danger:      #E8776C;
+      --danger-wash: #351815;
+      --code-bg:     #182022;
+      --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1214;
+    --panel:       #141B1D;
+    --panel-2:     #1B2426;
+    --rule:        #2B383A;
+    --rule-soft:   #212C2E;
+    --ink:         #DFE7E6;
+    --ink-2:       #A8B7B6;
+    --ink-3:       #7A8B8A;
+    --accent:      #4FC4BC;
+    --accent-ink:  #7BD8D1;
+    --accent-wash: #12302F;
+    --signal:      #E0894F;
+    --signal-wash: #33200F;
+    --ok:          #56C68C;
+    --ok-wash:     #10301F;
+    --warn:        #D6A544;
+    --warn-wash:   #302511;
+    --danger:      #E8776C;
+    --danger-wash: #351815;
+    --code-bg:     #182022;
+    --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  /* ─── base ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent-ink); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  code, pre, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+
+  /* ─── page frame ────────────────────────────────────────────────────── */
+  .wrap {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: var(--s8);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 var(--s5) var(--s8);
+  }
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: minmax(0,1fr); gap: var(--s6); padding: 0 var(--s4) var(--s7); }
+    .rail { position: static; height: auto; padding-top: 0; }
+  }
+
+  /* ─── masthead ──────────────────────────────────────────────────────── */
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    background: var(--panel);
+    padding: var(--s7) var(--s5) var(--s6);
+    margin-bottom: var(--s7);
+  }
+  .masthead-inner { max-width: 1180px; margin: 0 auto; padding: 0 var(--s5); }
+  @media (max-width: 900px) { .masthead-inner { padding: 0; } }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -.028em;
+    font-weight: 800;
+    margin: var(--s3) 0 var(--s4);
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .standfirst {
+    font-size: 18.5px;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s5);
+    margin-top: var(--s5);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--rule-soft);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ─── nav rail ──────────────────────────────────────────────────────── */
+  .rail { position: sticky; top: 0; align-self: start; padding-top: var(--s2); max-height: 100vh; overflow-y: auto; }
+  .rail-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: var(--s3);
+  }
+  .rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .rail a {
+    display: grid;
+    grid-template-columns: 2.2em 1fr;
+    gap: var(--s2);
+    padding: 5px var(--s2);
+    text-decoration: none;
+    color: var(--ink-2);
+    font-size: 14px;
+    border-radius: 3px;
+    border-left: 2px solid transparent;
+  }
+  .rail a:hover { background: var(--panel-2); color: var(--ink); border-left-color: var(--accent); }
+  .rail .n { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); padding-top: 2px; }
+  .rail .crit { color: var(--signal); font-weight: 600; }
+
+  /* ─── sections ──────────────────────────────────────────────────────── */
+  section { scroll-margin-top: var(--s4); }
+  section + section { margin-top: var(--s8); }
+  .sec-head { border-top: 2px solid var(--ink); padding-top: var(--s3); margin-bottom: var(--s5); }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h2 {
+    font-size: clamp(23px, 3vw, 30px);
+    line-height: 1.16;
+    letter-spacing: -.02em;
+    font-weight: 750;
+    margin: var(--s1) 0 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 18.5px;
+    letter-spacing: -.011em;
+    font-weight: 700;
+    margin: var(--s6) 0 var(--s3);
+    text-wrap: balance;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    margin: var(--s5) 0 var(--s2);
+  }
+  p, ul, ol.body { max-width: var(--measure); }
+  p { margin: 0 0 var(--s4); }
+  ul, ol.body { margin: 0 0 var(--s4); padding-left: 1.15em; }
+  li { margin-bottom: var(--s2); }
+  li::marker { color: var(--ink-3); }
+  strong { font-weight: 680; color: var(--ink); }
+
+  /* ─── inline code ───────────────────────────────────────────────────── */
+  :not(pre) > code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .06em .34em;
+    font-size: .875em;
+    white-space: nowrap;
+  }
+
+  /* ─── code blocks ───────────────────────────────────────────────────── */
+  .code {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin: 0 0 var(--s4);
+    overflow: hidden;
+  }
+  .code-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s3);
+    padding: 7px var(--s3);
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--panel-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  pre {
+    margin: 0;
+    padding: var(--s3) var(--s4);
+    overflow-x: auto;
+    font-size: 13.2px;
+    line-height: 1.62;
+    color: var(--ink-2);
+    tab-size: 2;
+  }
+  pre b { color: var(--ink); font-weight: 600; }
+  pre .k { color: var(--accent-ink); }
+  pre .s { color: var(--ok); }
+  pre .c { color: var(--ink-3); font-style: italic; }
+
+  /* ─── endpoint spec block ───────────────────────────────────────────── */
+  .ep {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--panel);
+    margin: 0 0 var(--s4);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .ep-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .verb {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    flex: none;
+  }
+  .verb.get    { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+  .verb.post   { color: var(--ok);     border-color: var(--ok);     background: var(--ok-wash); }
+  .verb.put    { color: var(--warn);   border-color: var(--warn);   background: var(--warn-wash); }
+  .verb.patch  { color: var(--warn);   border-color: var(--warn);   background: var(--warn-wash); }
+  .verb.delete { color: var(--danger); border-color: var(--danger); background: var(--danger-wash); }
+  .path { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .auth {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border: 1px dashed var(--rule);
+    border-radius: 3px;
+    padding: 2px 6px;
+    flex: none;
+  }
+  .ep-body { padding: var(--s4); }
+  .ep-body > :last-child { margin-bottom: 0; }
+  .ep-body p { max-width: none; }
+
+  /* ─── obligation callout — reserved for hard MUSTs, used sparingly ──── */
+  .must {
+    border-left: 3px solid var(--signal);
+    background: var(--signal-wash);
+    padding: var(--s4) var(--s4) var(--s4) var(--s5);
+    margin: 0 0 var(--s5);
+    border-radius: 0 4px 4px 0;
+    max-width: var(--measure);
+  }
+  .must-tag {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--signal);
+    font-weight: 700;
+    margin-bottom: var(--s2);
+  }
+  .must p:last-child, .must ul:last-child { margin-bottom: 0; }
+  .must p, .must ul { max-width: none; }
+
+  /* ─── tables ────────────────────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 0 0 var(--s5); border: 1px solid var(--rule); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 460px; background: var(--panel); }
+  th, td { text-align: left; padding: 9px var(--s3); border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    background: var(--panel-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, td.code-cell, th.num { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ─── flow steps ────────────────────────────────────────────────────── */
+  .flow { display: grid; gap: var(--s3); margin: 0 0 var(--s5); }
+  @media (min-width: 720px) { .flow { grid-template-columns: repeat(3, 1fr); } }
+  .step { border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); padding: var(--s4); }
+  .step-n {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .step h5 { font-family: var(--mono); font-size: 13.5px; font-weight: 700; margin: var(--s2) 0; color: var(--ink); overflow-wrap: anywhere; }
+  .step p { font-size: 14px; color: var(--ink-2); margin: 0; max-width: none; }
+
+  /* ─── state pills ───────────────────────────────────────────────────── */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .pill.pub  { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+  .pill.pend { color: var(--warn); border-color: var(--warn); background: var(--warn-wash); }
+  .pill.rej  { color: var(--danger); border-color: var(--danger); background: var(--danger-wash); }
+  .pill.rest { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+
+  .lede {
+    font-size: 17.5px;
+    color: var(--ink-2);
+    border-left: 2px solid var(--rule);
+    padding-left: var(--s4);
+    max-width: 64ch;
+  }
+  hr.soft { border: 0; border-top: 1px solid var(--rule-soft); margin: var(--s6) 0; }
+  footer { border-top: 1px solid var(--rule); margin-top: var(--s8); padding-top: var(--s4); font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Backend handoff · v1 draft</div>
+    <h1>GhanaMediaWatch Backend Spec</h1>
+    <p class="standfirst">
+      A GPS-gated incident reporting app for Ghana. The camera does not unlock until the device holds
+      an accurate fix; capture always succeeds offline; the queue drains itself when connectivity
+      returns. This is everything the server has to provide for that to work.
+    </p>
+    <div class="meta">
+      <span><b>Audience</b> backend engineer</span>
+      <span><b>Written by</b> the mobile client team</span>
+      <span><b>Status</b> proposed, not agreed</span>
+      <span><b>Base</b> <code>/v1</code></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="rail" aria-label="Contents">
+    <div class="rail-title">Contents</div>
+    <ol>
+      <li><a href="#s0"><span class="n">00</span><span>What you're building</span></a></li>
+      <li><a href="#s1"><span class="n">01</span><span>Conventions</span></a></li>
+      <li><a href="#s2"><span class="n">02</span><span>Domain model</span></a></li>
+      <li><a href="#s3"><span class="n">03</span><span>Identity &amp; anonymity</span></a></li>
+      <li><a href="#s4"><span class="n">04</span><span>Upload protocol</span></a></li>
+      <li><a href="#s5"><span class="n">05</span><span>Reading endpoints</span></a></li>
+      <li><a href="#s6"><span class="n">06</span><span>Vetting</span></a></li>
+      <li><a href="#s7"><span class="n">07</span><span class="crit">Display flags</span></a></li>
+      <li><a href="#s8"><span class="n">08</span><span>Org tier</span></a></li>
+      <li><a href="#s9"><span class="n">09</span><span>Error codes</span></a></li>
+      <li><a href="#s10"><span class="n">10</span><span>Open questions</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <!-- ═══ 0 ═══ -->
+    <section id="s0">
+      <div class="sec-head"><div class="sec-num">§ 00</div><h2>What you're building</h2></div>
+
+      <p class="lede">
+        Members of the public film incidents — floods, fires, road accidents, illegal mining, power
+        failures — and the app stamps each one with verified coordinates and a timestamp before it
+        ever reaches you. Some reports publish straight to a public feed; some need review first.
+        Institutions subscribe to standing queries over the same crowd-sourced pool.
+      </p>
+
+      <h3>Four behaviours that shape the API</h3>
+
+      <table style="display:none"></table>
+      <div class="tw">
+        <table>
+          <thead>
+            <tr><th style="width:22%">Behaviour</th><th>What it means for the server</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>GPS gate</strong></td>
+              <td>The camera will not mount until horizontal accuracy reaches 20 m. Every submission therefore arrives with a real fix and an <code>accuracyM</code>. Reports captured through the reduced-accuracy escape hatch are flagged <code>confidence: "low"</code> rather than silently downgraded.</td>
+            </tr>
+            <tr>
+              <td><strong>Offline-first</strong></td>
+              <td>Capture writes to local storage and a SQLite outbox. Uploads happen later, possibly days later, possibly from a different network. <strong>Assume every request may be a retry</strong> — idempotency is not optional.</td>
+            </tr>
+            <tr>
+              <td><strong>Vetting</strong></td>
+              <td>Reports carry a state. The public feed serves only <code>published</code>. The author sees all of their own, with reasons.</td>
+            </tr>
+            <tr>
+              <td><strong>Selective disclosure</strong></td>
+              <td>A reporter can publish footage while hiding its location, date, or time. This is a privacy guarantee, not a UI preference — see <a href="#s7">§07</a>.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>What the client already handles</h3>
+      <p>So you don't build it twice: local media storage, the SQLite outbox and its state machine,
+      exponential backoff with jitter, background upload scheduling, chunk resumption bookkeeping,
+      connectivity detection, and Wi-Fi-only deferral for video. The server sees the result, not the
+      machinery.</p>
+    </section>
+
+    <!-- ═══ 1 ═══ -->
+    <section id="s1">
+      <div class="sec-head"><div class="sec-num">§ 01</div><h2>Conventions</h2></div>
+
+      <h3>Authentication</h3>
+      <p>Bearer JWT. Short-lived access token (proposed 15 min), long-lived refresh token (proposed
+      60 days) held in the device keychain. Three caller identities, and every endpoint below names
+      which it accepts.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:20%">Identity</th><th style="width:34%">Obtained via</th><th>Can do</th></tr></thead>
+          <tbody>
+            <tr><td class="code-cell">device</td><td class="code-cell">POST /devices</td><td>Submit incidents, read the public feed. No profile.</td></tr>
+            <tr><td class="code-cell">user</td><td class="code-cell">POST /auth/signin</td><td>Everything above, plus own-report management and interactions.</td></tr>
+            <tr><td class="code-cell">org_member</td><td class="code-cell">POST /auth/signin</td><td>Adds the <code>/org/*</code> surface, scoped by role.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Headers on every request</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:26%">Header</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="code-cell">Authorization</td><td>Except <code>POST /devices</code> and <code>/auth/*</code>.</td></tr>
+            <tr><td class="code-cell">X-Device-Id</td><td>The keychain UUID. Sent <strong>always</strong>, authenticated or not — including on anonymous submissions.</td></tr>
+            <tr><td class="code-cell">X-Client-Version</td><td>App version and build, for support triage.</td></tr>
+            <tr><td class="code-cell">X-Platform</td><td><code>android</code> or <code>ios</code>.</td></tr>
+            <tr><td class="code-cell">Idempotency-Key</td><td>UUID v4. Required on every state-creating POST.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="must">
+        <span class="must-tag">Must — idempotency</span>
+        <p>Capture happens offline and the outbox retries. <strong>The same submission will arrive
+        more than once.</strong> On a repeated <code>Idempotency-Key</code> within 24 hours, return
+        the <em>original response and status code</em> — not a conflict. Without this, a reporter on
+        a flaky connection publishes the same incident three times to a public feed.</p>
+      </div>
+
+      <h3>Error envelope</h3>
+      <p>Every non-2xx uses exactly this shape. No bare strings, no HTML error pages.</p>
+      <div class="code">
+        <div class="code-bar"><span>Response · any 4xx / 5xx</span><span>json</span></div>
+<pre>{
+  <span class="k">"error"</span>: {
+    <span class="k">"code"</span>: <span class="s">"GPS_ACCURACY_REJECTED"</span>,
+    <span class="k">"message"</span>: <span class="s">"Location accuracy of 84 m exceeds the 20 m limit."</span>,
+    <span class="k">"details"</span>: { <span class="k">"accuracyM"</span>: 84, <span class="k">"limitM"</span>: 20 },
+    <span class="k">"requestId"</span>: <span class="s">"01JBX7Q2K9"</span>
+  }
+}</pre>
+      </div>
+      <ul>
+        <li><code>code</code> — stable <span class="mono">SCREAMING_SNAKE_CASE</span>. The client switches on this, never on <code>message</code>.</li>
+        <li><code>message</code> — developer-facing English. <strong>Never shown to users</strong>; the client maps <code>code</code> to a localised string.</li>
+        <li><code>requestId</code> — echoed into the client's bug reports. Log it.</li>
+      </ul>
+
+      <h3>Pagination — cursor, not offset</h3>
+      <p>The feed shifts under the reader as reports clear review, so offsets would duplicate and
+      skip. Return <code>{ items, nextCursor, hasMore }</code>; <code>nextCursor</code> is
+      <code>null</code> when exhausted and opaque to the client — encode whatever you like in it.
+      <code>limit</code> defaults to 20, caps at 50. Never return a <code>total</code>; it is
+      expensive and unused.</p>
+
+      <h3>Time and coordinates</h3>
+      <ul>
+        <li>Server timestamps are ISO 8601 UTC with <code>Z</code>.</li>
+        <li><strong>Device capture time is separate and untrusted.</strong> The client sends
+        <code>capturedAtIso</code>, <code>capturedAtUtcOffsetMinutes</code>, and
+        <code>deviceUptimeMs</code>. Store all three — a device clock inconsistent with its uptime
+        or with server receipt time is a tamper signal for vetting.</li>
+        <li>Coordinates: decimal degrees, WGS 84, JSON numbers at 6 dp (~0.11 m). Never strings.</li>
+        <li>Distances in metres, durations in ms, sizes in bytes. Integers unless noted.</li>
+      </ul>
+    </section>
+
+    <!-- ═══ 2 ═══ -->
+    <section id="s2">
+      <div class="sec-head"><div class="sec-num">§ 02</div><h2>Domain model</h2></div>
+
+      <p>Closed sets. The client holds these as TypeScript unions, so <strong>adding a value is a
+      breaking change</strong> unless the client ships support for it first.</p>
+
+      <div class="code">
+        <div class="code-bar"><span>Enumerations</span><span>ts</span></div>
+<pre><span class="c">// grouped into colour families in the UI: the hue signals the kind of
+// incident, the label says which one</span>
+<span class="k">type</span> IncidentCategory =
+  | <span class="s">'fire'</span> | <span class="s">'accident'</span> | <span class="s">'disorder'</span>            <span class="c">// emergency</span>
+  | <span class="s">'infrastructure'</span> | <span class="s">'utility'</span> | <span class="s">'corruption'</span> <span class="c">// civic</span>
+  | <span class="s">'environment'</span> | <span class="s">'wildlife'</span>                  <span class="c">// environment</span>
+  | <span class="s">'flood'</span> | <span class="s">'crime'</span> | <span class="s">'health'</span> | <span class="s">'other'</span>;
+
+<span class="k">type</span> VettingState = <span class="s">'pending_review'</span> | <span class="s">'published'</span> | <span class="s">'rejected'</span> | <span class="s">'restricted'</span>;
+<span class="k">type</span> MediaKind = <span class="s">'photo'</span> | <span class="s">'video'</span>;
+<span class="k">type</span> LocationConfidence = <span class="s">'high'</span> | <span class="s">'low'</span>;</pre>
+      </div>
+
+      <h3>Incident — public shape</h3>
+      <p>What the feed and detail endpoints return. Note the nullable metadata fields; that is
+      <a href="#s7">§07</a> at work.</p>
+      <div class="code">
+        <div class="code-bar"><span>GET /incidents · item</span><span>json</span></div>
+<pre>{
+  <span class="k">"id"</span>: <span class="s">"inc_01JBX7Q2K9"</span>,
+  <span class="k">"category"</span>: <span class="s">"flood"</span>,
+  <span class="k">"description"</span>: <span class="s">"Culvert blocked, road impassable at the junction."</span>,
+  <span class="k">"vettingState"</span>: <span class="s">"published"</span>,
+  <span class="k">"publishedAt"</span>: <span class="s">"2026-08-19T14:40:11.000Z"</span>,
+
+  <span class="k">"media"</span>: {
+    <span class="k">"kind"</span>: <span class="s">"video"</span>,
+    <span class="k">"url"</span>: <span class="s">"https://cdn.example.gh/m/01JBX7.mp4"</span>,
+    <span class="k">"posterUrl"</span>: <span class="s">"https://cdn.example.gh/m/01JBX7.jpg"</span>,
+    <span class="k">"width"</span>: 1080, <span class="k">"height"</span>: 1920,
+    <span class="k">"durationMs"</span>: 24500, <span class="k">"byteSize"</span>: 8421376
+  },
+
+  <span class="k">"location"</span>: {
+    <span class="k">"latitude"</span>: 5.603717, <span class="k">"longitude"</span>: -0.186964,
+    <span class="k">"label"</span>: <span class="s">"Kaneshie, Accra"</span>, <span class="k">"confidence"</span>: <span class="s">"high"</span>
+  },
+
+  <span class="k">"capturedAtIso"</span>: <span class="s">"2026-08-19T14:31:00.000Z"</span>,
+  <span class="k">"publisher"</span>: { <span class="k">"kind"</span>: <span class="s">"anonymous"</span> },
+  <span class="k">"counts"</span>: { <span class="k">"reactions"</span>: 42, <span class="k">"comments"</span>: 7 },
+  <span class="k">"viewerHasReacted"</span>: <span class="k">false</span>
+}</pre>
+      </div>
+      <p>For an attributed report, <code>publisher</code> is
+      <code>{ kind: "user", id, displayName, avatarUrl }</code>.</p>
+
+      <h3>Incident — author's own shape</h3>
+      <p><code>GET /me/incidents</code> returns the above <em>plus</em> the fields only the author
+      may see: <code>rejectionReason</code>, <code>displayFlags</code>, <code>isAnonymous</code>,
+      <code>locationMocked</code>, and the full precision block
+      (<code>accuracyM</code>, <code>altitude</code>, <code>heading</code>, <code>speed</code>).</p>
+    </section>
+
+    <!-- ═══ 3 ═══ -->
+    <section id="s3">
+      <div class="sec-head"><div class="sec-num">§ 03</div><h2>Identity &amp; anonymity</h2></div>
+
+      <p>The client generates a <strong>UUID v4 on first launch</strong> and keeps it in the secure
+      keychain. That is the primary device identifier, sent as <code>X-Device-Id</code> on every
+      request. It also sends a secondary platform identifier — Android ID, or iOS
+      <span class="mono">identifierForVendor</span>.</p>
+
+      <div class="must">
+        <span class="must-tag">Must — what anonymity means here</span>
+        <p><code>deviceId</code> is attached to anonymous submissions too. That is the accountability
+        mechanism the product depends on, and the app tells users so plainly before they publish.</p>
+        <p>In return, the public API <strong>must never expose</strong> <code>deviceId</code>, the
+        author's account, or any derived identifier on an anonymous report — not in the feed, not in
+        detail, not in comments, not in an ETag or a media URL. You retain the link internally for
+        abuse handling and lawful process. <strong>Do not implement anything that would make the
+        app's explainer a lie.</strong></p>
+      </div>
+
+      <p>Both platform identifiers reset on uninstall or factory reset and are <strong>not stable</strong>.
+      Treat them as a weak correlation signal, never a primary key.</p>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb post">POST</span><span class="path">/devices</span><span class="auth">no auth</span></div>
+        <div class="ep-body">
+          <p>Called once on first launch, and again if the token is lost.</p>
+          <div class="code">
+            <div class="code-bar"><span>Request → 201</span><span>json</span></div>
+<pre>{ <span class="k">"deviceId"</span>: <span class="s">"9f1c…"</span>, <span class="k">"platform"</span>: <span class="s">"android"</span>,
+  <span class="k">"platformDeviceId"</span>: <span class="s">"a1b2c3d4e5f6"</span>,
+  <span class="k">"appVersion"</span>: <span class="s">"1.0.0"</span>, <span class="k">"buildNumber"</span>: 42 }
+
+<span class="c">→ { "deviceToken": "eyJ…", "expiresAt": "2026-10-18T…Z" }</span></pre>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 4 ═══ -->
+    <section id="s4">
+      <div class="sec-head"><div class="sec-num">§ 04</div><h2>Upload protocol</h2></div>
+
+      <p class="lede">A 60-second video over Ghanaian mobile data <em>will</em> drop mid-flight.
+      Uploads are resumable and chunked, in three phases.</p>
+
+      <div class="flow">
+        <div class="step">
+          <div class="step-n">Phase 1 · init</div>
+          <h5>POST /incidents</h5>
+          <p>Metadata only, no bytes. Returns an <code>uploadId</code> and the chunk plan.</p>
+        </div>
+        <div class="step">
+          <div class="step-n">Phase 2 · transfer</div>
+          <h5>PUT /uploads/{id}/chunks/{n}</h5>
+          <p>Raw bytes. Repeatable and order-independent, because retries reorder.</p>
+        </div>
+        <div class="step">
+          <div class="step-n">Phase 3 · commit</div>
+          <h5>POST /uploads/{id}/complete</h5>
+          <p>Server assembles, verifies the hash, enqueues for vetting.</p>
+        </div>
+      </div>
+
+      <p>If the app dies mid-upload, the client calls <code>GET /uploads/{id}</code> on next launch
+      to learn which chunks you already hold, then resumes. <strong>It does not restart from
+      zero.</strong></p>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb post">POST</span><span class="path">/incidents</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>Metadata only. Requires <code>Idempotency-Key</code>.</p>
+          <div class="code">
+            <div class="code-bar"><span>Request body</span><span>json</span></div>
+<pre>{
+  <span class="k">"clientId"</span>: <span class="s">"e3a1…"</span>,                <span class="c">// the client's local row id</span>
+  <span class="k">"category"</span>: <span class="s">"flood"</span>,
+  <span class="k">"description"</span>: <span class="s">"Culvert blocked, road impassable."</span>,
+  <span class="k">"isAnonymous"</span>: <span class="k">true</span>,
+  <span class="k">"displayFlags"</span>: { <span class="k">"showLocation"</span>: <span class="k">true</span>,
+                    <span class="k">"showDate"</span>: <span class="k">true</span>,
+                    <span class="k">"showTime"</span>: <span class="k">false</span> },
+
+  <span class="k">"location"</span>: {
+    <span class="k">"latitude"</span>: 5.603717, <span class="k">"longitude"</span>: -0.186964,
+    <span class="k">"accuracyM"</span>: 8.4, <span class="k">"altitude"</span>: 61.2,
+    <span class="k">"heading"</span>: 142.0, <span class="k">"speed"</span>: 0.0,
+    <span class="k">"confidence"</span>: <span class="s">"high"</span>, <span class="k">"isMocked"</span>: <span class="k">false</span>
+  },
+
+  <span class="k">"capturedAtIso"</span>: <span class="s">"2026-08-19T14:31:00.000Z"</span>,
+  <span class="k">"capturedAtUtcOffsetMinutes"</span>: 0,
+  <span class="k">"deviceUptimeMs"</span>: 184523110,      <span class="c">// tamper signal</span>
+
+  <span class="k">"media"</span>: {
+    <span class="k">"kind"</span>: <span class="s">"video"</span>, <span class="k">"mimeType"</span>: <span class="s">"video/mp4"</span>,
+    <span class="k">"byteSize"</span>: 8421376, <span class="k">"durationMs"</span>: 24500,
+    <span class="k">"width"</span>: 1080, <span class="k">"height"</span>: 1920,
+    <span class="k">"sha256"</span>: <span class="s">"9f86d081884c7d65…"</span>
+  }
+}</pre>
+          </div>
+          <div class="code">
+            <div class="code-bar"><span>Response · 201</span><span>json</span></div>
+<pre>{ <span class="k">"incidentId"</span>: <span class="s">"inc_01JBX7Q2K9"</span>,
+  <span class="k">"uploadId"</span>: <span class="s">"upl_01JBX7Q2K9"</span>,
+  <span class="k">"chunkSizeBytes"</span>: 5242880,
+  <span class="k">"chunkCount"</span>: 2,
+  <span class="k">"expiresAt"</span>: <span class="s">"2026-08-20T14:31:00.000Z"</span> }</pre>
+          </div>
+          <p>The client proposes 5 MiB chunks, but <strong>your response is authoritative</strong> —
+          it will use whatever <code>chunkSizeBytes</code> you return. Echo <code>clientId</code> back
+          on the resulting incident so the outbox reconciles without relying on ordering.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb put">PUT</span><span class="path">/uploads/{uploadId}/chunks/{index}</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p><code>index</code> is <strong>0-based</strong>. Body is
+          <code>application/octet-stream</code> — raw bytes, no multipart wrapper. Returns
+          <code>{ index, received, bytesReceived }</code>.</p>
+          <p><strong>Must be idempotent.</strong> Re-sending a chunk you already hold returns
+          <code>200</code>, not an error.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb post">POST</span><span class="path">/uploads/{uploadId}/complete</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>Empty body. Returns the full incident in its author shape, with
+          <code>vettingState</code> set by your routing rules.</p>
+          <p>Verify <code>sha256</code> here and reject with <code>MEDIA_HASH_MISMATCH</code> on a
+          mismatch — that is the client's signal to re-upload rather than silently publishing corrupt
+          footage.</p>
+          <p><strong>Only after this succeeds does the client delete its local media file.</strong>
+          It keeps the metadata row so the reporter retains a personal history — which is why media
+          retention is <a href="#s10">an open question</a>.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/uploads/{uploadId}</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>Resume support. Returns <code>receivedChunks: [0]</code> so the client sends only what
+          is missing. If the window has elapsed, return <code>410 UPLOAD_EXPIRED</code> and the client
+          restarts from <code>POST /incidents</code>.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 5 ═══ -->
+    <section id="s5">
+      <div class="sec-head"><div class="sec-num">§ 05</div><h2>Reading endpoints</h2></div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/incidents</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>The public feed. <strong>Returns only <code>published</code>.</strong> Never leak another
+          state here.</p>
+          <div class="tw">
+            <table>
+              <thead><tr><th style="width:24%">Param</th><th>Notes</th></tr></thead>
+              <tbody>
+                <tr><td class="code-cell">limit, cursor</td><td>Cursor pagination, see §01.</td></tr>
+                <tr><td class="code-cell">category</td><td>Repeatable; multiple values mean OR.</td></tr>
+                <tr><td class="code-cell">near</td><td><code>lat,lng</code> — enables <code>distanceM</code> on each item.</td></tr>
+                <tr><td class="code-cell">radiusM</td><td>Requires <code>near</code>.</td></tr>
+                <tr><td class="code-cell">since, until</td><td>ISO 8601, applied to <code>publishedAt</code>.</td></tr>
+                <tr><td class="code-cell">sort</td><td><code>recent</code> (default) or <code>nearby</code>.</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/incidents/map</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>The map tab needs clusters, not a page of full records.
+          <code>?bbox=-0.3,5.5,-0.1,5.7&amp;zoom=12</code> returns
+          <code>{ clusters: [{ latitude, longitude, count, categories }], markers: [...] }</code>.</p>
+          <p><strong>Cluster server-side.</strong> Returning 4,000 raw points and clustering on-device
+          will not hold 60 fps on a mid-range Android phone.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/incidents/{id}</span><span class="auth">device · user</span></div>
+        <div class="ep-body">
+          <p>Public shape. If it is not published and the caller is not the author, return
+          <code>404 INCIDENT_NOT_FOUND</code> — <strong>not <code>403</code></strong>, which would
+          confirm the report exists.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/me/incidents</span><span class="auth">user</span></div>
+        <div class="ep-body"><p>All states, author shape, with <code>rejectionReason</code> where
+        applicable. Filter with <code>?state=pending_review</code>.</p></div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb patch">PATCH</span><span class="path">/incidents/{id}</span><span class="auth">user · author only</span></div>
+        <div class="ep-body">
+          <p>The account owner can change <code>displayFlags</code> <em>after</em> publication —
+          that is a product requirement, not an edge case.</p>
+          <p>Also accepts <code>description</code>. <strong>Editing the description after publication
+          must re-enter review</strong>, otherwise it is a trivial bait-and-switch on approved
+          footage.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb delete">DELETE</span><span class="path">/incidents/{id}</span><span class="auth">user · author only</span></div>
+        <div class="ep-body"><p>Soft-delete. Returns <code>204</code>.</p></div>
+      </div>
+    </section>
+
+    <!-- ═══ 6 ═══ -->
+    <section id="s6">
+      <div class="sec-head"><div class="sec-num">§ 06</div><h2>Vetting</h2></div>
+
+      <p>Every report enters at <span class="pill pend">pending_review</span> and leaves to exactly
+      one terminal state.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:20%">State</th><th style="width:14%">In feed?</th><th style="width:20%">Author sees?</th><th>Meaning</th></tr></thead>
+          <tbody>
+            <tr>
+              <td><span class="pill pend">pending_review</span></td><td>No</td><td>Yes, with a banner</td>
+              <td>Awaiting a human or automated decision.</td>
+            </tr>
+            <tr>
+              <td><span class="pill pub">published</span></td><td><strong>Yes</strong></td><td>Yes</td>
+              <td>Cleared for public display.</td>
+            </tr>
+            <tr>
+              <td><span class="pill rej">rejected</span></td><td>No</td><td>Yes, with the reason</td>
+              <td>Declined. <code>rejectionReason</code> is shown to the reporter verbatim — write it for them, not for staff.</td>
+            </tr>
+            <tr>
+              <td><span class="pill rest">restricted</span></td><td>No</td><td>Yes, with a banner</td>
+              <td>Held for security sensitivity. Visible to authorised org accounts only.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The brief allows reports to be "vetted or automatically uploaded … based on public or
+      security sensitivity". <strong>The client does not decide this</strong> — it renders whatever
+      state you return. Which categories auto-publish, and who triggers human review, is
+      <a href="#s10">question 3</a>.</p>
+    </section>
+
+    <!-- ═══ 7 ═══ -->
+    <section id="s7">
+      <div class="sec-head"><div class="sec-num">§ 07</div><h2>Display flags</h2></div>
+
+      <p class="lede">Read this section twice. Its failure mode is exposing a reporter's location.</p>
+
+      <p>Each report carries three booleans, set by the reporter at review time and editable later:
+      <code>showLocation</code>, <code>showDate</code>, <code>showTime</code>. They are
+      <strong>display flags, not storage flags</strong> — you still store the true coordinates and
+      capture timestamp for every report, always, because vetting, abuse investigation, and lawful
+      requests all depend on it.</p>
+
+      <div class="must">
+        <span class="must-tag">Must — suppress at the source</span>
+        <p>On any endpoint serving a <em>public</em> audience — feed, map, public detail, comments —
+        the server must <strong>omit or null the suppressed fields</strong>. Do not send them and
+        trust the client to hide them.</p>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:24%">When false</th><th>Public responses must…</th></tr></thead>
+          <tbody>
+            <tr>
+              <td class="code-cell">showLocation</td>
+              <td>Null <code>latitude</code>, <code>longitude</code>, and <code>label</code>.
+              <strong>Also drop the item from <code>/incidents/map</code></strong> and from
+              <code>near</code>/<code>radiusM</code> filtering — a marker on a map is a location
+              disclosure.</td>
+            </tr>
+            <tr>
+              <td class="code-cell">showDate</td>
+              <td>Null <code>capturedAtIso</code>. Use <code>publishedAt</code> truncated to the hour
+              if you need an ordering key.</td>
+            </tr>
+            <tr>
+              <td class="code-cell">showTime</td>
+              <td>Truncate <code>capturedAtIso</code> to midnight UTC.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p>The client enforces the identical rules independently, with unit tests asserting a hidden
+      value never renders. <strong>Both layers are required.</strong> Client-side hiding alone means
+      the true coordinates travel to every phone that scrolls past the report and sit in an
+      inspectable cache. Server-side alone means one client bug leaks them. Defence in depth is not
+      negotiable here.</p>
+
+      <p>If <code>showDate</code> is false but <code>showTime</code> is true, suppress both — a bare
+      time with no date is meaningless and still narrows the window. The client greys out that
+      combination, but do not rely on it.</p>
+    </section>
+
+    <!-- ═══ 8 ═══ -->
+    <section id="s8">
+      <div class="sec-head"><div class="sec-num">§ 08</div><h2>Org tier</h2></div>
+
+      <p>Institutions and businesses subscribe to standing queries over the crowd-sourced pool.</p>
+
+      <div class="must">
+        <span class="must-tag">Must — authorisation</span>
+        <p>The client hides <code>/org</code> routes from non-members as a courtesy.
+        <strong>That is not authorisation.</strong> Every endpoint here must independently enforce
+        membership and role. Roles: <code>owner</code>, <code>admin</code>, <code>analyst</code>,
+        <code>viewer</code>.</p>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb get">GET</span><span class="path">/org/dashboard</span><span class="auth">org_member</span></div>
+        <div class="ep-body"><p>Counts by category and by state, a daily trend series for the
+        sparkline, and recent high-priority reports.</p></div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head">
+          <span class="verb get">GET</span><span class="verb post">POST</span>
+          <span class="path">/org/queries</span><span class="auth">org_member</span>
+        </div>
+        <div class="ep-body">
+          <p>An org's standing watch criteria — categories, keywords, a geofence, a time window,
+          and alert preferences.</p>
+          <div class="code">
+            <div class="code-bar"><span>Saved query</span><span>json</span></div>
+<pre>{
+  <span class="k">"name"</span>: <span class="s">"Flooding — Odaw catchment"</span>,
+  <span class="k">"categories"</span>: [<span class="s">"flood"</span>, <span class="s">"infrastructure"</span>],
+  <span class="k">"keywords"</span>: [<span class="s">"culvert"</span>, <span class="s">"drain"</span>],
+  <span class="k">"geofence"</span>: {
+    <span class="k">"kind"</span>: <span class="s">"circle"</span>,          <span class="c">// or "polygon" + points[]</span>
+    <span class="k">"center"</span>: { <span class="k">"latitude"</span>: 5.603717, <span class="k">"longitude"</span>: -0.186964 },
+    <span class="k">"radiusM"</span>: 3000
+  },
+  <span class="k">"timeWindow"</span>: { <span class="k">"since"</span>: <span class="s">"2026-08-01T00:00:00.000Z"</span> },
+  <span class="k">"alerts"</span>: { <span class="k">"push"</span>: <span class="k">true</span>, <span class="k">"email"</span>: <span class="k">false</span> }
+}</pre>
+          </div>
+          <p><strong>A saved query must never match a report whose <code>showLocation</code> is
+          false</strong> via its geofence. Suppressed location means suppressed from location-based
+          matching — including for paying customers.</p>
+        </div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb post">POST</span><span class="path">/org/incidents/{id}/status · /notes</span><span class="auth">org_member</span></div>
+        <div class="ep-body"><p>Inbox triage: <code>in_review</code>, <code>actioned</code>,
+        <code>dismissed</code>; plus internal notes that are <strong>never public</strong>.</p></div>
+      </div>
+
+      <div class="ep">
+        <div class="ep-head"><span class="verb post">POST</span><span class="path">/org/exports</span><span class="auth">org_member</span></div>
+        <div class="ep-body">
+          <p>Returns <code>202</code> with an <code>exportId</code>. The client polls
+          <code>GET /org/exports/{id}</code> until ready, then hands the URL to the OS share sheet.</p>
+          <p><strong>Async, not a blocking download</strong> — a 90-day CSV will time out a mobile
+          request.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- ═══ 9 ═══ -->
+    <section id="s9">
+      <div class="sec-head"><div class="sec-num">§ 09</div><h2>Error codes</h2></div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num">HTTP</th><th style="width:26%">Code</th><th>Client behaviour</th></tr></thead>
+          <tbody>
+            <tr><td class="num">400</td><td class="code-cell">VALIDATION_FAILED</td><td>Shows a field error. Does <strong>not</strong> retry.</td></tr>
+            <tr><td class="num">401</td><td class="code-cell">TOKEN_EXPIRED</td><td>Refreshes once, replays the request.</td></tr>
+            <tr><td class="num">401</td><td class="code-cell">TOKEN_INVALID</td><td>Signs the user out.</td></tr>
+            <tr><td class="num">403</td><td class="code-cell">FORBIDDEN</td><td>Shows an explanatory screen.</td></tr>
+            <tr><td class="num">404</td><td class="code-cell">INCIDENT_NOT_FOUND</td><td>Generic not-found.</td></tr>
+            <tr><td class="num">409</td><td class="code-cell">IDEMPOTENCY_CONFLICT</td><td>Logs; does not retry.</td></tr>
+            <tr><td class="num">410</td><td class="code-cell">UPLOAD_EXPIRED</td><td>Restarts from <code>POST /incidents</code>.</td></tr>
+            <tr><td class="num">413</td><td class="code-cell">MEDIA_TOO_LARGE</td><td>Fails permanently, tells the user.</td></tr>
+            <tr><td class="num">422</td><td class="code-cell">GPS_ACCURACY_REJECTED</td><td>Fails permanently with an explanation.</td></tr>
+            <tr><td class="num">422</td><td class="code-cell">MEDIA_HASH_MISMATCH</td><td>Re-uploads from chunk 0.</td></tr>
+            <tr><td class="num">429</td><td class="code-cell">RATE_LIMITED</td><td>Backs off, honours <code>Retry-After</code>.</td></tr>
+            <tr><td class="num">500</td><td class="code-cell">INTERNAL</td><td>Retries with backoff.</td></tr>
+            <tr><td class="num">503</td><td class="code-cell">MAINTENANCE</td><td>Retries with backoff; shows a banner.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="must">
+        <span class="must-tag">Must — retryable vs terminal</span>
+        <p>The outbox retries <code>429</code>, <code>5xx</code>, and network failures
+        <em>forever</em> with backoff (2s → 8s → 30s → 2m → 10m → 1h). It fails an item permanently
+        on <code>400</code>, <code>403</code>, <code>413</code>, and <code>422</code>.</p>
+        <p>Returning <code>500</code> for what is really a validation error means every affected
+        phone retries a doomed upload, hourly, indefinitely.</p>
+      </div>
+    </section>
+
+    <!-- ═══ 10 ═══ -->
+    <section id="s10">
+      <div class="sec-head"><div class="sec-num">§ 10</div><h2>Open questions</h2></div>
+
+      <p>None of these are decided. The client picked a default to stay unblocked. Each is cheap to
+      change now and expensive later — <strong>these are the answers we need from you</strong>.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num" style="width:5%">#</th><th style="width:28%">Question</th><th style="width:28%">Client assumes</th><th>Why it matters</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td><strong>Media retention</strong> — how long is footage kept?</td><td>Indefinite</td><td>The client deletes its local copy once you confirm completion. Expire media at 90 days and the reporter's own history breaks.</td></tr>
+            <tr><td class="num">2</td><td><strong>Max file size</strong></td><td>200 MB / 60 s</td><td>Drives the recording cap and whether we transcode on-device.</td></tr>
+            <tr><td class="num">3</td><td><strong>Who triggers review; which categories auto-publish?</strong></td><td>Everything enters review</td><td>If <code>fire</code> and <code>accident</code> auto-publish for speed, the submit confirmation must say so.</td></tr>
+            <tr><td class="num">4</td><td><strong>Do comments exist in v1?</strong></td><td><strong>No</strong> — the count is in the shape, no UI ships</td><td>Adding them later is additive; the action rail has the slot reserved.</td></tr>
+            <tr><td class="num">5</td><td><strong>Org seat / pricing model</strong></td><td>Unlimited seats, no in-app billing</td><td>Capped or purchasable seats change the members screen and pull in app-store billing.</td></tr>
+            <tr><td class="num">6</td><td><strong>Push payload shape</strong></td><td><code>{ incidentId, queryId, title, body }</code></td><td>The client routes the notification tap by <code>incidentId</code>.</td></tr>
+            <tr><td class="num">7</td><td><strong>Consent copy before publishing footage of people</strong></td><td>Placeholder text</td><td><strong>This needs a lawyer, not either of us.</strong> Ghana's Data Protection Act 2012 (Act 843) applies to publishing identifiable people. The screen exists; the words must be supplied.</td></tr>
+            <tr><td class="num">8</td><td><strong>Server-side GPS accuracy limit</strong></td><td>Accept and flag <code>confidence: "low"</code></td><td>Do you reject loose fixes outright, or accept and flag?</td></tr>
+            <tr><td class="num">9</td><td><strong>Mocked-location reports</strong></td><td>Accepted, flagged <code>isMocked</code></td><td>Confirm you want them stored at all.</td></tr>
+            <tr><td class="num">10</td><td><strong>Account deletion</strong></td><td><code>DELETE /me</code> cascades and anonymises prior reports</td><td>Interacts with retention and with law-enforcement obligations.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="soft">
+      <p>The mobile client runs today against a <code>MockApiClient</code> implementing every
+      endpoint above with seeded fixtures, so this contract is already exercised end to end. Where
+      your implementation needs to differ, say so early — the client's API layer is a single
+      swappable interface, and changing it before the screens are built costs almost nothing.</p>
+
+      <footer>GhanaMediaWatch · backend handoff · v1 draft · written by the mobile client team</footer>
+    </section>
+  </main>
+</div>
+
+</body>
+</html>

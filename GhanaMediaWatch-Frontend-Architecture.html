@@ -1,0 +1,888 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="How the GhanaMediaWatch mobile client is built — companion to the API contract.">
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body,h1,h2,h3,h4,h5,p,figure,blockquote,dl,dd{margin:0}
+  ul[class],ol[class]{list-style:none;margin:0;padding:0}
+  img,picture{max-width:100%;display:block}
+  table{border-collapse:collapse}
+  @media print{
+    .rail{display:none}
+    .wrap{grid-template-columns:minmax(0,1fr);max-width:none;padding:0}
+    .ep,.code,.tw,.must,.step,.card,.machine{break-inside:avoid}
+    a{color:inherit;text-decoration:none}
+    body{background:#fff;font-size:10.5pt}
+  }
+</style>
+<title>GhanaMediaWatch Frontend Architecture</title>
+</head>
+<body>
+<style>
+  /* ─── tokens ─────────────────────────────────────────────────────────────
+     Light is the base. Neutrals carry a slight teal bias so they read as
+     chosen rather than inherited mid-grey. */
+  :root {
+    --ground:        #EEF1F0;
+    --panel:         #F7F9F8;
+    --panel-2:       #E3E8E7;
+    --rule:          #C7D0CE;
+    --rule-soft:     #DAE1DF;
+    --ink:           #101819;
+    --ink-2:         #3C4A4B;
+    --ink-3:         #647575;
+    --accent:        #0F6E6A;
+    --accent-ink:    #0B534F;
+    --accent-wash:   #DCEBE9;
+    --signal:        #B4531A;
+    --signal-wash:   #F7E7DA;
+    --ok:            #1A6B45;
+    --ok-wash:       #DCEDE4;
+    --warn:          #8A5E10;
+    --warn-wash:     #F5EBD5;
+    --danger:        #9E2A22;
+    --danger-wash:   #F7E1DF;
+    --code-bg:       #E7ECEB;
+    --shadow:        0 1px 2px rgba(16,24,25,.06), 0 8px 24px -16px rgba(16,24,25,.28);
+
+    --mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    --measure: 70ch;
+    --s1: 4px;  --s2: 8px;  --s3: 12px; --s4: 16px;
+    --s5: 24px; --s6: 32px; --s7: 48px; --s8: 72px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground:      #0D1214;
+      --panel:       #141B1D;
+      --panel-2:     #1B2426;
+      --rule:        #2B383A;
+      --rule-soft:   #212C2E;
+      --ink:         #DFE7E6;
+      --ink-2:       #A8B7B6;
+      --ink-3:       #7A8B8A;
+      --accent:      #4FC4BC;
+      --accent-ink:  #7BD8D1;
+      --accent-wash: #12302F;
+      --signal:      #E0894F;
+      --signal-wash: #33200F;
+      --ok:          #56C68C;
+      --ok-wash:     #10301F;
+      --warn:        #D6A544;
+      --warn-wash:   #302511;
+      --danger:      #E8776C;
+      --danger-wash: #351815;
+      --code-bg:     #182022;
+      --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.9);
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground:      #0D1214;
+    --panel:       #141B1D;
+    --panel-2:     #1B2426;
+    --rule:        #2B383A;
+    --rule-soft:   #212C2E;
+    --ink:         #DFE7E6;
+    --ink-2:       #A8B7B6;
+    --ink-3:       #7A8B8A;
+    --accent:      #4FC4BC;
+    --accent-ink:  #7BD8D1;
+    --accent-wash: #12302F;
+    --signal:      #E0894F;
+    --signal-wash: #33200F;
+    --ok:          #56C68C;
+    --ok-wash:     #10301F;
+    --warn:        #D6A544;
+    --warn-wash:   #302511;
+    --danger:      #E8776C;
+    --danger-wash: #351815;
+    --code-bg:     #182022;
+    --shadow:      0 1px 2px rgba(0,0,0,.5), 0 10px 30px -18px rgba(0,0,0,.9);
+  }
+
+  /* ─── base ──────────────────────────────────────────────────────────── */
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 16.5px;
+    line-height: 1.62;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent-ink); text-underline-offset: 2px; }
+  a:focus-visible, summary:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 2px;
+  }
+  code, pre, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+
+  /* ─── page frame ────────────────────────────────────────────────────── */
+  .wrap {
+    display: grid;
+    grid-template-columns: 232px minmax(0, 1fr);
+    gap: var(--s8);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 0 var(--s5) var(--s8);
+  }
+  @media (max-width: 900px) {
+    .wrap { grid-template-columns: minmax(0,1fr); gap: var(--s6); padding: 0 var(--s4) var(--s7); }
+    .rail { position: static; height: auto; padding-top: 0; }
+  }
+
+  /* ─── masthead ──────────────────────────────────────────────────────── */
+  .masthead {
+    border-bottom: 1px solid var(--rule);
+    background: var(--panel);
+    padding: var(--s7) var(--s5) var(--s6);
+    margin-bottom: var(--s7);
+  }
+  .masthead-inner { max-width: 1180px; margin: 0 auto; padding: 0 var(--s5); }
+  @media (max-width: 900px) { .masthead-inner { padding: 0; } }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 46px);
+    line-height: 1.06;
+    letter-spacing: -.028em;
+    font-weight: 800;
+    margin: var(--s3) 0 var(--s4);
+    text-wrap: balance;
+    max-width: 22ch;
+  }
+  .standfirst {
+    font-size: 18.5px;
+    color: var(--ink-2);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--s2) var(--s5);
+    margin-top: var(--s5);
+    padding-top: var(--s4);
+    border-top: 1px solid var(--rule-soft);
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-3);
+  }
+  .meta b { color: var(--ink-2); font-weight: 600; }
+
+  /* ─── nav rail ──────────────────────────────────────────────────────── */
+  .rail { position: sticky; top: 0; align-self: start; padding-top: var(--s2); max-height: 100vh; overflow-y: auto; }
+  .rail-title {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    margin-bottom: var(--s3);
+  }
+  .rail ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 1px; }
+  .rail a {
+    display: grid;
+    grid-template-columns: 2.2em 1fr;
+    gap: var(--s2);
+    padding: 5px var(--s2);
+    text-decoration: none;
+    color: var(--ink-2);
+    font-size: 14px;
+    border-radius: 3px;
+    border-left: 2px solid transparent;
+  }
+  .rail a:hover { background: var(--panel-2); color: var(--ink); border-left-color: var(--accent); }
+  .rail .n { font-family: var(--mono); font-size: 11.5px; color: var(--ink-3); padding-top: 2px; }
+  .rail .crit { color: var(--signal); font-weight: 600; }
+
+  /* ─── sections ──────────────────────────────────────────────────────── */
+  section { scroll-margin-top: var(--s4); }
+  section + section { margin-top: var(--s8); }
+  .sec-head { border-top: 2px solid var(--ink); padding-top: var(--s3); margin-bottom: var(--s5); }
+  .sec-num {
+    font-family: var(--mono);
+    font-size: 11.5px;
+    letter-spacing: .16em;
+    color: var(--accent);
+    font-weight: 600;
+  }
+  h2 {
+    font-size: clamp(23px, 3vw, 30px);
+    line-height: 1.16;
+    letter-spacing: -.02em;
+    font-weight: 750;
+    margin: var(--s1) 0 0;
+    text-wrap: balance;
+  }
+  h3 {
+    font-size: 18.5px;
+    letter-spacing: -.011em;
+    font-weight: 700;
+    margin: var(--s6) 0 var(--s3);
+    text-wrap: balance;
+  }
+  h4 {
+    font-family: var(--mono);
+    font-size: 12px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    margin: var(--s5) 0 var(--s2);
+  }
+  p, ul, ol.body { max-width: var(--measure); }
+  p { margin: 0 0 var(--s4); }
+  ul, ol.body { margin: 0 0 var(--s4); padding-left: 1.15em; }
+  li { margin-bottom: var(--s2); }
+  li::marker { color: var(--ink-3); }
+  strong { font-weight: 680; color: var(--ink); }
+
+  /* ─── inline code ───────────────────────────────────────────────────── */
+  :not(pre) > code {
+    background: var(--code-bg);
+    border: 1px solid var(--rule-soft);
+    border-radius: 3px;
+    padding: .06em .34em;
+    font-size: .875em;
+    white-space: nowrap;
+  }
+
+  /* ─── code blocks ───────────────────────────────────────────────────── */
+  .code {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    margin: 0 0 var(--s4);
+    overflow: hidden;
+  }
+  .code-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: var(--s3);
+    padding: 7px var(--s3);
+    border-bottom: 1px solid var(--rule-soft);
+    background: var(--panel-2);
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .11em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+  }
+  pre {
+    margin: 0;
+    padding: var(--s3) var(--s4);
+    overflow-x: auto;
+    font-size: 13.2px;
+    line-height: 1.62;
+    color: var(--ink-2);
+    tab-size: 2;
+  }
+  pre b { color: var(--ink); font-weight: 600; }
+  pre .k { color: var(--accent-ink); }
+  pre .s { color: var(--ok); }
+  pre .c { color: var(--ink-3); font-style: italic; }
+
+  /* ─── endpoint spec block ───────────────────────────────────────────── */
+  .ep {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--panel);
+    margin: 0 0 var(--s4);
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+  .ep-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--s3);
+    padding: var(--s3) var(--s4);
+    border-bottom: 1px solid var(--rule-soft);
+  }
+  .verb {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .1em;
+    padding: 3px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    flex: none;
+  }
+  .verb.get    { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+  .verb.post   { color: var(--ok);     border-color: var(--ok);     background: var(--ok-wash); }
+  .verb.put    { color: var(--warn);   border-color: var(--warn);   background: var(--warn-wash); }
+  .verb.patch  { color: var(--warn);   border-color: var(--warn);   background: var(--warn-wash); }
+  .verb.delete { color: var(--danger); border-color: var(--danger); background: var(--danger-wash); }
+  .path { font-family: var(--mono); font-size: 14px; font-weight: 600; color: var(--ink); flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+  .auth {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .09em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    border: 1px dashed var(--rule);
+    border-radius: 3px;
+    padding: 2px 6px;
+    flex: none;
+  }
+  .ep-body { padding: var(--s4); }
+  .ep-body > :last-child { margin-bottom: 0; }
+  .ep-body p { max-width: none; }
+
+  /* ─── obligation callout — reserved for hard MUSTs, used sparingly ──── */
+  .must {
+    border-left: 3px solid var(--signal);
+    background: var(--signal-wash);
+    padding: var(--s4) var(--s4) var(--s4) var(--s5);
+    margin: 0 0 var(--s5);
+    border-radius: 0 4px 4px 0;
+    max-width: var(--measure);
+  }
+  .must-tag {
+    display: block;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: var(--signal);
+    font-weight: 700;
+    margin-bottom: var(--s2);
+  }
+  .must p:last-child, .must ul:last-child { margin-bottom: 0; }
+  .must p, .must ul { max-width: none; }
+
+  /* ─── tables ────────────────────────────────────────────────────────── */
+  .tw { overflow-x: auto; margin: 0 0 var(--s5); border: 1px solid var(--rule); border-radius: 4px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14.5px; min-width: 460px; background: var(--panel); }
+  th, td { text-align: left; padding: 9px var(--s3); border-bottom: 1px solid var(--rule-soft); vertical-align: top; }
+  thead th {
+    background: var(--panel-2);
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    color: var(--ink-3);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  td.num, td.code-cell, th.num { font-family: var(--mono); font-size: 13px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+  /* ─── flow steps ────────────────────────────────────────────────────── */
+  .flow { display: grid; gap: var(--s3); margin: 0 0 var(--s5); }
+  @media (min-width: 720px) { .flow { grid-template-columns: repeat(3, 1fr); } }
+  .step { border: 1px solid var(--rule); border-radius: 4px; background: var(--panel); padding: var(--s4); }
+  .step-n {
+    font-family: var(--mono);
+    font-size: 10.5px;
+    letter-spacing: .14em;
+    color: var(--accent);
+    font-weight: 700;
+    text-transform: uppercase;
+  }
+  .step h5 { font-family: var(--mono); font-size: 13.5px; font-weight: 700; margin: var(--s2) 0; color: var(--ink); overflow-wrap: anywhere; }
+  .step p { font-size: 14px; color: var(--ink-2); margin: 0; max-width: none; }
+
+  /* ─── state pills ───────────────────────────────────────────────────── */
+  .pill {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 11.5px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid;
+    white-space: nowrap;
+  }
+  .pill.pub  { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+  .pill.pend { color: var(--warn); border-color: var(--warn); background: var(--warn-wash); }
+  .pill.rej  { color: var(--danger); border-color: var(--danger); background: var(--danger-wash); }
+  .pill.rest { color: var(--accent); border-color: var(--accent); background: var(--accent-wash); }
+
+  .lede {
+    font-size: 17.5px;
+    color: var(--ink-2);
+    border-left: 2px solid var(--rule);
+    padding-left: var(--s4);
+    max-width: 64ch;
+  }
+  hr.soft { border: 0; border-top: 1px solid var(--rule-soft); margin: var(--s6) 0; }
+  footer { border-top: 1px solid var(--rule); margin-top: var(--s8); padding-top: var(--s4); font-family: var(--mono); font-size: 12.5px; color: var(--ink-3); }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+  }
+  html { scroll-behavior: smooth; }
+</style>
+<style>
+  /* ── additions specific to the frontend companion ─────────────────── */
+  .status {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: .13em;
+    text-transform: uppercase;
+    padding: 2px 7px;
+    border-radius: 3px;
+    border: 1px solid;
+    white-space: nowrap;
+    vertical-align: 2px;
+  }
+  .status.built { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+  .status.spec  { color: var(--ink-3); border-color: var(--rule); background: var(--panel-2); }
+  .status.part  { color: var(--warn); border-color: var(--warn); background: var(--warn-wash); }
+
+  .sec-head .status { margin-left: var(--s3); }
+
+  .machine {
+    background: var(--panel);
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    padding: var(--s4);
+    overflow-x: auto;
+    margin: 0 0 var(--s5);
+  }
+  .machine pre { padding: 0; background: none; font-size: 12.6px; color: var(--ink-2); }
+  .machine pre b { color: var(--accent-ink); }
+
+  .split { display: grid; gap: var(--s4); margin: 0 0 var(--s5); }
+  @media (min-width: 760px) { .split { grid-template-columns: 1fr 1fr; } }
+  .card {
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    background: var(--panel);
+    padding: var(--s4);
+  }
+  .card h5 {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: .14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 700;
+    margin: 0 0 var(--s2);
+  }
+  .card p, .card ul { max-width: none; font-size: 14.5px; margin-bottom: 0; }
+  .card ul { padding-left: 1.1em; }
+
+  .kv { font-variant-numeric: tabular-nums; }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="eyebrow">Companion to the backend spec · v1 draft</div>
+    <h1>GhanaMediaWatch Frontend Architecture</h1>
+    <p class="standfirst">
+      What the mobile client does with everything the server sends — and, more usefully, the work it
+      already handles so the server does not have to. Written for someone who needs to understand
+      the client without working on it.
+    </p>
+    <div class="meta">
+      <span><b>Audience</b> backend engineer</span>
+      <span><b>Pairs with</b> API Contract §1–§10</span>
+      <span><b>Built today</b> Phase 1 of 8</span>
+      <span><b>Stack</b> <code>Expo SDK 57 · RN 0.86</code></span>
+    </div>
+  </div>
+</header>
+
+<div class="wrap">
+  <nav class="rail" aria-label="Contents">
+    <div class="rail-title">Contents</div>
+    <ol>
+      <li><a href="#f1"><span class="n">01</span><span>Division of labour</span></a></li>
+      <li><a href="#f2"><span class="n">02</span><span>Stack</span></a></li>
+      <li><a href="#f3"><span class="n">03</span><span>Structure</span></a></li>
+      <li><a href="#f4"><span class="n">04</span><span>API layer</span></a></li>
+      <li><a href="#f5"><span class="n">05</span><span>The GPS gate</span></a></li>
+      <li><a href="#f6"><span class="n">06</span><span>Offline sync</span></a></li>
+      <li><a href="#f7"><span class="n">07</span><span class="crit">Privacy enforcement</span></a></li>
+      <li><a href="#f8"><span class="n">08</span><span>Device identity</span></a></li>
+      <li><a href="#f9"><span class="n">09</span><span>Design system</span></a></li>
+      <li><a href="#f10"><span class="n">10</span><span>Constraints</span></a></li>
+      <li><a href="#f11"><span class="n">11</span><span>Takeaways</span></a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <section id="f0">
+      <div class="must">
+        <span class="must-tag">Read this first — status</span>
+        <p>This document describes the client <strong>as designed</strong>. Only Phase 1 is built
+        today. Every section is marked <span class="status built">Built</span> or
+        <span class="status spec">Specified</span> — <strong>do not assume a Specified component
+        exists yet.</strong></p>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num" style="width:8%">Phase</th><th style="width:52%">Scope</th><th>Status</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td>Scaffold, tooling, design system, tab shell</td><td><span class="status built">Built</span></td></tr>
+            <tr><td class="num">2</td><td>Types, <code>ApiClient</code>, <code>MockApiClient</code>, API contract</td><td><span class="status part">Contract only</span></td></tr>
+            <tr><td class="num">3</td><td>Local DB + sync engine</td><td><span class="status spec">Specified</span></td></tr>
+            <tr><td class="num">4</td><td>Capture flow — GPS gate, camera, review, outbox</td><td><span class="status spec">Specified</span></td></tr>
+            <tr><td class="num">5</td><td>Feed, map, incident detail</td><td><span class="status spec">Specified</span></td></tr>
+            <tr><td class="num">6</td><td>Auth and profile</td><td><span class="status spec">Specified</span></td></tr>
+            <tr><td class="num">7</td><td>Org / institution tier</td><td><span class="status spec">Specified</span></td></tr>
+            <tr><td class="num">8</td><td>Polish — states, a11y, i18n, performance</td><td><span class="status spec">Specified</span></td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 1 -->
+    <section id="f1">
+      <div class="sec-head"><div class="sec-num">§ 01</div><h2>Division of labour</h2></div>
+      <p class="lede">Several things a server might expect to handle are already solved on the
+      device. Knowing which saves you building them twice.</p>
+
+      <div class="split">
+        <div class="card">
+          <h5>Client owns</h5>
+          <ul>
+            <li>Media capture and the GPS gate</li>
+            <li>Local persistence of media and metadata</li>
+            <li>The outbox queue and its state machine</li>
+            <li>Retry scheduling and exponential backoff</li>
+            <li>Background upload continuation</li>
+            <li>Connectivity detection, Wi-Fi-only deferral</li>
+            <li>Chunk resumption bookkeeping</li>
+            <li>Rendering of vetting state and privacy flags</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h5>Server owns</h5>
+          <ul>
+            <li>Durable storage and media hosting</li>
+            <li>Vetting decisions and routing</li>
+            <li>The public feed and its ordering</li>
+            <li>Map clustering</li>
+            <li>Org saved queries and matching</li>
+            <li>Authorisation, in full</li>
+            <li>Abuse handling and lawful process</li>
+          </ul>
+        </div>
+      </div>
+
+      <p><strong>Both own display-flag enforcement.</strong> That is deliberate duplication, not
+      redundancy — see <a href="#f7">§07</a>.</p>
+    </section>
+
+    <!-- 2 -->
+    <section id="f2">
+      <div class="sec-head"><div class="sec-num">§ 02</div><h2>Stack</h2><span class="status built">Built</span></div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:15%">Concern</th><th style="width:22%">Choice</th><th class="num" style="width:12%">Version</th><th>Why not the alternative</th></tr></thead>
+          <tbody>
+            <tr><td>Framework</td><td>Expo, managed + dev client</td><td class="num">SDK 57</td><td>Declarative native config while still allowing custom native modules.</td></tr>
+            <tr><td>Runtime</td><td>React Native, New Arch</td><td class="num">0.86.2</td><td>React 19.2.3, Hermes.</td></tr>
+            <tr><td>Routing</td><td>Expo Router, typed</td><td class="num">57.0.14</td><td>Route files stay thin; typed routes catch broken links at compile time.</td></tr>
+            <tr><td>Styling</td><td>NativeWind v4</td><td class="num">4.2.6</td><td>One styling language app-wide. v5 is still preview.</td></tr>
+            <tr><td>Client state</td><td>Zustand</td><td class="num">5.0.15</td><td>Capture session and upload queue are read from <strong>non-React code</strong> (the sync engine). Redux Toolkit is heavier than this needs.</td></tr>
+            <tr><td>Server state</td><td>TanStack Query</td><td class="num">5.101.4</td><td>Caching, pagination and offline persistence <em>are</em> the problem; hand-rolling them is the mistake.</td></tr>
+            <tr><td>Local DB</td><td>expo-sqlite + Drizzle</td><td class="num">0.45.2</td><td>The outbox is a relational queue with a state machine. AsyncStorage means hand-rolled indexing over JSON blobs.</td></tr>
+            <tr><td>Camera</td><td>vision-camera</td><td class="num">5.2.2</td><td>Finer control over format, torch and frame quality than <code>expo-camera</code>.</td></tr>
+            <tr><td>Lists</td><td>FlashList</td><td class="num">2.0.2</td><td>Feed and outbox must hold 60 fps on mid-range Android.</td></tr>
+            <tr><td>Forms</td><td>react-hook-form + zod</td><td class="num">7.85 / 4.4</td><td>One schema drives both validation and the TS types on the submit payload.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>TypeScript is strict</strong>, with <code>noUncheckedIndexedAccess</code> and
+      <code>noUnusedLocals</code>. <code>any</code> is an ESLint <em>error</em>, not a warning.</p>
+    </section>
+
+    <!-- 3 -->
+    <section id="f3">
+      <div class="sec-head"><div class="sec-num">§ 03</div><h2>Structure</h2><span class="status built">Built</span></div>
+
+      <div class="code">
+        <div class="code-bar"><span>src/</span><span>tree</span></div>
+<pre><b>app/</b>                 <span class="c">expo-router routes only — thin, they compose features</span>
+<b>features/</b>
+  capture/           <span class="c">GPS gate, camera, review, metadata editor</span>
+  feed/              <span class="c">vertical pager</span>
+  outbox/            <span class="c">offline queue UI + sync engine</span>
+  incident/          <span class="c">detail view, map, navigation handoff</span>
+  org/               <span class="c">institution / business tier</span>
+  auth/  settings/
+<b>components/ui/</b>       <span class="c">design-system primitives</span>
+<b>api/</b>                 <span class="c">ApiClient interface, MockApiClient, HttpApiClient</span>
+<b>db/</b>                  <span class="c">drizzle schema, migrations, repositories</span>
+<b>services/</b>            <span class="c">location, permissions, device identity, sync, media</span>
+<b>stores/</b>              <span class="c">zustand stores</span>
+<b>hooks/  types/  lib/  i18n/</b></pre>
+      </div>
+
+      <p>Two rules hold this together: <strong>route files contain no business logic</strong>, and
+      <strong>cross-feature imports go through <code>components/ui</code>, <code>services</code>, or
+      <code>types</code> only</strong> — <code>features/feed</code> never imports from
+      <code>features/capture</code>.</p>
+    </section>
+
+    <!-- 4 -->
+    <section id="f4">
+      <div class="sec-head"><div class="sec-num">§ 04</div><h2>API layer</h2><span class="status spec">Specified</span></div>
+
+      <p>Every screen is built against one swappable interface, with two implementations selected by
+      a single environment variable.</p>
+
+      <div class="code">
+        <div class="code-bar"><span>.env</span><span>env</span></div>
+<pre>EXPO_PUBLIC_API_MODE=mock   <span class="c">→ MockApiClient — seeded fixtures, artificial</span>
+                            <span class="c">  latency, injectable failure rate, no backend</span>
+EXPO_PUBLIC_API_MODE=http   <span class="c">→ HttpApiClient — real calls to API_URL</span></pre>
+      </div>
+
+      <p>This is why frontend work never blocks on the backend, and why the contract is already
+      exercised end to end before a server exists.</p>
+
+      <div class="must">
+        <span class="must-tag">What this means for you</span>
+        <p>The client <strong>never constructs a request inline in a component.</strong> If your
+        implementation needs to differ from the contract, the change lands in exactly one file — so
+        raise differences early rather than working around them.</p>
+      </div>
+    </section>
+
+    <!-- 5 -->
+    <section id="f5">
+      <div class="sec-head"><div class="sec-num">§ 05</div><h2>The GPS gate</h2><span class="status spec">Specified</span></div>
+
+      <p class="lede">The defining feature. The camera preview does not mount until a location fix
+      meets the accuracy threshold. This is a hard gate, not a warning.</p>
+
+      <div class="machine">
+<pre>  entering capture
+        │
+        ▼
+  <b>watchPositionAsync(BestForNavigation)</b>
+        │
+        ├─ permission denied ──────► explainer + deep link to settings
+        ├─ location services off ──► prompt to enable
+        │
+        ▼
+  <b>acquiring</b>  accuracy readout · pulse indicator · live lat/long at 6 dp
+        │
+        ├─ accuracy ≤ 20 m ────────► <b>CAMERA MOUNTS</b>  (haptic confirmation)
+        │
+        └─ stalled &gt; 30 s ─────────► "move to an open area" coaching
+                                     └─ optional escape hatch:
+                                        proceed, flagged confidence: "low"</pre>
+      </div>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:32%">Constant</th><th class="num" style="width:12%">Value</th><th>Rationale</th></tr></thead>
+          <tbody>
+            <tr><td class="code-cell">GPS_ACCURACY_THRESHOLD_M</td><td class="num">20</td><td>About the best a consumer phone achieves outdoors within a few seconds. Tighter feels broken in urban canyons; looser is useless for sending someone to the scene.</td></tr>
+            <tr><td class="code-cell">GPS_STALL_TIMEOUT_MS</td><td class="num">30 000</td><td>When coaching and the escape hatch appear.</td></tr>
+            <tr><td class="code-cell">GPS_ABSOLUTE_MAX_ACCURACY_M</td><td class="num">150</td><td>Beyond this, not offered even via the escape hatch.</td></tr>
+            <tr><td class="code-cell">MAX_VIDEO_DURATION_S</td><td class="num">60</td><td>Enforced client-side with a ring countdown.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <p><strong>The fix is locked at the moment of capture</strong> and does not keep updating
+      afterwards.</p>
+
+      <p><strong>Tamper signals sent alongside it:</strong> <code>accuracyM</code>,
+      <code>altitude</code>, <code>heading</code>, <code>speed</code>, <code>capturedAtIso</code>
+      (device clock), <code>capturedAtUtcOffsetMinutes</code>, <code>deviceUptimeMs</code>, and
+      <code>isMocked</code> on Android. The reduced-accuracy escape hatch <em>flags</em> the report
+      — it never silently downgrades it, and the flag is visible in the UI as well as the payload.</p>
+    </section>
+
+    <!-- 6 -->
+    <section id="f6">
+      <div class="sec-head"><div class="sec-num">§ 06</div><h2>Offline sync</h2><span class="status spec">Specified</span></div>
+
+      <p class="lede">The network is treated as absent by default. Capture always succeeds locally.</p>
+
+      <p>On capture the client writes the media file to <code>documentDirectory/incidents/</code> —
+      <strong>never the cache directory</strong>, which the OS can evict — and inserts a row in the
+      local <code>incidents</code> table. Only when both succeed does the UI report success.</p>
+
+      <h3>Local record state machine</h3>
+      <div class="machine">
+<pre>  <b>draft</b> ──► <b>queued</b> ──► <b>uploading</b> ──► <b>uploaded</b>
+                        │
+                        └──► <b>failed</b> ──► (retry) ──► <b>queued</b>
+
+  any state ──► <b>cancelled</b>   <span class="c">terminal, user-initiated</span></pre>
+      </div>
+      <p>Persisted per row: <code>attemptCount</code>, <code>lastError</code>,
+      <code>nextRetryAt</code>, <code>serverId</code>, <code>bytesUploaded</code>.</p>
+
+      <h3>Retry schedule</h3>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num" style="width:18%">Attempt</th><th class="num" style="width:18%">Delay</th><th>Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td class="num kv">2 s</td><td rowspan="6">Plus ±25 % jitter, so a thousand phones do not retry in lockstep when a cell tower returns. A <code>Retry-After</code> header on a <code>429</code> overrides the schedule.</td></tr>
+            <tr><td class="num">2</td><td class="num kv">8 s</td></tr>
+            <tr><td class="num">3</td><td class="num kv">30 s</td></tr>
+            <tr><td class="num">4</td><td class="num kv">2 min</td></tr>
+            <tr><td class="num">5</td><td class="num kv">10 min</td></tr>
+            <tr><td class="num">6+</td><td class="num kv">1 h</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <h3>Drain rules</h3>
+      <ul>
+        <li>Drains when <code>isInternetReachable === true</code> — <strong>not merely
+        <code>isConnected</code></strong>, which is true on a captive-portal Wi-Fi that goes
+        nowhere.</li>
+        <li>Oldest first, one item at a time.</li>
+        <li>A background task continues uploads when the app is backgrounded. <strong>iOS background
+        execution is opportunistic and not guaranteed</strong> — the app also resumes draining on
+        foreground. This is documented, not assumed away.</li>
+        <li><strong>Wi-Fi-only toggle</strong> defers <em>video</em> uploads to Wi-Fi; photos still
+        go over mobile data. The outbox shows what is waiting and why.</li>
+      </ul>
+
+      <div class="must">
+        <span class="must-tag">Consequence for retention</span>
+        <p>The local media file is deleted <strong>only after the server confirms completion</strong>.
+        The metadata row is kept, with <code>serverId</code>, so the reporter retains a personal
+        history.</p>
+        <p>Which is why media retention is question 1 in the contract's open questions:
+        <strong>if the server expires footage the client has already deleted, the user's own history
+        points at nothing.</strong></p>
+      </div>
+    </section>
+
+    <!-- 7 -->
+    <section id="f7">
+      <div class="sec-head"><div class="sec-num">§ 07</div><h2>Privacy enforcement</h2><span class="status spec">Specified</span></div>
+
+      <p>Three booleans per report: <code>showLocation</code>, <code>showDate</code>,
+      <code>showTime</code>. <strong>The client enforces these independently of the server</strong>,
+      with unit tests asserting a hidden value never reaches rendered output.</p>
+
+      <div class="must">
+        <span class="must-tag">Why both layers exist</span>
+        <p>Client-side hiding alone means true coordinates travel to every phone that scrolls past
+        the report and sit in an inspectable cache. Server-side alone means one client bug leaks
+        them. <strong>Neither layer is the backup for the other.</strong></p>
+      </div>
+
+      <p>The review screen shows a <strong>live public preview</strong> — exactly what a stranger
+      will see — so the reporter is never guessing what they are about to publish.</p>
+
+      <h3>Anonymous mode</h3>
+      <p>A prominent toggle with an honest explainer sheet. The copy states that anonymous means the
+      public and other users see no profile, <strong>but a device identifier is still attached</strong>
+      for abuse prevention and accountability. The client deliberately does not overstate the
+      guarantee — and <code>deviceId</code> is never rendered in the public UI, on any screen.</p>
+    </section>
+
+    <!-- 8 -->
+    <section id="f8">
+      <div class="sec-head"><div class="sec-num">§ 08</div><h2>Device identity</h2><span class="status spec">Specified</span></div>
+      <ul>
+        <li>A <strong>UUID v4</strong> generated on first launch, persisted in the secure keychain.
+        Primary identifier, sent as <code>X-Device-Id</code> on every request.</li>
+        <li>Supplemented by the Android ID / iOS <span class="mono">identifierForVendor</span> as a
+        secondary field.</li>
+        <li><strong>Both platform IDs reset on uninstall or factory reset and are not stable.</strong>
+        Treat them as a weak correlation signal; the keychain UUID is the primary.</li>
+      </ul>
+    </section>
+
+    <!-- 9 -->
+    <section id="f9">
+      <div class="sec-head"><div class="sec-num">§ 09</div><h2>Design system</h2><span class="status built">Built</span></div>
+
+      <p>Tokens live as CSS custom properties, surfaced as Tailwind utilities. Components never
+      hardcode a hex value.</p>
+
+      <p><strong>The palette is tuned for a 70-year-old reader</strong>, which drove some
+      non-obvious choices:</p>
+      <ul>
+        <li><strong>Light by default, not dark.</strong> Intraocular light scatter roughly doubles
+        between 20 and 70, so white-on-black haloes badly. Dark mode is a young-eye preference.</li>
+        <li><strong>WCAG AAA (7:1) for body text</strong>, not AA — contrast sensitivity falls
+        sharply after 60.</li>
+        <li><strong>Warm paper, not pure white</strong> — <code>#FFFFFF</code> at phone brightness
+        causes veiling glare.</li>
+        <li><strong>Warm hues.</strong> The aging lens yellows and absorbs short wavelengths, so
+        blues muddy. Blue never carries meaning alone.</li>
+        <li><strong>17px body type, 48pt tap targets.</strong></li>
+      </ul>
+
+      <p>Category colours are grouped into families so hue signals the <em>kind</em> of incident and
+      the label says which one. Colour is a secondary cue — twelve hues cannot be reliably
+      distinguished by an older eye, so every chip carries a text label and every map pin gets a
+      distinct icon.</p>
+
+      <p>All of this is <strong>enforced by 33 test assertions</strong>, not just documented — a
+      later "soften that grey" fails CI.</p>
+    </section>
+
+    <!-- 10 -->
+    <section id="f10">
+      <div class="sec-head"><div class="sec-num">§ 10</div><h2>Constraints</h2></div>
+      <div class="tw">
+        <table>
+          <thead><tr><th class="num" style="width:5%">#</th><th style="width:38%">Constraint</th><th>Consequence</th></tr></thead>
+          <tbody>
+            <tr><td class="num">1</td><td><strong>vision-camera v5 ships no Expo config plugin</strong></td><td>Camera and mic permissions declared directly in <code>app.json</code>. Re-check if the library restores one.</td></tr>
+            <tr><td class="num">2</td><td><strong><code>react-dom</code> pinned to 19.2.3</strong></td><td><code>expo-router → @expo/ui → vaul</code> floats it past Expo's pinned React and breaks npm peer resolution.</td></tr>
+            <tr><td class="num">3</td><td><strong>Android cannot synthesise font weights</strong></td><td>Each Inter weight is registered as its own family: <code>font-sans</code>, <code>-medium</code>, <code>-semibold</code>, <code>-bold</code>.</td></tr>
+            <tr><td class="num">4</td><td><strong>Testing Library v14 made render async</strong></td><td>Every test must <code>await</code> render and fireEvent.</td></tr>
+            <tr><td class="num">5</td><td><strong>Emulators report a perfect mocked fix</strong></td><td>Precisely the branch the gate detects. Capture needs a physical device to test meaningfully.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 11 -->
+    <section id="f11">
+      <div class="sec-head"><div class="sec-num">§ 11</div><h2>Takeaways</h2></div>
+
+      <p class="lede">If you read nothing else in this document, read these five.</p>
+
+      <div class="tw">
+        <table>
+          <thead><tr><th style="width:34%">Because the client…</th><th>You should…</th></tr></thead>
+          <tbody>
+            <tr><td>is offline-first and <strong>retries forever</strong></td><td>Assume duplicates. Implement idempotency keys — this is not optional.</td></tr>
+            <tr><td><strong>already backs off</strong> on 429 and 5xx</td><td>Return the correct status and it behaves. Return <code>500</code> for a validation error and every affected phone retries hourly, indefinitely.</td></tr>
+            <tr><td><strong>deletes local media</strong> on upload completion</td><td>Treat retention as a product decision, not an internal detail — it changes what a reporter sees in their own history.</td></tr>
+            <tr><td><strong>enforces display flags too</strong></td><td>Still suppress at source. That is defence in depth, not permission to send suppressed values.</td></tr>
+            <tr><td>is built against <strong>one swappable interface</strong></td><td>Raise contract differences now. Cheap today, expensive once the screens exist.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <hr class="soft">
+      <footer>GhanaMediaWatch · frontend architecture · companion to the API contract · v1 draft</footer>
+    </section>
+  </main>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,75 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — "Light Glass".
+ *
+ * A bright, layered interface: soft cool-white ground, frosted white panels with
+ * real depth, and a violet-to-blue accent. Chrome floats above content rather
+ * than boxing it in.
+ *
+ * Values are space-separated RGB channels (not `rgb()` strings) so Tailwind can
+ * inject an alpha channel via `<alpha-value>`. Alpha is load-bearing here, not
+ * decorative — every panel is semi-transparent over a blur.
+ *
+ * TWO CONTEXTS, and the distinction matters:
+ *
+ *   1. App surfaces (map, profile, outbox, settings) — light ground, dark text,
+ *      white frosted panels.
+ *   2. Media surfaces (feed, camera) — panels sit on unpredictable photography,
+ *      so they use a dark frost and white text no matter the theme. That is not
+ *      "dark mode"; it is the only thing legible over an arbitrary photo, and
+ *      every photo-led app does the same.
+ *
+ * Single theme by choice: `.dark:root` resolves identically so NativeWind's dark
+ * variant cannot pull the palette out from under the design.
+ */
+@layer base {
+  :root,
+  .dark:root,
+  .dark {
+    /* Ground. Faintly cool rather than pure white — pure #FFF as a full-screen
+       ground flattens the frosted panels sitting on top of it. */
+    --color-canvas: 244 245 250;
+    --color-canvas-soft: 255 255 255;
+    --color-canvas-raise: 233 236 244;
+
+    /* Frosted panel fill on light surfaces. Painted at high alpha over a blur. */
+    --color-glass: 255 255 255;
+    /* Frosted panel fill over media. Dark, so white text survives any frame. */
+    --color-glass-media: 16 17 26;
+
+    /* Hairlines are dark on light ground, and light over media. */
+    --color-hairline: 14 16 36;
+    --color-hairline-media: 255 255 255;
+
+    --color-text-primary: 11 12 20;
+    --color-text-secondary: 58 61 77;
+    --color-text-muted: 71 75 94;
+    --color-text-faint: 122 127 148;
+    /* Fixed white — used only on media overlays and accent fills. */
+    --color-text-on-dark: 255 255 255;
+
+    /* Accent — violet to blue. Deepened from the dark-theme values so a white
+       label on the gradient still clears contrast on a light page. */
+    --color-accent: 91 61 245;
+    --color-accent-alt: 37 99 235;
+    --color-accent-bright: 124 92 255;
+    --color-accent-wash: 237 233 254;
+
+    /* Semantic. Darkened for a light ground; these are read as text and icons,
+       not just as fills. */
+    --color-success: 11 122 75;
+    --color-success-wash: 219 244 232;
+    --color-warning: 162 92 0;
+    --color-warning-wash: 253 240 214;
+    --color-danger: 193 18 31;
+    --color-danger-wash: 253 228 230;
+    --color-info: 29 78 216;
+    --color-info-wash: 224 233 254;
+
+    /* Live / urgent — reserved for active incidents only. */
+    --color-live: 200 18 56;
+  }
+}
