@@ -7,11 +7,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Glass, Pressable, Text } from '@/components/ui';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { AuthField } from './AuthField';
 import { forgotPasswordSchema, type ForgotPasswordValues } from './schemas';
 
 export function ForgotPasswordScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -52,7 +53,7 @@ export function ForgotPasswordScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg">{t('auth.resetPassword')}</Text>
         </View>
@@ -60,7 +61,7 @@ export function ForgotPasswordScreen() {
         {sent ? (
           <View className="gap-4">
             <Glass elevation="low" className="flex-row items-start gap-3 rounded-lg p-4">
-              <Ionicons name="mail-outline" size={20} color={colors.success} />
+              <Ionicons name="mail-outline" size={20} color={c.success} />
               <View className="flex-1 gap-1">
                 <Text variant="body" className="font-sans-semibold">
                   {t('auth.resetSentTitle')}

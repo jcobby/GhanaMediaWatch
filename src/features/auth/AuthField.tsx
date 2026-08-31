@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { TextInput, View, type TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Glass, Pressable, Text } from '@/components/ui';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 
 interface AuthFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -18,6 +18,7 @@ interface AuthFieldProps extends Omit<TextInputProps, 'style'> {
  * what went wrong.
  */
 export function AuthField({ label, error, secure = false, ...rest }: AuthFieldProps) {
+  const c = useColors();
   const [hidden, setHidden] = useState(secure);
 
   return (
@@ -35,14 +36,14 @@ export function AuthField({ label, error, secure = false, ...rest }: AuthFieldPr
       >
         <TextInput
           secureTextEntry={hidden}
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={c.textFaint}
           accessibilityLabel={label}
           // TextInput's colour, height and font have no NativeWind equivalent
           // that behaves consistently across both platforms.
           style={{
             flex: 1,
             height: 52,
-            color: colors.textPrimary,
+            color: c.textPrimary,
             fontFamily: 'Inter_400Regular',
             fontSize: 16,
           }}
@@ -58,7 +59,7 @@ export function AuthField({ label, error, secure = false, ...rest }: AuthFieldPr
             <Ionicons
               name={hidden ? 'eye-outline' : 'eye-off-outline'}
               size={19}
-              color={colors.textMuted}
+              color={c.textMuted}
             />
           </Pressable>
         ) : null}

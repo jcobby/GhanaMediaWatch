@@ -22,13 +22,19 @@
  *      "dark mode"; it is the only thing legible over an arbitrary photo, and
  *      every photo-led app does the same.
  *
- * Single theme by choice: `.dark:root` resolves identically so NativeWind's dark
- * variant cannot pull the palette out from under the design.
+ * Two themes, dark by default.
+ *
+ * Dark leads because this app is used outdoors at night as often as in an
+ * office — a reporter filming a fire at 9pm should not be flashed by a white
+ * screen — and because the media surfaces are dark regardless, so a dark shell
+ * is the one that does not fight them.
+ *
+ * Light is kept, and kept good, for daylight and for older readers:
+ * intraocular scatter roughly doubles between 20 and 70, and white-on-black
+ * haloes badly for them. Both palettes are designed, neither is an inversion.
  */
 @layer base {
-  :root,
-  .dark:root,
-  .dark {
+  :root {
     /* Ground. Faintly cool rather than pure white — pure #FFF as a full-screen
        ground flattens the frosted panels sitting on top of it. */
     --color-canvas: 244 245 250;
@@ -71,5 +77,55 @@
 
     /* Live / urgent — reserved for active incidents only. */
     --color-live: 200 18 56;
+  }
+
+  /*
+   * Dark.
+   *
+   * Not an inversion of the above. The grounds are lifted off pure black —
+   * true #000 with light text produces halation on an OLED panel, which is
+   * the specific complaint people have about "dark mode that hurts".
+   *
+   * Text steps are compressed rather than mirrored: on a dark ground the eye
+   * needs less separation between levels, and a faint grey that reads as
+   * "quiet" on white reads as "broken" on black.
+   *
+   * The accent and semantics are all lifted, because a colour tuned to clear
+   * contrast against white fails against near-black.
+   */
+  .dark:root,
+  .dark {
+    --color-canvas: 14 16 26;
+    --color-canvas-soft: 22 25 38;
+    --color-canvas-raise: 32 36 52;
+
+    --color-glass: 30 34 50;
+    /* Media panels stay as they are — they sit on photography, not on theme. */
+    --color-glass-media: 16 17 26;
+
+    --color-hairline: 255 255 255;
+    --color-hairline-media: 255 255 255;
+
+    --color-text-primary: 240 242 250;
+    --color-text-secondary: 199 204 220;
+    --color-text-muted: 160 167 189;
+    --color-text-faint: 118 126 150;
+    --color-text-on-dark: 255 255 255;
+
+    --color-accent: 139 116 255;
+    --color-accent-alt: 96 150 255;
+    --color-accent-bright: 167 149 255;
+    --color-accent-wash: 44 38 78;
+
+    --color-success: 74 222 128;
+    --color-success-wash: 16 48 34;
+    --color-warning: 251 191 36;
+    --color-warning-wash: 56 42 12;
+    --color-danger: 248 113 113;
+    --color-danger-wash: 58 20 24;
+    --color-info: 125 170 255;
+    --color-info-wash: 22 36 68;
+
+    --color-live: 251 113 133;
   }
 }

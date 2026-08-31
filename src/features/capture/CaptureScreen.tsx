@@ -1,4 +1,4 @@
-import { Linking, View } from 'react-native';
+import { Linking, ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -9,6 +9,7 @@ import { colors } from '@/lib/theme';
 import { formatCoordinate } from '@/lib/format';
 import { CameraStage } from './CameraStage';
 import { AcquisitionRing } from './AcquisitionRing';
+import { SafetyNotice } from './SafetyNotice';
 import { canOfferReducedAccuracy } from './gpsGate';
 import { useGpsGate } from './useGpsGate';
 
@@ -66,9 +67,14 @@ export function CaptureScreen() {
   const stalled = status.kind === 'stalled';
 
   return (
-    <View
-      className="flex-1 items-center justify-center bg-canvas px-8"
-      style={{ paddingTop: insets.top }}
+    /* Scrollable now that the safety guidance sits here. Centred while it
+       fits, scrollable when it does not — on a small phone the rules must not
+       be the part that falls off the bottom. */
+    <ScrollView
+      className="flex-1 bg-canvas"
+      contentContainerClassName="grow items-center justify-center px-8"
+      contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}
+      showsVerticalScrollIndicator={false}
     >
       <AcquisitionRing accuracyM={status.accuracyM} />
 
@@ -102,6 +108,12 @@ export function CaptureScreen() {
         ) : null}
       </Glass>
 
+      {/* The wait is the one moment a reporter is certainly holding the phone,
+          about to film, and not yet committed to anything. */}
+      <View className="mt-4 w-full">
+        <SafetyNotice />
+      </View>
+
       {/* The escape hatch flags the report rather than silently downgrading it. */}
       {canOfferReducedAccuracy(status, fix) ? (
         <Button
@@ -112,7 +124,7 @@ export function CaptureScreen() {
           onPress={acceptReducedAccuracy}
         />
       ) : null}
-    </View>
+    </ScrollView>
   );
 }
 

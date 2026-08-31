@@ -8,10 +8,11 @@ import { useTranslation } from 'react-i18next';
 import * as Crypto from 'expo-crypto';
 import { Badge, Button, Chip, Glass, Pressable, Sheet, SwitchRow, Text } from '@/components/ui';
 import { INCIDENT_CATEGORIES } from '@/types/api';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatExactCapture } from '@/lib/format';
 import { hapticError, hapticUnlock } from '@/lib/haptics';
 import { useCaptureStore } from '@/stores/captureStore';
+import { ContextFields } from './ContextFields';
 import { submitCapture } from './submitCapture';
 import { DestinationPicker } from './DestinationPicker';
 import { toast } from '@/stores/toastStore';
@@ -25,6 +26,7 @@ import { toast } from '@/stores/toastStore';
  * toggles they have to mentally simulate.
  */
 export function ReviewScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -34,6 +36,9 @@ export function ReviewScreen() {
     category,
     description,
     isAnonymous,
+    severity,
+    landmark,
+    consent,
     showLocation,
     showDate,
     showTime,
@@ -44,6 +49,9 @@ export function ReviewScreen() {
     setCategory,
     setDescription,
     setAnonymous,
+    setSeverity,
+    setLandmark,
+    setConsent,
     setShowLocation,
     setShowDate,
     setShowTime,
@@ -80,6 +88,9 @@ export function ReviewScreen() {
         description: description.trim(),
         isAnonymous,
         displayFlags: { showLocation, showDate, showTime },
+        severity,
+        landmark,
+        consent,
       });
       hapticUnlock();
       reset();
@@ -100,6 +111,9 @@ export function ReviewScreen() {
     category,
     description,
     isAnonymous,
+    severity,
+    landmark,
+    consent,
     showLocation,
     showDate,
     showTime,
@@ -134,7 +148,7 @@ export function ReviewScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg">{t('review.title')}</Text>
         </View>
@@ -145,12 +159,23 @@ export function ReviewScreen() {
             {t('review.previewLabel')}
           </Text>
           <View className="h-72 overflow-hidden rounded-lg bg-canvas-raise">
-            <Image
-              source={{ uri: pending.uri }}
-              style={{ position: 'absolute', inset: 0 }}
-              contentFit="cover"
-              transition={180}
-            />
+            {/* A voice recording has no frame to show. Rather than an empty
+                box that reads as a failed load, the preview says what it is. */}
+            {pending.kind === 'audio' ? (
+              <View className="absolute inset-0 items-center justify-center gap-2 bg-canvas-raise">
+                <Ionicons name="mic" size={28} color={c.accent} />
+                <Text variant="body-sm" tone="muted">
+                  {t('review.audioPreview')}
+                </Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: pending.uri }}
+                style={{ position: 'absolute', inset: 0 }}
+                contentFit="cover"
+                transition={180}
+              />
+            )}
             <View className="absolute bottom-0 left-0 right-0 gap-1.5 bg-black/55 p-3.5">
               <View className="flex-row items-center gap-2">
                 <View
@@ -215,14 +240,14 @@ export function ReviewScreen() {
               value={description}
               onChangeText={setDescription}
               placeholder={t('review.descriptionPlaceholder')}
-              placeholderTextColor={colors.textFaint}
+              placeholderTextColor={c.textFaint}
               multiline
               numberOfLines={4}
               maxLength={500}
               style={{
                 // TextInput's own text colour and min height have no NativeWind
                 // equivalent that survives multiline on both platforms.
-                color: colors.textPrimary,
+                color: c.textPrimary,
                 minHeight: 90,
                 textAlignVertical: 'top',
                 fontFamily: 'Inter_400Regular',
@@ -260,12 +285,21 @@ export function ReviewScreen() {
             accessibilityLabel={t('review.whatThisMeans')}
             className="flex-row items-center gap-1.5 pb-3.5"
           >
-            <Ionicons name="information-circle-outline" size={14} color={colors.accent} />
+            <Ionicons name="information-circle-outline" size={14} color={c.accent} />
             <Text variant="caption" tone="accent" className="font-sans-semibold">
               {t('review.whatThisMeans')}
             </Text>
           </Pressable>
         </Glass>
+
+        <ContextFields
+          severity={severity}
+          onSeverity={setSeverity}
+          landmark={landmark}
+          onLandmark={setLandmark}
+          consent={consent}
+          onConsent={setConsent}
+        />
 
         {/* ── Display toggles ─────────────────────────────────────────────── */}
         <View className="gap-2">
@@ -297,7 +331,7 @@ export function ReviewScreen() {
             />
           </Glass>
           <View className="flex-row items-start gap-2">
-            <Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} />
+            <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
             <Text variant="caption" tone="muted" className="flex-1">
               {t('review.storedRegardless')}
             </Text>

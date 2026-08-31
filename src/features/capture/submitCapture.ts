@@ -1,3 +1,4 @@
+import type { ConsentFlags, Severity } from '@/types/context';
 import * as Crypto from 'expo-crypto';
 import { incidentsRepository } from '@/db/incidentsRepository';
 import { hashFile, fileSize, persistCapture } from '@/services/media';
@@ -13,6 +14,9 @@ export interface SubmitCaptureInput {
   description: string;
   isAnonymous: boolean;
   displayFlags: { showLocation: boolean; showDate: boolean; showTime: boolean };
+  severity: Severity;
+  landmark: string;
+  consent: ConsentFlags;
 }
 
 /**
@@ -31,7 +35,11 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
   const { capture, clientId } = input;
   const id = Crypto.randomUUID();
 
-  const extension = capture.kind === 'video' ? 'mp4' : 'jpg';
+  // Keyed off the kind rather than a two-way guess: an audio recording saved
+  // as .jpg is playable by nothing, and the mismatch would not surface until
+  // someone tried to open the evidence.
+  const EXTENSION = { photo: 'jpg', video: 'mp4', audio: 'm4a' } as const;
+  const extension = EXTENSION[capture.kind];
   const mediaUri = persistCapture(capture.uri, `${id}.${extension}`);
 
   const byteSize = fileSize(mediaUri);
@@ -52,6 +60,11 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
     showLocation: input.displayFlags.showLocation,
     showDate: input.displayFlags.showDate,
     showTime: input.displayFlags.showTime,
+    severity: input.severity,
+    // Empty is stored as null so "not answered" and "answered blank" are the
+    // same thing, which is what they mean here.
+    landmark: input.landmark.trim() || null,
+    consentJson: JSON.stringify(input.consent),
 
     // Stored at full precision regardless of the display flags — suppression is
     // a publishing decision, and the reporter may change it later.

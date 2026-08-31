@@ -27,4 +27,17 @@ module.exports = defineConfig([
       'no-console': ['warn', { allow: ['warn', 'error'] }],
     },
   },
+  {
+    // Build scripts are CommonJS running under Node, not app code bundled for
+    // a device. They need Node's globals, and printing progress is the whole
+    // point of them rather than a leftover debug statement.
+    files: ['scripts/**/*.js'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { __dirname: 'readonly', require: 'readonly', module: 'writable', process: 'readonly' },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
 ]);

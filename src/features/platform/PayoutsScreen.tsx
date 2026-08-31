@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, Text } from '@/components/ui';
 import { PAYOUT_BATCHES, type PayoutBatch } from '@/api/dawuroData';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis } from '@/types/dawuro';
 import { toast } from '@/stores/toastStore';
@@ -29,6 +29,7 @@ const TONE: Record<PayoutBatch['status'], 'neutral' | 'accent' | 'success'> = {
  * has left.
  */
 export function PayoutsScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -59,7 +60,7 @@ export function PayoutsScreen() {
           accessibilityLabel={t('common.back')}
           className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
         >
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
         </Pressable>
         <Text variant="title-lg" className="flex-1">
           {t('platform.payouts')}
@@ -86,7 +87,7 @@ export function PayoutsScreen() {
             </View>
 
             <View className="flex-row items-center gap-1.5 border-t border-hairline/[0.07] pt-3">
-              <Ionicons name="time-outline" size={13} color={colors.textFaint} />
+              <Ionicons name="time-outline" size={13} color={c.textFaint} />
               <Text variant="caption" tone="muted" className="flex-1">
                 {batch.settledAtIso
                   ? t('platform.settledAgo', { time: formatRelativeTime(batch.settledAtIso) })
@@ -129,7 +130,7 @@ export function PayoutsScreen() {
         ))}
 
         <View className="flex-row items-start gap-2.5 rounded-lg bg-warning-wash p-3.5">
-          <Ionicons name="information-circle-outline" size={15} color={colors.warning} />
+          <Ionicons name="information-circle-outline" size={15} color={c.warning} />
           <Text variant="caption" tone="warning" className="flex-1">
             {t('platform.payoutSimulation')}
           </Text>

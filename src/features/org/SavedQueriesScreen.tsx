@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, EmptyState, Glass, Pressable, Text } from '@/components/ui';
 import { SAVED_QUERIES } from '@/api/mockData';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatDistance } from '@/lib/format';
 import { RequireRole } from './RequireRole';
 
@@ -17,6 +17,7 @@ import { RequireRole } from './RequireRole';
  * crowd-sourced feed useful to an institution that cannot watch it all day.
  */
 export function SavedQueriesScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -32,7 +33,7 @@ export function SavedQueriesScreen() {
           accessibilityLabel={t('common.back')}
           className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
         >
-          <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+          <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
         </Pressable>
         <Text variant="title-lg" className="flex-1">
           {t('org.watchQueries')}
@@ -96,12 +97,12 @@ export function SavedQueriesScreen() {
                 </View>
 
                 <View className="flex-row items-center gap-1.5 border-t border-hairline/[0.07] pt-3">
-                  <Ionicons name="documents-outline" size={14} color={colors.accent} />
+                  <Ionicons name="documents-outline" size={14} color={c.accent} />
                   <Text variant="body-sm" tone="accent" className="font-sans-semibold">
                     {t('org.matches', { count: query.matchCount })}
                   </Text>
                   <View className="flex-1" />
-                  <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+                  <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
                 </View>
               </Glass>
             </Pressable>

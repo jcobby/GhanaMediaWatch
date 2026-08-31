@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Sheet, Text } from '@/components/ui';
 import { COMMISSION_LEDGER, EARNINGS_SUMMARY } from '@/api/dawuroData';
-import { accentGradient, categoryColor, colors } from '@/lib/theme';
+import { accentGradient, categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis, type CommissionStatus } from '@/types/dawuro';
 import { payoutProgress, sumPesewas } from './commission';
@@ -32,6 +32,7 @@ const MOMO_NETWORKS = ['MTN MoMo', 'Telecel Cash', 'AT Money'] as const;
  * platform is skimming.
  */
 export function EarningsScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -89,7 +90,7 @@ export function EarningsScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg">{t('earnings.title')}</Text>
         </View>
@@ -193,7 +194,7 @@ export function EarningsScreen() {
 
         {ledgerMismatch ? (
           <Glass elevation="low" className="flex-row items-start gap-2.5 rounded-lg p-3.5">
-            <Ionicons name="alert-circle-outline" size={16} color={colors.warning} />
+            <Ionicons name="alert-circle-outline" size={16} color={c.warning} />
             <Text variant="caption" tone="warning" className="flex-1">
               {t('earnings.mismatchNotice')}
             </Text>
@@ -257,12 +258,12 @@ export function EarningsScreen() {
                 value={momoNumber}
                 onChangeText={setMomoNumber}
                 placeholder="024 000 0000"
-                placeholderTextColor={colors.textFaint}
+                placeholderTextColor={c.textFaint}
                 keyboardType="phone-pad"
                 accessibilityLabel={t('earnings.momoNumber')}
                 style={{
                   height: 52,
-                  color: colors.textPrimary,
+                  color: c.textPrimary,
                   fontFamily: 'Inter_400Regular',
                   fontSize: 16,
                 }}
@@ -273,7 +274,7 @@ export function EarningsScreen() {
           {/* Said plainly, because a fake payment that looks real is worse than
               an obvious placeholder. */}
           <View className="flex-row items-start gap-2 rounded-lg bg-warning-wash p-3">
-            <Ionicons name="information-circle-outline" size={15} color={colors.warning} />
+            <Ionicons name="information-circle-outline" size={15} color={c.warning} />
             <Text variant="caption" tone="warning" className="flex-1">
               {t('earnings.simulationNotice')}
             </Text>

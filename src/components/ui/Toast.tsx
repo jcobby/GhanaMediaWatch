@@ -4,7 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeInUp, FadeOutUp } from 'react-native-reanimated';
 import { Ionicons } from '@expo/vector-icons';
 import { useToastStore, type Toast as ToastModel, type ToastTone } from '@/stores/toastStore';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { Pressable } from './Pressable';
 import { Text } from './Text';
 
@@ -16,12 +16,13 @@ const ICON: Record<ToastTone, keyof typeof Ionicons.glyphMap> = {
 };
 
 function ToastCard({ toast }: { toast: ToastModel }) {
+  const c = useColors();
   const dismiss = useToastStore((s) => s.dismiss);
   const iconColor: Record<ToastTone, string> = {
-    success: colors.success,
-    warning: colors.warning,
-    danger: colors.danger,
-    info: colors.info,
+    success: c.success,
+    warning: c.warning,
+    danger: c.danger,
+    info: c.info,
   };
 
   useEffect(() => {
@@ -67,7 +68,7 @@ function ToastCard({ toast }: { toast: ToastModel }) {
             accessibilityLabel="Dismiss"
             className="pt-0.5"
           >
-            <Ionicons name="close" size={16} color={colors.textMuted} />
+            <Ionicons name="close" size={16} color={c.textMuted} />
           </Pressable>
         )}
       </View>

@@ -6,8 +6,14 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Chip, Glass, Pressable, Text } from '@/components/ui';
 import { BUSINESSES } from '@/api/dawuroData';
-import { categoryColor, colors } from '@/lib/theme';
-import { SUBSCRIPTION_PLANS, formatCedis, type BusinessAccount } from '@/types/dawuro';
+import { categoryColor, useColors } from '@/lib/theme';
+import {
+  SUBSCRIPTION_PLANS,
+  downloadCharge,
+  formatCedis,
+  isUnlimited,
+  type BusinessAccount,
+} from '@/types/dawuro';
 
 const STATUS_TONE: Record<
   BusinessAccount['subscriptionStatus'],
@@ -28,6 +34,7 @@ const STATUS_TONE: Record<
  * overage, and one at 4% may be about to churn — neither reads from a raw count.
  */
 export function ManageBusinessesScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -44,7 +51,7 @@ export function ManageBusinessesScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="title-lg">{t('platform.manageBusinesses')}</Text>
@@ -82,14 +89,15 @@ export function ManageBusinessesScreen() {
       >
         {visible.map((business) => {
           const plan = SUBSCRIPTION_PLANS[business.tier];
-          const usage = Math.min(1, business.reportsUsedThisPeriod / plan.includedReports);
-          const overAllowance = business.reportsUsedThisPeriod > plan.includedReports;
+          // No allowance exists to exceed; this now reads spend, not quota.
+          const spent = downloadCharge(plan) * business.reportsUsedThisPeriod;
+          const uncapped = isUnlimited(plan);
 
           return (
             <Glass key={business.id} elevation="low" className="gap-3 rounded-lg p-4">
               <View className="flex-row items-start gap-3">
                 <View className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise">
-                  <Ionicons name="business" size={17} color={colors.textMuted} />
+                  <Ionicons name="business" size={17} color={c.textMuted} />
                 </View>
                 <View className="flex-1 gap-0.5">
                   <View className="flex-row items-center gap-1.5">
@@ -97,7 +105,7 @@ export function ManageBusinessesScreen() {
                       {business.name}
                     </Text>
                     {business.verified ? (
-                      <Ionicons name="checkmark-circle" size={13} color={colors.info} />
+                      <Ionicons name="checkmark-circle" size={13} color={c.info} />
                     ) : null}
                   </View>
                   <Text variant="caption" tone="muted">
@@ -111,33 +119,30 @@ export function ManageBusinessesScreen() {
                 />
               </View>
 
-              {/* Allowance consumption */}
+              {/* Downloads taken, and what they have cost */}
               <View className="gap-1.5">
                 <View className="flex-row items-center justify-between">
                   <Text variant="caption" tone="muted">
-                    {t('platform.reportsUsed', {
-                      used: business.reportsUsedThisPeriod,
-                      total: plan.includedReports,
+                    {t('platform.downloadsTaken', {
+                      count: business.reportsUsedThisPeriod,
                     })}
                   </Text>
-                  <Text
-                    variant="caption"
-                    tone={overAllowance ? 'warning' : 'muted'}
-                    className="font-sans-semibold"
-                  >
-                    {overAllowance
-                      ? t('platform.onOverage')
-                      : formatCedis(plan.monthlyPesewas, { compact: true })}
+                  <Text variant="caption" tone="muted" className="font-sans-semibold">
+                    {/* What this organisation has actually run up this period —
+                        the number an operator chasing revenue wants. */}
+                    {uncapped
+                      ? t('business.unlimitedDownloads')
+                      : formatCedis(spent, { compact: true })}
                   </Text>
                 </View>
                 <View className="h-1.5 overflow-hidden rounded-pill bg-canvas-raise">
                   <View
                     className={
-                      overAllowance
-                        ? 'h-full rounded-pill bg-warning'
-                        : 'h-full rounded-pill bg-accent'
+                      uncapped ? 'h-full rounded-pill bg-warning' : 'h-full rounded-pill bg-accent'
                     }
-                    style={{ width: `${usage * 100}%` }}
+                    style={{
+                      width: `${Math.min(100, business.reportsUsedThisPeriod * 4)}%`,
+                    }}
                   />
                 </View>
               </View>

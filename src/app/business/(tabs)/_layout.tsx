@@ -1,7 +1,7 @@
 import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { useTabScreenOptions } from '@/components/RoleTabBar';
 
 /**
@@ -16,6 +16,7 @@ import { useTabScreenOptions } from '@/components/RoleTabBar';
  * makes both feel like an afterthought.
  */
 export default function BusinessTabsLayout() {
+  const c = useColors();
   const { t } = useTranslation();
   const options = useTabScreenOptions();
 
@@ -23,8 +24,8 @@ export default function BusinessTabsLayout() {
     <Tabs
       screenOptions={{
         ...options,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: c.accent,
+        tabBarInactiveTintColor: c.textFaint,
       }}
     >
       <Tabs.Screen

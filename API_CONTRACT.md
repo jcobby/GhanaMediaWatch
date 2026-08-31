@@ -1,9 +1,19 @@
 # API Contract — GhanaMediaWatch
 
-**Audience:** the engineer building the backend.
-**Status:** proposed by the frontend, not yet agreed. Everything in [§10 Assumptions to confirm](#10-assumptions-to-confirm) needs your sign-off before it hardens.
+> ## ⚠️ Superseded
+>
+> **This document is v1 and is no longer maintained. Build against [`BACKEND_SPEC.md`](BACKEND_SPEC.md) instead** — rendered as `Dawuro-Backend-Spec.pdf`.
+>
+> v1 covers only capture, upload and the early business tier. It predates the trust model (assurance × verification), employees and branches, institutional onboarding, subscriptions and commission, the response log and SLA, invites and affiliations, and audio capture — roughly two thirds of the current product. It also uses the old product name and the wrong `SubmissionDestination` values.
+>
+> It is kept because the upload protocol in §4 is unchanged and reproduced verbatim in the new spec, and because the assumptions in §10 record decisions that were open at the time.
+>
+> **Do not update this file.** One spec, or the two drift and the backend gets built against whichever the reader happened to open.
 
-The mobile client is built against this contract via a swappable `ApiClient` interface. A `MockApiClient` implements it locally with seeded fixtures, so **frontend work never blocks on the backend** — but it also means any drift between this document and your implementation surfaces only at integration. If you need to change something here, say so and we change it together.
+**Audience:** the engineer building the backend.
+**Status:** superseded — see above.
+
+The mobile client is built against this contract via a swappable `ApiClient` interface. A `MockApiClient` implements it locally with seeded fixtures, so **frontend work never blocks on the backend** — but it also means any drift between this document and your implementation surfaces only at integration.
 
 ---
 

@@ -4,10 +4,10 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { BUSINESSES } from '@/api/dawuroData';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { estimateCommission } from '@/features/earnings/commission';
 import { formatCedis, type SubmissionDestination } from '@/types/dawuro';
-import type { IncidentCategory } from '@/types/api';
+import type { IncidentCategory, MediaKind } from '@/types/api';
 
 interface DestinationPickerProps {
   destination: SubmissionDestination;
@@ -15,7 +15,7 @@ interface DestinationPickerProps {
   selectedBusinessIds: string[];
   onChangeBusinesses: (ids: string[]) => void;
   category: IncidentCategory;
-  mediaKind: 'photo' | 'video';
+  mediaKind: MediaKind;
   locationConfidence: 'high' | 'low';
 }
 
@@ -49,6 +49,7 @@ export function DestinationPicker({
   mediaKind,
   locationConfidence,
 }: DestinationPickerProps) {
+  const c = useColors();
   const { t } = useTranslation();
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -111,7 +112,7 @@ export function DestinationPicker({
                   <Ionicons
                     name={option.icon}
                     size={18}
-                    color={active ? colors.textOnDark : colors.textMuted}
+                    color={active ? c.textOnDark : c.textMuted}
                   />
                 </View>
                 <View className="flex-1 gap-0.5">
@@ -129,9 +130,7 @@ export function DestinationPicker({
                       : 'h-5 w-5 rounded-pill border border-hairline/25'
                   }
                 >
-                  {active ? (
-                    <Ionicons name="checkmark" size={12} color={colors.textOnDark} />
-                  ) : null}
+                  {active ? <Ionicons name="checkmark" size={12} color={c.textOnDark} /> : null}
                 </View>
               </Glass>
             </Pressable>
@@ -146,7 +145,7 @@ export function DestinationPicker({
           accessibilityLabel={t('destination.chooseBusinesses')}
         >
           <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
-            <Ionicons name="business-outline" size={18} color={colors.accent} />
+            <Ionicons name="business-outline" size={18} color={c.accent} />
             <View className="flex-1">
               <Text variant="body-sm" className="font-sans-semibold">
                 {selected.length > 0
@@ -157,7 +156,7 @@ export function DestinationPicker({
                 {t('destination.recipientCount', { count: selected.length })}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+            <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
           </Glass>
         </Pressable>
       ) : null}
@@ -165,7 +164,7 @@ export function DestinationPicker({
       {/* Earnings estimate */}
       <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
         <View className="h-10 w-10 items-center justify-center rounded-pill bg-success-wash">
-          <Ionicons name="cash-outline" size={18} color={colors.success} />
+          <Ionicons name="cash-outline" size={18} color={c.success} />
         </View>
         <View className="flex-1">
           <Text variant="body" className="font-sans-semibold">
@@ -210,7 +209,7 @@ export function DestinationPicker({
                   }
                 >
                   <View className="h-9 w-9 items-center justify-center rounded-pill bg-canvas-raise">
-                    <Ionicons name="business" size={15} color={colors.textMuted} />
+                    <Ionicons name="business" size={15} color={c.textMuted} />
                   </View>
                   <View className="flex-1">
                     <View className="flex-row items-center gap-1.5">
@@ -218,7 +217,7 @@ export function DestinationPicker({
                         {business.name}
                       </Text>
                       {business.verified ? (
-                        <Ionicons name="checkmark-circle" size={13} color={colors.info} />
+                        <Ionicons name="checkmark-circle" size={13} color={c.info} />
                       ) : null}
                     </View>
                     <Text variant="caption" tone={relevant ? 'success' : 'muted'}>
@@ -235,7 +234,7 @@ export function DestinationPicker({
                     }
                   >
                     {isSelected ? (
-                      <Ionicons name="checkmark" size={12} color={colors.textOnDark} />
+                      <Ionicons name="checkmark" size={12} color={c.textOnDark} />
                     ) : null}
                   </View>
                 </Pressable>

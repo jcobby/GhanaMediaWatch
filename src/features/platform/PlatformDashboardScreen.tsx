@@ -13,7 +13,7 @@ import {
   PLATFORM_METRICS,
   ROUTING_QUEUE,
 } from '@/api/dawuroData';
-import { accentGradient, colors } from '@/lib/theme';
+import { accentGradient, useColors } from '@/lib/theme';
 import { formatCedis } from '@/types/dawuro';
 import { useAuthStore } from '@/stores/authStore';
 
@@ -29,6 +29,7 @@ import { useAuthStore } from '@/stores/authStore';
  * mean discovering a broken model a quarter late.
  */
 export function PlatformDashboardScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -46,7 +47,10 @@ export function PlatformDashboardScreen() {
   return (
     <ScrollView
       className="flex-1 bg-canvas"
-      contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + TAB_SCROLL_CLEARANCE }}
+      contentContainerStyle={{
+        paddingTop: insets.top + 12,
+        paddingBottom: insets.bottom + TAB_SCROLL_CLEARANCE,
+      }}
       contentContainerClassName="gap-5 px-4"
       showsVerticalScrollIndicator={false}
     >
@@ -70,7 +74,7 @@ export function PlatformDashboardScreen() {
           accessibilityLabel={t('settings.signOut')}
           className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
         >
-          <Ionicons name="log-out-outline" size={18} color={colors.danger} />
+          <Ionicons name="log-out-outline" size={18} color={c.danger} />
         </Pressable>
       </View>
 
@@ -189,12 +193,12 @@ export function PlatformDashboardScreen() {
       >
         <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-4">
           <View className="h-10 w-10 items-center justify-center rounded-pill bg-accent-wash">
-            <Ionicons name="briefcase-outline" size={18} color={colors.accent} />
+            <Ionicons name="briefcase-outline" size={18} color={c.accent} />
           </View>
           <Text variant="body" className="flex-1 font-sans-semibold">
             {t('platform.manageBusinesses')}
           </Text>
-          <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+          <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
         </Glass>
       </Pressable>
     </ScrollView>
@@ -216,14 +220,15 @@ function ActionRow({
   tone: 'neutral' | 'accent' | 'warning' | 'success';
   onPress: () => void;
 }) {
+  const c = useColors();
   const tint =
     tone === 'warning'
-      ? colors.warning
+      ? c.warning
       : tone === 'success'
-        ? colors.success
+        ? c.success
         : tone === 'accent'
-          ? colors.accent
-          : colors.textMuted;
+          ? c.accent
+          : c.textMuted;
 
   return (
     <Pressable onPress={onPress} accessibilityLabel={`${label}, ${count}`}>
@@ -250,9 +255,9 @@ function ActionRow({
             tone={tone === 'neutral' ? 'neutral' : (tone as 'accent' | 'warning' | 'success')}
           />
         ) : (
-          <Ionicons name="checkmark-circle" size={18} color={colors.success} />
+          <Ionicons name="checkmark-circle" size={18} color={c.success} />
         )}
-        <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+        <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
       </Glass>
     </Pressable>
   );

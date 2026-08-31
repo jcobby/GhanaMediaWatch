@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Button, Chip, Glass, Pressable, SwitchRow, Text } from '@/components/ui';
 import { SAVED_QUERIES } from '@/api/mockData';
 import { INCIDENT_CATEGORIES, type IncidentCategory } from '@/types/api';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatDistance } from '@/lib/format';
 import { toast } from '@/stores/toastStore';
 
@@ -29,6 +29,7 @@ interface QueryEditorScreenProps {
  * a precision the underlying matching does not have.
  */
 export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -94,7 +95,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg">{existing ? t('org.editQuery') : t('org.newQuery')}</Text>
         </View>
@@ -129,7 +130,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
               <Circle
                 center={center}
                 radius={radiusM}
-                strokeColor={colors.accent}
+                strokeColor={c.accent}
                 strokeWidth={2}
                 fillColor="rgba(91, 61, 245, 0.14)"
               />
@@ -164,7 +165,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
                 accessibilityLabel={t('org.smaller')}
                 className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
               >
-                <Ionicons name="remove" size={18} color={colors.textPrimary} />
+                <Ionicons name="remove" size={18} color={c.textPrimary} />
               </Pressable>
               <View className="h-1.5 flex-1 flex-row gap-1">
                 {RADIUS_STOPS.map((stop, i) => (
@@ -184,7 +185,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
                 accessibilityLabel={t('org.larger')}
                 className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
               >
-                <Ionicons name="add" size={18} color={colors.textPrimary} />
+                <Ionicons name="add" size={18} color={c.textPrimary} />
               </Pressable>
             </View>
           </Glass>
@@ -220,7 +221,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
 
         {/* The privacy rule that also binds paying customers. */}
         <View className="flex-row items-start gap-2">
-          <Ionicons name="lock-closed-outline" size={13} color={colors.textMuted} />
+          <Ionicons name="lock-closed-outline" size={13} color={c.textMuted} />
           <Text variant="caption" tone="muted" className="flex-1">
             {t('org.suppressedNote')}
           </Text>
@@ -244,13 +245,14 @@ function TextField(props: {
   placeholder: string;
   accessibilityLabel: string;
 }) {
+  const c = useColors();
   return (
     <TextInput
       {...props}
-      placeholderTextColor={colors.textFaint}
+      placeholderTextColor={c.textFaint}
       style={{
         height: 52,
-        color: colors.textPrimary,
+        color: c.textPrimary,
         fontFamily: 'Inter_400Regular',
         fontSize: 16,
       }}

@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, EmptyState, Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { BUSINESS_APPLICATIONS, type BusinessApplication } from '@/api/dawuroData';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { SUBSCRIPTION_PLANS, formatCedis } from '@/types/dawuro';
 import { toast } from '@/stores/toastStore';
@@ -25,6 +25,7 @@ import { toast } from '@/stores/toastStore';
  * own, which is exactly why a human looks rather than a rule deciding.
  */
 export function BusinessApprovalScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -61,7 +62,7 @@ export function BusinessApprovalScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="title-lg">{t('platform.applications')}</Text>
@@ -108,7 +109,7 @@ export function BusinessApprovalScreen() {
               <Glass elevation="low" className="gap-2.5 rounded-lg p-4">
                 <View className="flex-row items-start gap-3">
                   <View className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise">
-                    <Ionicons name="business" size={17} color={colors.textMuted} />
+                    <Ionicons name="business" size={17} color={c.textMuted} />
                   </View>
                   <View className="flex-1 gap-0.5">
                     <Text variant="body" className="font-sans-semibold" numberOfLines={1}>
@@ -134,7 +135,7 @@ export function BusinessApprovalScreen() {
                         key={flag}
                         className="flex-row items-center gap-1.5 rounded-pill bg-warning-wash px-2.5 py-1"
                       >
-                        <Ionicons name="warning-outline" size={11} color={colors.warning} />
+                        <Ionicons name="warning-outline" size={11} color={c.warning} />
                         <Text variant="caption" tone="warning">
                           {t(`platform.flag.${flag}`)}
                         </Text>
@@ -146,12 +147,12 @@ export function BusinessApprovalScreen() {
                 <View className="flex-row items-center gap-2 border-t border-hairline/[0.07] pt-2.5">
                   <Text variant="caption" tone="muted" className="flex-1">
                     {t(`business.tier.${app.requestedTier}`)} ·{' '}
-                    {formatCedis(SUBSCRIPTION_PLANS[app.requestedTier].monthlyPesewas, {
+                    {formatCedis(SUBSCRIPTION_PLANS[app.requestedTier].feePesewas, {
                       compact: true,
                     })}
                     /mo
                   </Text>
-                  <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+                  <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
                 </View>
               </Glass>
             </Pressable>
@@ -208,7 +209,7 @@ export function BusinessApprovalScreen() {
             {/* Stated at the point of decision, because this is the moment the
                 consequence attaches to a person. */}
             <View className="flex-row items-start gap-2.5 rounded-lg bg-warning-wash p-3.5">
-              <Ionicons name="eye-outline" size={16} color={colors.warning} />
+              <Ionicons name="eye-outline" size={16} color={c.warning} />
               <Text variant="caption" tone="warning" className="flex-1">
                 {t('platform.approvalConsequence')}
               </Text>

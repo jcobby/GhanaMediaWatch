@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, EmptyState, Glass, Pressable, Text } from '@/components/ui';
 import { SURVEYS } from '@/api/dawuroData';
-import { accentGradient, colors } from '@/lib/theme';
+import { accentGradient, useColors } from '@/lib/theme';
 import { formatDistance } from '@/lib/format';
 import { haversineMetres } from '@/lib/geo';
 import { useViewerLocation } from '@/hooks/useViewerLocation';
@@ -25,6 +25,7 @@ import { isAcceptingResponses } from './surveyLogic';
  * task twenty kilometres away is not a task.
  */
 export function SurveyListScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -60,7 +61,7 @@ export function SurveyListScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg" className="flex-1">
             {t('surveys.title')}
@@ -74,7 +75,7 @@ export function SurveyListScreen() {
             end={{ x: 1, y: 1 }}
             style={{ borderRadius: 16, padding: 16, flexDirection: 'row', gap: 12 }}
           >
-            <Ionicons name="cash-outline" size={20} color={colors.textOnDark} />
+            <Ionicons name="cash-outline" size={20} color={c.textOnDark} />
             <View className="flex-1">
               <Text variant="body" className="font-sans-semibold text-white">
                 {t('surveys.availableNow', { amount: formatCedis(totalAvailable) })}
@@ -131,7 +132,7 @@ export function SurveyListScreen() {
                 <View className="flex-row flex-wrap items-center gap-2 border-t border-hairline/[0.07] pt-3">
                   {distanceM !== null ? (
                     <View className="flex-row items-center gap-1.5">
-                      <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+                      <Ionicons name="location-outline" size={13} color={c.textMuted} />
                       <Text variant="caption" tone={inRange ? 'muted' : 'warning'}>
                         {inRange ? formatDistance(distanceM) : t('surveys.outOfRange')}
                       </Text>
@@ -147,9 +148,7 @@ export function SurveyListScreen() {
                       count: survey.responsesTarget - survey.responsesReceived,
                     })}
                   </Text>
-                  {inRange ? (
-                    <Ionicons name="chevron-forward" size={15} color={colors.accent} />
-                  ) : null}
+                  {inRange ? <Ionicons name="chevron-forward" size={15} color={c.accent} /> : null}
                 </View>
               </Glass>
             </Pressable>

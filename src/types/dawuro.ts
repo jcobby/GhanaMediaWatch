@@ -46,16 +46,25 @@ export const SUBMISSION_DESTINATIONS: readonly SubmissionDestination[] = [
 export type BusinessSector =
   'government' | 'media' | 'utility' | 'insurance' | 'ngo' | 'research' | 'other';
 
-export type SubscriptionTier = 'starter' | 'professional' | 'enterprise';
+export type SubscriptionTier = 'basic' | 'standard' | 'enterprise';
+
+export type BillingPeriod = 'monthly' | 'annual';
 
 export interface SubscriptionPlan {
   tier: SubscriptionTier;
-  /** Monthly price in Ghana cedis, minor units (pesewas) to avoid float drift. */
-  monthlyPesewas: number;
-  /** Reports the subscription includes each month before per-report pricing. */
-  includedReports: number;
-  /** Cost per report beyond the included allowance, in pesewas. */
-  overagePesewas: number;
+  /** How often the recurring fee falls due. */
+  billingPeriod: BillingPeriod;
+  /** The recurring fee for one billing period, in pesewas. */
+  feePesewas: number;
+  /**
+   * Charge per downloaded report, in pesewas.
+   *
+   * `null` means unlimited — downloads cost nothing beyond the recurring fee.
+   * Deliberately null rather than 0: a zero price and an uncapped plan are
+   * different things, and a nullable field forces every caller to decide which
+   * one it is handling.
+   */
+  perDownloadPesewas: number | null;
   seats: number;
   /** Surveys the business may have running at once. 0 disables the feature. */
   concurrentSurveys: number;
@@ -63,40 +72,60 @@ export interface SubscriptionPlan {
 }
 
 /**
- * Prices are placeholders pending a commercial decision — flagged in
- * API_CONTRACT.md. The *shape* is what matters here: an included allowance plus
- * metered overage is what lets a small district assembly and a national
- * broadcaster share one product.
+ * MUST stay identical to packages/core in the console repo.
+ *
+ * The two products quote the same prices to different people — a reporter sees
+ * what a download earns them, an organisation sees what it costs. If these
+ * drift, the app and the invoice disagree, and the person who notices is a
+ * customer. Until the shared package is published, this file is the copy and
+ * core is the original.
  */
 export const SUBSCRIPTION_PLANS: Record<SubscriptionTier, SubscriptionPlan> = {
-  starter: {
-    tier: 'starter',
-    monthlyPesewas: 45_000,
-    includedReports: 25,
-    overagePesewas: 1_500,
+  basic: {
+    tier: 'basic',
+    billingPeriod: 'monthly',
+    feePesewas: 45_000,
+    perDownloadPesewas: 2_000,
     seats: 3,
     concurrentSurveys: 1,
     canDirectRequest: false,
   },
-  professional: {
-    tier: 'professional',
-    monthlyPesewas: 180_000,
-    includedReports: 150,
-    overagePesewas: 1_000,
+  standard: {
+    tier: 'standard',
+    billingPeriod: 'monthly',
+    feePesewas: 180_000,
+    perDownloadPesewas: 1_200,
     seats: 12,
     concurrentSurveys: 5,
     canDirectRequest: true,
   },
   enterprise: {
     tier: 'enterprise',
-    monthlyPesewas: 650_000,
-    includedReports: 1_000,
-    overagePesewas: 600,
+    billingPeriod: 'annual',
+    feePesewas: 2_400_000,
+    perDownloadPesewas: null,
     seats: 50,
     concurrentSurveys: 25,
     canDirectRequest: true,
   },
 };
+
+/** True when downloads carry no per-item charge. */
+export function isUnlimited(plan: SubscriptionPlan): boolean {
+  return plan.perDownloadPesewas === null;
+}
+
+/** What one more download costs on this plan. Zero on an unlimited plan. */
+export function downloadCharge(plan: SubscriptionPlan): number {
+  return plan.perDownloadPesewas ?? 0;
+}
+
+/** Cost of a year on this plan, for comparing a monthly tier with an annual one. */
+export function annualCost(plan: SubscriptionPlan, downloadsPerYear: number): number {
+  const taken = Math.max(0, Math.floor(downloadsPerYear));
+  const periods = plan.billingPeriod === 'annual' ? 1 : 12;
+  return plan.feePesewas * periods + downloadCharge(plan) * taken;
+}
 
 export interface BusinessAccount {
   id: string;
@@ -108,6 +137,7 @@ export interface BusinessAccount {
   subscriptionStatus: 'trialing' | 'active' | 'past_due' | 'cancelled';
   renewsAtIso: string;
   seatsUsed: number;
+  /** Billable downloads taken in the current period. */
   reportsUsedThisPeriod: number;
   /** Categories this business is interested in — drives routing suggestions. */
   interests: IncidentCategory[];

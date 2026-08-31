@@ -61,10 +61,10 @@ export function formatExactCapture(iso: string | null, precision: TimePrecision)
     return isThisYear(date) ? format(date, 'd MMM') : format(date, 'd MMM yyyy');
   }
 
-  if (isToday(date)) return `Today, ${format(date, 'HH:mm')}`;
-  if (isYesterday(date)) return `Yesterday, ${format(date, 'HH:mm')}`;
-  if (isThisYear(date)) return format(date, 'd MMM, HH:mm');
-  return format(date, 'd MMM yyyy, HH:mm');
+  if (isToday(date)) return `Today, ${format(date, 'h:mm a')}`;
+  if (isYesterday(date)) return `Yesterday, ${format(date, 'h:mm a')}`;
+  if (isThisYear(date)) return format(date, 'd MMM, h:mm a');
+  return format(date, 'd MMM yyyy, h:mm a');
 }
 
 /**
@@ -77,5 +77,5 @@ export function formatFullTimestamp(iso: string | null, precision: TimePrecision
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return null;
   if (precision === 'date_only') return format(date, 'EEEE, d MMMM yyyy');
-  return format(date, "EEEE, d MMMM yyyy 'at' HH:mm:ss");
+  return format(date, "EEEE, d MMMM yyyy 'at' h:mm:ss a");
 }

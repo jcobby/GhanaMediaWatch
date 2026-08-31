@@ -1,3 +1,6 @@
+import { useThemeStore } from '@/stores/themeStore';
+import { useColorScheme } from 'nativewind';
+
 /**
  * TypeScript mirror of the design tokens in global.css / tailwind.config.js.
  *
@@ -5,9 +8,13 @@
  * (StatusBar, ActivityIndicator, vector icons, gradient stops, map markers).
  * Anything that *can* be a className must use one — this is the escape hatch,
  * not an alternative styling system.
+ *
+ * Both palettes are mirrored here because a className cannot reach an icon's
+ * `color` prop. **Read them through `useColors()`, not directly** — a component
+ * importing `lightColors` will not repaint when the theme changes.
  */
 
-export const colors = {
+export const lightColors = {
   canvas: '#F4F5FA',
   canvasSoft: '#FFFFFF',
   canvasRaise: '#E9ECF4',
@@ -35,14 +42,18 @@ export const colors = {
   live: '#C81238',
 } as const;
 
-export type ThemeColors = typeof colors;
+/**
+ * Widened off the literals `as const` produces. The two palettes must share a
+ * shape, not values — and `#0E101A` is not assignable to `"#F4F5FA"`.
+ */
+export type ThemeColors = Record<keyof typeof lightColors, string>;
 
 /**
  * The signature gradient — violet to blue, on primary actions and the capture
  * button. Kept as a tuple so every consumer renders identical stops; a gradient
  * that drifts between screens is the fastest way to make a design feel unowned.
  */
-export const accentGradient = [colors.accent, colors.accentAlt] as const;
+export const accentGradient = [lightColors.accent, lightColors.accentAlt] as const;
 
 /**
  * Elevation presets.
@@ -98,3 +109,67 @@ export const categoryColor = {
 } as const;
 
 export type CategoryColorKey = keyof typeof categoryColor;
+
+/**
+ * The dark palette, mirroring the `.dark` block in global.css.
+ *
+ * Kept in step by hand, which is the cost of RN needing colours as props. The
+ * palette test asserts both sets carry the same keys, so a token added to one
+ * and forgotten in the other fails rather than rendering as `undefined`.
+ */
+export const darkColors: ThemeColors = {
+  canvas: '#0E101A',
+  canvasSoft: '#161926',
+  canvasRaise: '#202434',
+
+  glass: '#1E2232',
+  glassMedia: '#10111A',
+  hairline: '#FFFFFF',
+
+  textPrimary: '#F0F2FA',
+  textSecondary: '#C7CCDC',
+  textMuted: '#A0A7BD',
+  textFaint: '#767E96',
+  textOnDark: '#FFFFFF',
+
+  accent: '#8B74FF',
+  accentAlt: '#6096FF',
+  accentBright: '#A795FF',
+  accentWash: '#2C264E',
+
+  success: '#4ADE80',
+  warning: '#FBBF24',
+  danger: '#F87171',
+  info: '#7DAAFF',
+  live: '#FB7185',
+};
+
+/**
+ * The palette for the theme currently in force.
+ *
+ * A hook rather than a mutable export, because RN has to re-render to repaint
+ * an icon — mutating a shared object would change the value and leave the
+ * screen showing the old one.
+ */
+export function useColors(): ThemeColors {
+  const choice = useThemeStore((s) => s.choice);
+  const { colorScheme } = useColorScheme();
+
+  const resolved = choice === 'system' ? (colorScheme ?? 'dark') : choice;
+  return resolved === 'light' ? lightColors : darkColors;
+}
+
+/** True when the app is currently wearing the dark palette. */
+export function useIsDark(): boolean {
+  const choice = useThemeStore((s) => s.choice);
+  const { colorScheme } = useColorScheme();
+  return (choice === 'system' ? (colorScheme ?? 'dark') : choice) === 'dark';
+}
+
+/**
+ * The light palette under its old name.
+ *
+ * Kept so non-component code and tests can still reach a concrete set. Any
+ * component using this will not follow the theme — use `useColors()`.
+ */
+export const colors = lightColors;

@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
 import { BUSINESSES, COMMISSION_LEDGER, EARNINGS_SUMMARY, SURVEYS } from '@/api/dawuroData';
-import { accentGradient, categoryColor, colors } from '@/lib/theme';
+import { accentGradient, categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis } from '@/types/dawuro';
 import { useBusinessStore } from '@/stores/businessStore';
@@ -26,6 +26,7 @@ import { isAcceptingResponses } from '@/features/surveys/surveyLogic';
  * reason a reporter earns nothing is filming something nobody asked for.
  */
 export function EarnHubScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -117,7 +118,7 @@ export function EarnHubScreen() {
                 justifyContent: 'center',
               }}
             >
-              <Ionicons name="videocam" size={21} color={colors.textOnDark} />
+              <Ionicons name="videocam" size={21} color={c.textOnDark} />
             </LinearGradient>
             <View className="flex-1 gap-0.5">
               <Text variant="title-sm">{t('earn.filmTitle')}</Text>
@@ -125,7 +126,7 @@ export function EarnHubScreen() {
                 {t('earn.filmBody')}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
           </Glass>
         </Pressable>
 
@@ -135,7 +136,7 @@ export function EarnHubScreen() {
         >
           <Glass elevation="low" className="flex-row items-center gap-3.5 rounded-lg p-4">
             <View className="h-11 w-11 items-center justify-center rounded-md bg-success-wash">
-              <Ionicons name="clipboard-outline" size={20} color={colors.success} />
+              <Ionicons name="clipboard-outline" size={20} color={c.success} />
             </View>
             <View className="flex-1 gap-0.5">
               <Text variant="title-sm">{t('earn.surveyTitle')}</Text>
@@ -148,7 +149,7 @@ export function EarnHubScreen() {
             {openSurveys.length > 0 ? (
               <Badge label={String(openSurveys.length)} tone="success" />
             ) : null}
-            <Ionicons name="chevron-forward" size={16} color={colors.textFaint} />
+            <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
           </Glass>
         </Pressable>
       </View>

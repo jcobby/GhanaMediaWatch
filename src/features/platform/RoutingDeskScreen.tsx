@@ -8,7 +8,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, EmptyState, Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { BUSINESSES, ROUTING_QUEUE } from '@/api/dawuroData';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { estimateCommission } from '@/features/earnings/commission';
 import { formatCedis, type RoutingItem } from '@/types/dawuro';
@@ -31,6 +31,7 @@ import { toast } from '@/stores/toastStore';
  * decision, and hiding it would make the desk feel consequence-free.
  */
 export function RoutingDeskScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -90,7 +91,7 @@ export function RoutingDeskScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="title-lg">{t('platform.routingDesk')}</Text>
@@ -229,7 +230,7 @@ export function RoutingDeskScreen() {
                         {business.name}
                       </Text>
                       {business.verified ? (
-                        <Ionicons name="checkmark-circle" size={13} color={colors.info} />
+                        <Ionicons name="checkmark-circle" size={13} color={c.info} />
                       ) : null}
                     </View>
                     <View className="flex-row items-center gap-1.5">
@@ -255,9 +256,7 @@ export function RoutingDeskScreen() {
                         : 'h-5 w-5 rounded-pill border border-hairline/25'
                     }
                   >
-                    {isChosen ? (
-                      <Ionicons name="checkmark" size={12} color={colors.textOnDark} />
-                    ) : null}
+                    {isChosen ? <Ionicons name="checkmark" size={12} color={c.textOnDark} /> : null}
                   </View>
                 </Pressable>
               );
@@ -269,7 +268,7 @@ export function RoutingDeskScreen() {
             rather than hidden behind a later screen. */}
         {activeEarning ? (
           <Glass elevation="low" className="mt-3 flex-row items-center gap-3 rounded-lg p-3.5">
-            <Ionicons name="cash-outline" size={17} color={colors.success} />
+            <Ionicons name="cash-outline" size={17} color={c.success} />
             <Text variant="body-sm" className="flex-1">
               {t('platform.reporterEarns', {
                 amount: formatCedis(activeEarning.reporterPesewas),

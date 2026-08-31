@@ -3,7 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Badge, Pressable, Sheet, Text } from '@/components/ui';
 import { DEMO_LOGINS, DEMO_PASSWORD, type DemoLogin } from '@/api/dawuroData';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 
 interface DemoAccountSheetProps {
   visible: boolean;
@@ -35,6 +35,7 @@ const TONE: Record<DemoLogin['accountType'], 'neutral' | 'accent' | 'success'> =
  * thing that must not exist against a real backend.
  */
 export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetProps) {
+  const c = useColors();
   const { t } = useTranslation();
 
   return (
@@ -54,7 +55,7 @@ export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetP
               className="flex-row items-center gap-3 rounded-lg border border-hairline/[0.10] p-3.5"
             >
               <View className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise">
-                <Ionicons name={ICON[login.accountType]} size={17} color={colors.textMuted} />
+                <Ionicons name={ICON[login.accountType]} size={17} color={c.textMuted} />
               </View>
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">
@@ -75,7 +76,7 @@ export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetP
                   {login.showcases}
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+              <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
             </Pressable>
           ))}
         </View>

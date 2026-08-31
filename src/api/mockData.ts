@@ -1,4 +1,5 @@
 import type { AuthoredIncident, IncidentCategory, VettingState } from '@/types/api';
+import { placeholderImage } from '@/lib/placeholder';
 import { SAMPLE_INCIDENTS } from './fixtures';
 
 /**
@@ -107,7 +108,7 @@ export const OUTBOX_ITEMS: OutboxItem[] = [
     id: 'out_1',
     category: 'accident',
     description: 'Motorbike down at the Tetteh Quarshie underpass, rider sitting up.',
-    thumbnailUrl: 'https://loremflickr.com/200/200/motorbike,road?lock=9',
+    thumbnailUrl: placeholderImage('mock-9', 'other', { width: 540, height: 960 }),
     kind: 'video',
     byteSize: 18_400_000,
     capturedAtIso: minutesAgo(4),
@@ -121,7 +122,7 @@ export const OUTBOX_ITEMS: OutboxItem[] = [
     id: 'out_2',
     category: 'infrastructure',
     description: 'Manhole cover missing on the pavement outside the school gate.',
-    thumbnailUrl: 'https://loremflickr.com/200/200/manhole,pavement?lock=9',
+    thumbnailUrl: placeholderImage('mock-9', 'other', { width: 540, height: 960 }),
     kind: 'photo',
     byteSize: 2_100_000,
     capturedAtIso: minutesAgo(31),
@@ -135,7 +136,7 @@ export const OUTBOX_ITEMS: OutboxItem[] = [
     id: 'out_3',
     category: 'flood',
     description: 'Drain overflowing across both lanes after last night’s rain.',
-    thumbnailUrl: 'https://loremflickr.com/200/200/flood,drain?lock=9',
+    thumbnailUrl: placeholderImage('mock-9', 'other', { width: 540, height: 960 }),
     kind: 'video',
     byteSize: 44_800_000,
     capturedAtIso: minutesAgo(96),
@@ -150,7 +151,7 @@ export const OUTBOX_ITEMS: OutboxItem[] = [
     id: 'out_4',
     category: 'utility',
     description: 'Sparking cable on the pole at the corner.',
-    thumbnailUrl: 'https://loremflickr.com/200/200/powerline,cable?lock=9',
+    thumbnailUrl: placeholderImage('mock-9', 'other', { width: 540, height: 960 }),
     kind: 'photo',
     byteSize: 3_300_000,
     capturedAtIso: minutesAgo(220),

@@ -5,7 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Glass, Pressable, Sheet, Text } from '@/components/ui';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { formatCedis, type SurveyQuestion, type SurveyQuestionKind } from '@/types/dawuro';
 import { toast } from '@/stores/toastStore';
 import { MAX_QUESTIONS, estimateSurveyCost, validateSurvey, type SurveyIssue } from './surveyLogic';
@@ -38,6 +38,7 @@ let questionCounter = 0;
  * author should be able to fix the form in a single pass.
  */
 export function SurveyBuilderScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -105,7 +106,7 @@ export function SurveyBuilderScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="caption" tone="accent" className="font-sans-semibold uppercase">
@@ -146,7 +147,7 @@ export function SurveyBuilderScreen() {
           {questions.map((question, index) => (
             <Glass key={question.id} elevation="low" className="gap-3 rounded-lg p-3.5">
               <View className="flex-row items-center gap-2">
-                <Ionicons name={KIND_ICON[question.kind]} size={15} color={colors.accent} />
+                <Ionicons name={KIND_ICON[question.kind]} size={15} color={c.accent} />
                 <Text variant="caption" tone="accent" className="flex-1 uppercase">
                   {t(`surveys.kind.${question.kind}`)}
                 </Text>
@@ -155,7 +156,7 @@ export function SurveyBuilderScreen() {
                   accessibilityLabel={t('surveys.removeQuestion')}
                   className="h-7 w-7 items-center justify-center rounded-pill bg-canvas-raise"
                 >
-                  <Ionicons name="trash-outline" size={13} color={colors.danger} />
+                  <Ionicons name="trash-outline" size={13} color={c.danger} />
                 </Pressable>
               </View>
 
@@ -163,10 +164,10 @@ export function SurveyBuilderScreen() {
                 value={question.prompt}
                 onChangeText={(prompt) => updateQuestion(question.id, { prompt })}
                 placeholder={t('surveys.questionPlaceholder', { number: index + 1 })}
-                placeholderTextColor={colors.textFaint}
+                placeholderTextColor={c.textFaint}
                 accessibilityLabel={t('surveys.questionPlaceholder', { number: index + 1 })}
                 style={{
-                  color: colors.textPrimary,
+                  color: c.textPrimary,
                   fontFamily: 'Inter_500Medium',
                   fontSize: 15,
                   paddingVertical: 4,
@@ -186,13 +187,13 @@ export function SurveyBuilderScreen() {
                           updateQuestion(question.id, { options });
                         }}
                         placeholder={t('surveys.optionPlaceholder', { number: optionIndex + 1 })}
-                        placeholderTextColor={colors.textFaint}
+                        placeholderTextColor={c.textFaint}
                         accessibilityLabel={t('surveys.optionPlaceholder', {
                           number: optionIndex + 1,
                         })}
                         style={{
                           flex: 1,
-                          color: colors.textPrimary,
+                          color: c.textPrimary,
                           fontFamily: 'Inter_400Regular',
                           fontSize: 14,
                           paddingVertical: 6,
@@ -207,7 +208,7 @@ export function SurveyBuilderScreen() {
                     accessibilityLabel={t('surveys.addOption')}
                     className="flex-row items-center gap-1.5 self-start"
                   >
-                    <Ionicons name="add" size={13} color={colors.accent} />
+                    <Ionicons name="add" size={13} color={c.accent} />
                     <Text variant="caption" tone="accent" className="font-sans-semibold">
                       {t('surveys.addOption')}
                     </Text>
@@ -230,7 +231,7 @@ export function SurveyBuilderScreen() {
                   }
                 >
                   {question.required ? (
-                    <Ionicons name="checkmark" size={10} color={colors.textOnDark} />
+                    <Ionicons name="checkmark" size={10} color={c.textOnDark} />
                   ) : null}
                 </View>
                 <Text variant="caption" tone="muted">
@@ -246,7 +247,7 @@ export function SurveyBuilderScreen() {
               accessibilityLabel={t('surveys.addQuestion')}
               className="flex-row items-center justify-center gap-2 rounded-lg border border-dashed border-hairline/25 py-4"
             >
-              <Ionicons name="add-circle-outline" size={17} color={colors.accent} />
+              <Ionicons name="add-circle-outline" size={17} color={c.accent} />
               <Text variant="body-sm" tone="accent" className="font-sans-semibold">
                 {t('surveys.addQuestion')}
               </Text>
@@ -308,7 +309,7 @@ export function SurveyBuilderScreen() {
           <View className="gap-1.5 rounded-lg bg-warning-wash p-3.5">
             {issues.map((issue) => (
               <View key={issue} className="flex-row items-start gap-2">
-                <Ionicons name="alert-circle-outline" size={14} color={colors.warning} />
+                <Ionicons name="alert-circle-outline" size={14} color={c.warning} />
                 <Text variant="caption" tone="warning" className="flex-1">
                   {t(`surveys.issue.${issue as SurveyIssue}`)}
                 </Text>
@@ -347,7 +348,7 @@ export function SurveyBuilderScreen() {
               className="flex-row items-center gap-3 rounded-lg border border-hairline/[0.10] p-3.5"
             >
               <View className="h-10 w-10 items-center justify-center rounded-pill bg-accent-wash">
-                <Ionicons name={KIND_ICON[kind]} size={17} color={colors.accent} />
+                <Ionicons name={KIND_ICON[kind]} size={17} color={c.accent} />
               </View>
               <View className="flex-1">
                 <Text variant="body-sm" className="font-sans-semibold">
@@ -376,6 +377,7 @@ function Field({
   placeholder: string;
   multiline?: boolean;
 }) {
+  const c = useColors();
   return (
     <View className="gap-2">
       <Text variant="label" tone="muted">
@@ -386,11 +388,11 @@ function Field({
           {...rest}
           multiline={multiline}
           accessibilityLabel={label}
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={c.textFaint}
           style={{
             minHeight: multiline ? 76 : 52,
             paddingVertical: multiline ? 14 : 0,
-            color: colors.textPrimary,
+            color: c.textPrimary,
             fontFamily: 'Inter_400Regular',
             fontSize: 15,
             textAlignVertical: multiline ? 'top' : 'center',
@@ -414,6 +416,7 @@ function Stepper({
   length: number;
   onChange: (index: number) => void;
 }) {
+  const c = useColors();
   const { t } = useTranslation();
   return (
     <Glass elevation="low" className="gap-3 rounded-lg p-4">
@@ -432,7 +435,7 @@ function Stepper({
           accessibilityLabel={t('org.smaller')}
           className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
         >
-          <Ionicons name="remove" size={18} color={colors.textPrimary} />
+          <Ionicons name="remove" size={18} color={c.textPrimary} />
         </Pressable>
         <View className="h-1.5 flex-1 flex-row gap-1">
           {Array.from({ length }, (_, i) => (
@@ -452,7 +455,7 @@ function Stepper({
           accessibilityLabel={t('org.larger')}
           className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
         >
-          <Ionicons name="add" size={18} color={colors.textPrimary} />
+          <Ionicons name="add" size={18} color={c.textPrimary} />
         </Pressable>
       </View>
     </Glass>

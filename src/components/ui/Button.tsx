@@ -2,7 +2,7 @@ import { type ReactNode } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { cn } from '@/lib/cn';
-import { accentGradient, colors, shadow } from '@/lib/theme';
+import { accentGradient, shadow, useColors } from '@/lib/theme';
 import { Pressable, type PressableProps } from './Pressable';
 import { Text, type TextTone } from './Text';
 
@@ -44,11 +44,12 @@ export function Button({
   className,
   ...rest
 }: ButtonProps) {
+  const c = useColors();
   const isDisabled = disabled || loading;
 
   const content = (
     <View className="flex-row items-center justify-center gap-2">
-      {loading ? <ActivityIndicator size="small" color={colors.textPrimary} /> : leading}
+      {loading ? <ActivityIndicator size="small" color={c.textPrimary} /> : leading}
       <Text
         variant={size === 'lg' ? 'title-sm' : 'body'}
         tone={LABEL_TONE[variant]}

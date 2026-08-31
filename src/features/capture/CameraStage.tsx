@@ -5,12 +5,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Button, Glass, Pressable, Text } from '@/components/ui';
+import { Button, Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { MAX_VIDEO_DURATION_S } from '@/lib/constants';
 import { colors } from '@/lib/theme';
 import { hapticPress, hapticRecord, hapticWarning } from '@/lib/haptics';
 import { useCaptureStore } from '@/stores/captureStore';
 import { lockFix, type LocationFix } from './gpsGate';
+import { AudioRecorder } from './AudioRecorder';
 
 interface CameraStageProps {
   fix: LocationFix;
@@ -18,7 +19,14 @@ interface CameraStageProps {
   accuracyM: number;
 }
 
-type Mode = 'photo' | 'video';
+/**
+ * What the shutter does.
+ *
+ * `live` is offered but not yet implemented — it is on the switch so the
+ * intent is visible and so the layout is settled before it arrives, and it
+ * explains itself rather than doing nothing when tapped.
+ */
+type Mode = 'photo' | 'video' | 'audio' | 'live';
 
 /**
  * The camera, mounted only once the GPS gate has opened.
@@ -42,6 +50,9 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
   const [mode, setMode] = useState<Mode>('photo');
   const [facing, setFacing] = useState<'back' | 'front'>('back');
   const [torch, setTorch] = useState(false);
+  // Live is on the switch but not built yet; tapping it explains itself
+  // rather than selecting a mode whose shutter would do nothing.
+  const [liveSheet, setLiveSheet] = useState(false);
   const [recording, setRecording] = useState(false);
   const [elapsedS, setElapsedS] = useState(0);
   const [busy, setBusy] = useState(false);
@@ -228,6 +239,28 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
         </View>
       ) : null}
 
+      {mode === 'audio' ? (
+        <View className="absolute inset-0 bg-canvas">
+          <AudioRecorder
+            fix={lockFix(fix)}
+            onDiscard={() => setMode('video')}
+            onKeep={(uri, durationMs) => {
+              setPending({
+                uri,
+                kind: 'audio',
+                mimeType: 'audio/m4a',
+                width: null,
+                height: null,
+                durationMs,
+                fix: lockFix(fix),
+                confidence,
+              });
+              router.push('/capture/review');
+            }}
+          />
+        </View>
+      ) : null}
+
       {/* Mode switch + shutter */}
       <View
         className="absolute left-0 right-0 items-center gap-5"
@@ -235,14 +268,20 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
       >
         {!recording ? (
           <Glass context="media" elevation="mid" className="flex-row rounded-pill p-1">
-            {(['photo', 'video'] as const).map((m) => (
+            {(['photo', 'video', 'audio', 'live'] as const).map((m) => (
               <Pressable
                 key={m}
-                onPress={() => setMode(m)}
+                onPress={() => {
+                  if (m === 'live') {
+                    setLiveSheet(true);
+                    return;
+                  }
+                  setMode(m);
+                }}
                 accessibilityLabel={t(`capture.${m}`)}
                 accessibilityState={{ selected: mode === m }}
                 className={
-                  mode === m ? 'rounded-pill bg-glass/25 px-5 py-2' : 'rounded-pill px-5 py-2'
+                  mode === m ? 'rounded-pill bg-glass/25 px-4 py-2' : 'rounded-pill px-4 py-2'
                 }
               >
                 <Text
@@ -258,27 +297,31 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
           </Glass>
         ) : null}
 
-        <Pressable
-          onPress={mode === 'photo' ? handlePhoto : undefined}
-          onLongPress={mode === 'video' ? handleVideoStart : undefined}
-          onPressOut={mode === 'video' && recording ? handleVideoStop : undefined}
-          delayLongPress={180}
-          haptic={false}
-          disabled={busy}
-          accessibilityLabel={mode === 'video' ? t('capture.holdToRecord') : t('capture.photo')}
-          className="h-20 w-20 items-center justify-center rounded-pill border-4 border-white/70"
-        >
-          {/* Ring countdown: the border fills as the cap approaches. */}
-          {recording ? (
+        {mode !== 'audio' ? (
+          <Pressable
+            onPress={mode === 'photo' ? handlePhoto : undefined}
+            onLongPress={mode === 'video' ? handleVideoStart : undefined}
+            onPressOut={mode === 'video' && recording ? handleVideoStop : undefined}
+            delayLongPress={180}
+            haptic={false}
+            disabled={busy}
+            accessibilityLabel={mode === 'video' ? t('capture.holdToRecord') : t('capture.photo')}
+            className="h-20 w-20 items-center justify-center rounded-pill border-4 border-white/70"
+          >
+            {/* Ring countdown: the border fills as the cap approaches. */}
+            {recording ? (
+              <View
+                className="absolute inset-0 rounded-pill border-4 border-live"
+                style={{ opacity: 0.35 + ringProgress * 0.65 }}
+              />
+            ) : null}
             <View
-              className="absolute inset-0 rounded-pill border-4 border-live"
-              style={{ opacity: 0.35 + ringProgress * 0.65 }}
+              className={
+                recording ? 'h-7 w-7 rounded-sm bg-live' : 'h-16 w-16 rounded-pill bg-white'
+              }
             />
-          ) : null}
-          <View
-            className={recording ? 'h-7 w-7 rounded-sm bg-live' : 'h-16 w-16 rounded-pill bg-white'}
-          />
-        </Pressable>
+          </Pressable>
+        ) : null}
 
         {mode === 'video' && !recording ? (
           <Text variant="caption" onMedia tone="muted">
@@ -286,6 +329,21 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
           </Text>
         ) : null}
       </View>
+
+      <Sheet visible={liveSheet} onClose={() => setLiveSheet(false)} title={t('capture.liveTitle')}>
+        <Text variant="body-sm" tone="secondary">
+          {t('capture.liveBody')}
+        </Text>
+        <Button
+          label={t('capture.liveGotIt')}
+          fullWidth
+          className="mt-4"
+          onPress={() => {
+            setMode('video');
+            setLiveSheet(false);
+          }}
+        />
+      </Sheet>
     </View>
   );
 }

@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Glass, Pressable, Text } from '@/components/ui';
 import { ORG_STATS, ORG_TREND, SAVED_QUERIES } from '@/api/mockData';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { useAuthStore } from '@/stores/authStore';
 import { Sparkline } from '@/components/Sparkline';
@@ -22,6 +22,7 @@ import { useRole } from './useRole';
  * trend, and the reports needing attention right now.
  */
 export function OrgDashboardScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -73,7 +74,7 @@ export function OrgDashboardScreen() {
               <Ionicons
                 name={weekOverWeek >= 0 ? 'trending-up' : 'trending-down'}
                 size={15}
-                color={weekOverWeek >= 0 ? colors.warning : colors.success}
+                color={weekOverWeek >= 0 ? c.warning : c.success}
               />
               <Text
                 variant="body-sm"
@@ -167,7 +168,7 @@ export function OrgDashboardScreen() {
               >
                 <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
                   <View className="h-9 w-9 items-center justify-center rounded-pill bg-accent-wash">
-                    <Ionicons name="funnel-outline" size={16} color={colors.accent} />
+                    <Ionicons name="funnel-outline" size={16} color={c.accent} />
                   </View>
                   <View className="flex-1">
                     <Text variant="body-sm" className="font-sans-semibold" numberOfLines={1}>
@@ -179,7 +180,7 @@ export function OrgDashboardScreen() {
                     </Text>
                   </View>
                   {query.alertsOn ? (
-                    <Ionicons name="notifications" size={15} color={colors.accent} />
+                    <Ionicons name="notifications" size={15} color={c.accent} />
                   ) : null}
                 </Glass>
               </Pressable>
@@ -227,7 +228,7 @@ export function OrgDashboardScreen() {
                       : ''}
                   </Text>
                 </View>
-                <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+                <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
               </Glass>
             </Pressable>
           ))}

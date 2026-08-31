@@ -33,6 +33,16 @@ export const incidents = sqliteTable(
     showDate: integer('show_date', { mode: 'boolean' }).notNull().default(true),
     showTime: integer('show_time', { mode: 'boolean' }).notNull().default(true),
 
+    /*
+     * The reporter's account of the incident, beyond category and description.
+     * Consent is stored as JSON rather than five columns: the flags are always
+     * read together, never queried individually, and adding a sixth later
+     * should not need a migration.
+     */
+    severity: text('severity').notNull().default('concern'),
+    landmark: text('landmark'),
+    consentJson: text('consent_json').notNull().default('{}'),
+
     // The fix, locked at the moment of capture and never updated afterwards.
     latitude: text('latitude'),
     longitude: text('longitude'),

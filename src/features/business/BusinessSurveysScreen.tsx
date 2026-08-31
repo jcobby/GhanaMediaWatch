@@ -5,7 +5,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, EmptyState, Glass, Text } from '@/components/ui';
 import { SURVEYS } from '@/api/dawuroData';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { formatCedis } from '@/types/dawuro';
 import { estimateSurveyCost, fillRate } from '@/features/surveys/surveyLogic';
 
@@ -17,6 +17,7 @@ import { estimateSurveyCost, fillRate } from '@/features/surveys/surveyLogic';
  * close it early.
  */
 export function BusinessSurveysScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -91,7 +92,7 @@ export function BusinessSurveysScreen() {
 
                 {stalling ? (
                   <View className="flex-row items-start gap-2 rounded-sm bg-warning-wash p-2.5">
-                    <Ionicons name="trending-down-outline" size={13} color={colors.warning} />
+                    <Ionicons name="trending-down-outline" size={13} color={c.warning} />
                     <Text variant="caption" tone="warning" className="flex-1">
                       {t('surveys.stallingHint')}
                     </Text>
@@ -102,7 +103,7 @@ export function BusinessSurveysScreen() {
                   <Text variant="caption" tone="muted" className="flex-1">
                     {t('surveys.committed', { amount: formatCedis(cost.totalPesewas) })}
                   </Text>
-                  <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+                  <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
                 </View>
               </Glass>
             );

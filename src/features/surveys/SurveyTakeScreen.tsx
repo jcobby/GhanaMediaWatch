@@ -6,7 +6,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
 import { SURVEYS } from '@/api/dawuroData';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { formatCedis, type SurveyQuestion } from '@/types/dawuro';
 import { hapticSelect, hapticUnlock } from '@/lib/haptics';
 import { toast } from '@/stores/toastStore';
@@ -29,6 +29,7 @@ interface SurveyTakeScreenProps {
  * promised on the previous screen.
  */
 export function SurveyTakeScreen({ surveyId }: SurveyTakeScreenProps) {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -74,7 +75,7 @@ export function SurveyTakeScreen({ surveyId }: SurveyTakeScreenProps) {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="close" size={20} color={colors.textPrimary} />
+            <Ionicons name="close" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="title-md" numberOfLines={1}>
@@ -152,6 +153,7 @@ function QuestionCard({
   value: AnswerValue;
   onChange: (value: AnswerValue) => void;
 }) {
+  const c = useColors();
   const { t } = useTranslation();
   const answered = isAnswered(question, value);
 
@@ -166,7 +168,7 @@ function QuestionCard({
           }
         >
           {answered ? (
-            <Ionicons name="checkmark" size={13} color={colors.textOnDark} />
+            <Ionicons name="checkmark" size={13} color={c.textOnDark} />
           ) : (
             <Text variant="caption" tone="muted" className="font-sans-semibold">
               {index + 1}
@@ -242,9 +244,7 @@ function QuestionCard({
                       : 'h-4 w-4 rounded-xs border border-hairline/25'
                   }
                 >
-                  {selected ? (
-                    <Ionicons name="checkmark" size={10} color={colors.textOnDark} />
-                  ) : null}
+                  {selected ? <Ionicons name="checkmark" size={10} color={c.textOnDark} /> : null}
                 </View>
                 <Text variant="body-sm" className="flex-1">
                   {option}
@@ -297,13 +297,13 @@ function QuestionCard({
           value={typeof value === 'string' ? value : ''}
           onChangeText={onChange}
           placeholder={t('surveys.textPlaceholder')}
-          placeholderTextColor={colors.textFaint}
+          placeholderTextColor={c.textFaint}
           multiline
           maxLength={300}
           accessibilityLabel={question.prompt}
           style={{
             minHeight: 80,
-            color: colors.textPrimary,
+            color: c.textPrimary,
             fontFamily: 'Inter_400Regular',
             fontSize: 15,
             textAlignVertical: 'top',
@@ -328,7 +328,7 @@ function QuestionCard({
           <Ionicons
             name={value ? 'checkmark-circle' : 'camera-outline'}
             size={18}
-            color={value ? colors.accent : colors.textMuted}
+            color={value ? c.accent : c.textMuted}
           />
           <Text variant="body-sm" tone={value ? 'accent' : 'muted'} className="font-sans-semibold">
             {value ? t('surveys.photoAttached') : t('surveys.addPhoto')}

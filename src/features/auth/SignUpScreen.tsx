@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Pressable, Text } from '@/components/ui';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 import { AuthField } from './AuthField';
@@ -17,6 +17,7 @@ const STRENGTH_LABEL = ['tooShort', 'weak', 'good', 'strong'] as const;
 const STRENGTH_CLASS = ['bg-danger', 'bg-warning', 'bg-info', 'bg-success'] as const;
 
 export function SignUpScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -73,7 +74,7 @@ export function SignUpScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <Text variant="title-lg">{t('auth.createAccount')}</Text>
         </View>
@@ -191,9 +192,7 @@ export function SignUpScreen() {
                     : 'h-5 w-5 items-center justify-center rounded-xs border border-hairline/30'
                 }
               >
-                {accepted ? (
-                  <Ionicons name="checkmark" size={13} color={colors.textOnDark} />
-                ) : null}
+                {accepted ? <Ionicons name="checkmark" size={13} color={c.textOnDark} /> : null}
               </View>
               <Text variant="body-sm" tone="muted" className="flex-1">
                 {t('auth.acceptTerms')}

@@ -1,0 +1,2628 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Version 2.0 · 27 August 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)">
+<title>Dawuro Platform — Backend Specification</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body,h1,h2,h3,h4,h5,p,figure,blockquote,dl,dd{margin:0}
+  img{max-width:100%;display:block}
+  table{border-collapse:collapse}
+
+  :root{
+    --ground:#EEF1F0; --panel:#F7F9F8; --panel-2:#E3E8E7;
+    --rule:#C7D0CE; --rule-soft:#DAE1DF;
+    --ink:#101819; --ink-2:#3C4A4B; --ink-3:#647575;
+    --accent:#0F6E6A; --accent-ink:#0B534F; --accent-wash:#DCEAE8;
+    --warn:#A25C00; --warn-wash:#F6EADA;
+    --danger:#B4232C; --danger-wash:#F7E2E3;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{
+    display:grid; grid-template-columns:210px minmax(0,1fr);
+    gap:44px; max-width:1180px; margin:0 auto; padding:56px 32px 96px;
+  }
+
+  /* ── contents rail ─────────────────────────────────────────────── */
+  .rail{position:sticky; top:32px; align-self:start; max-height:calc(100vh - 64px); overflow-y:auto}
+  .rail-title{
+    font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-3); margin-bottom:12px;
+  }
+  .rail ol{list-style:none; margin:0; padding:0; counter-reset:sec}
+  .rail li{margin-bottom:2px}
+  .rail a{
+    display:block; padding:5px 9px; border-radius:5px;
+    color:var(--ink-2); text-decoration:none; font-size:12.5px; line-height:1.35;
+  }
+  .rail a:hover{background:var(--accent-wash); color:var(--accent-ink)}
+
+  /* ── document ──────────────────────────────────────────────────── */
+  .doc{min-width:0}
+  .doc > h1{
+    font-size:40px; line-height:1.14; letter-spacing:-.022em; font-weight:700;
+    text-wrap:balance; margin-bottom:6px;
+  }
+  .doc h2{
+    font-size:25px; line-height:1.22; letter-spacing:-.014em; font-weight:650;
+    margin:52px 0 14px; padding-top:22px; border-top:1px solid var(--rule);
+    text-wrap:balance;
+  }
+  .doc h3{font-size:17.5px; font-weight:650; margin:30px 0 9px; letter-spacing:-.006em}
+  .doc h4{font-size:15px; font-weight:650; margin:22px 0 7px; color:var(--ink-2)}
+
+  .doc p{margin:0 0 13px; max-width:74ch}
+  .doc ul,.doc ol{margin:0 0 15px; padding-left:22px; max-width:74ch}
+  .doc li{margin-bottom:5px}
+  .doc li > ul,.doc li > ol{margin-top:5px; margin-bottom:2px}
+
+  .doc a{color:var(--accent-ink); text-decoration-thickness:1px; text-underline-offset:2px}
+  .doc strong{font-weight:650; color:var(--ink)}
+
+  /* Inline code: distinct from prose without shouting. */
+  .doc code{
+    font-family:var(--mono); font-size:.855em;
+    background:var(--panel-2); color:var(--accent-ink);
+    padding:.1em .35em; border-radius:3px; white-space:nowrap;
+  }
+  .doc pre{
+    background:var(--panel); border:1px solid var(--rule-soft); border-left:3px solid var(--accent);
+    border-radius:6px; padding:15px 17px; margin:0 0 17px;
+    overflow-x:auto; font-size:13px; line-height:1.58;
+  }
+  .doc pre code{background:none; color:var(--ink); padding:0; white-space:pre; font-size:inherit}
+
+  /* Tables carry most of the reference material, so they get the most care. */
+  .doc table{
+    width:100%; margin:0 0 19px; font-size:13.5px;
+    background:var(--panel); border:1px solid var(--rule-soft); border-radius:6px;
+    overflow:hidden; font-variant-numeric:tabular-nums;
+  }
+  .doc thead th{
+    background:var(--panel-2); text-align:left; font-weight:650; font-size:11.5px;
+    letter-spacing:.05em; text-transform:uppercase; color:var(--ink-2);
+    padding:9px 12px; border-bottom:1px solid var(--rule);
+  }
+  .doc td{padding:8px 12px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+  .doc tbody tr:last-child td{border-bottom:none}
+  .doc td code{white-space:nowrap; font-size:.9em}
+  .tw{overflow-x:auto; margin-bottom:19px}
+  .tw table{margin-bottom:0}
+
+  .doc blockquote{
+    border-left:3px solid var(--warn); background:var(--warn-wash);
+    padding:11px 15px; margin:0 0 17px; border-radius:0 5px 5px 0;
+  }
+  .doc blockquote p:last-child{margin-bottom:0}
+
+  .doc hr{border:0; height:0; margin:0}     /* section rules come from h2 */
+
+  .meta{
+    color:var(--ink-3); font-size:13.5px; margin-bottom:30px;
+    padding-bottom:18px; border-bottom:1px solid var(--rule);
+  }
+
+  /* ── print ─────────────────────────────────────────────────────── */
+  @page{ margin:15mm 14mm; }
+  @media print{
+    body{background:#fff; font-size:10pt; line-height:1.5}
+    .wrap{display:block; max-width:none; padding:0}
+    .rail{display:none}
+    .doc > h1{font-size:24pt}
+    .doc h2{
+      font-size:14pt; margin:20pt 0 7pt; padding-top:9pt;
+      break-after:avoid; break-inside:avoid;
+    }
+    .doc h3{font-size:11.5pt; margin:13pt 0 5pt; break-after:avoid}
+    .doc h4{font-size:10pt; break-after:avoid}
+    .doc p,.doc li{max-width:none}
+    .doc pre{
+      font-size:8pt; break-inside:avoid; padding:8pt 10pt;
+      background:#F7F9F8; border-color:#C7D0CE;
+    }
+    .doc table{font-size:8.5pt; break-inside:avoid}
+    .doc thead th{padding:5pt 7pt; font-size:7.5pt}
+    .doc td{padding:4pt 7pt}
+    .tw{overflow:visible}
+    .doc a{color:inherit; text-decoration:none}
+    .doc blockquote{break-inside:avoid}
+  }
+
+  @media (max-width:900px){
+    .wrap{grid-template-columns:minmax(0,1fr); gap:0; padding:32px 20px 64px}
+    .rail{display:none}
+    .doc > h1{font-size:30px}
+    .doc h2{font-size:21px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="rail" aria-label="Contents">
+    <div class="rail-title">Contents</div>
+    <ol>
+<li><a href="#0-how-to-use-this-document">0. How to use this document</a></li>
+<li><a href="#1-what-dawuro-is">1. What Dawuro is</a></li>
+<li><a href="#2-conventions">2. Conventions</a></li>
+<li><a href="#use-a-64-bit-integer-column-numericdecimal-is-acceptable-floatrealdouble-is-a-defect">Use a 64-bit integer column. NUMERIC/DECIMAL is acceptable; FLOAT/REAL/DOUBLE is a defect.</a></li>
+<li><a href="#3-domain-model">3. Domain model</a></li>
+<li><a href="#4-the-trust-model">4. The trust model</a></li>
+<li><a href="#5-capture-and-upload">5. Capture and upload</a></li>
+<li><a href="#6-routing-which-institutions-receive-a-report">6. Routing — which institutions receive a report</a></li>
+<li><a href="#7-assignment-which-employee-handles-it">7. Assignment — which employee handles it</a></li>
+<li><a href="#8-organisations">8. Organisations</a></li>
+<li><a href="#an-individual-reporter-declares-an-institution-they-are-affiliated-with-or-declares-themselves-independent-both-are-first-class-independence-is-not-a-missing-value">An individual reporter declares an institution they are affiliated with, or declares themselves independent. Both are first-class; independence is not a missing value.</a></li>
+<li><a href="#9-institutional-onboarding">9. Institutional onboarding</a></li>
+<li><a href="#10-money">10. Money</a></li>
+<li><a href="#11-response-and-sla">11. Response and SLA</a></li>
+<li><a href="#12-surveys">12. Surveys</a></li>
+<li><a href="#13-endpoint-index">13. Endpoint index</a></li>
+<li><a href="#14-invariants-the-must-never-list">14. Invariants — the must-never list</a></li>
+<li><a href="#15-test-vectors">15. Test vectors</a></li>
+<li><a href="#16-open-decisions">16. Open decisions</a></li>
+<li><a href="#appendix-reference-implementation">Appendix — reference implementation</a></li>
+    </ol>
+  </nav>
+  <main class="doc">
+<h1 id="dawuro-platform-backend-specification">Dawuro Platform — Backend Specification</h1>
+<p><strong>Version 2.0 · 27 August 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)</strong></p>
+<hr>
+<h2 id="0-how-to-use-this-document">0. How to use this document</h2>
+<p>This is the complete specification for the Dawuro backend. <strong>Both clients are already built</strong> — an Expo mobile app for reporters and a Next.js console for institutions and platform operators. They run today against fixtures. This document describes the server they need.</p>
+<p>It is written to be handed to an AI coding assistant in full. It is deliberately self-contained: every type, every constant and every rule appears here literally, so nothing has to be inferred from a repository the assistant cannot see.</p>
+<p><strong>Normative language.</strong> <strong>MUST</strong> is a requirement — breaking it is a defect. <strong>SHOULD</strong> is a strong recommendation with room for a documented alternative. <strong>MAY</strong> is genuinely optional.</p>
+<p><strong>Read §4 and §14 before writing any code.</strong> §4 is the trust model, which is the product; §14 is the list of things that must never happen. Everything else is mechanics.</p>
+<p><strong>Language.</strong> All shapes are given as TypeScript because both clients are TypeScript and these exact declarations are compiled against today. Implement the server in whatever you like; the JSON on the wire must match these shapes exactly.</p>
+<h3 id="what-already-exists">What already exists</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mobile app (Expo / React Native)</td>
+<td>Built. Capture, GPS gating, offline outbox, resumable upload, feed, comments, earnings. 214 tests.</td>
+</tr>
+<tr>
+<td>Web console (Next.js 15)</td>
+<td>Built. Business inbox, routing desk, editorial workbench, onboarding, approvals, payouts, organisations.</td>
+</tr>
+<tr>
+<td>Shared business rules (<code>@dawuro/core</code>)</td>
+<td>Built and unit-tested. ~3,600 lines. Reproduced in full in §3–§11 below.</td>
+</tr>
+<tr>
+<td>Backend</td>
+<td><strong>Nothing. This document.</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="the-one-rule-about-shared-logic">The one rule about shared logic</h3>
+<p>Routing, commission, billing, permissions, assurance classification and the editorial gate are implemented in the clients and specified here. <strong>The server MUST implement them independently and treat its own answer as authoritative.</strong> Client-side rules exist to make the interface honest, not to secure anything — anyone can call your endpoints directly. Where this document gives an algorithm, implement that algorithm; do not trust a client to have applied it.</p>
+<hr>
+<h2 id="1-what-dawuro-is">1. What Dawuro is</h2>
+<p>A Ghanaian incident-reporting platform. Members of the public film incidents on a phone. Reports are automatically routed to institutions — government agencies, utilities, media houses — whose declared interests and geography match. Those institutions license reports, which pays the reporter a commission, and may then publish a report to the public feed credited to themselves.</p>
+<p><code>dawuro</code> is the gong an Akan town crier strikes to gather people before speaking.</p>
+<h3 id="the-loop">The loop</h3>
+<pre><code>reporter films  →  provenance sealed at capture  →  auto-routed to matching institutions
+      ↑                                                          ↓
+  commission paid  ←  institution licenses  ←  editorial verifies  →  published to feed
+</code></pre>
+<h3 id="four-roles">Four roles</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Role</th>
+<th>Surface</th>
+<th>What they do</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>reporter</code></td>
+<td>Mobile only</td>
+<td>Films incidents, submits, earns commission. Never uses the console.</td>
+</tr>
+<tr>
+<td><code>business</code></td>
+<td>Console only</td>
+<td>Receives routed reports, licenses them, assigns to staff, publishes.</td>
+</tr>
+<tr>
+<td><code>platform_owner</code></td>
+<td>Console only</td>
+<td>Operates the service: onboards institutions, oversees routing, runs payouts.</td>
+</tr>
+<tr>
+<td><code>editor</code></td>
+<td>Console only</td>
+<td>Decides whether a claim is true. <strong>Deliberately separate from <code>platform_owner</code></strong> — operating the service and adjudicating truth are different jobs.</td>
+</tr>
+</tbody></table></div>
+<p>A reporter who signs into the console is shown an explanation and no data.</p>
+<h3 id="why-the-trust-model-is-the-product">Why the trust model is the product</h3>
+<p>Anyone can collect footage. The reason an institution would pay for Dawuro rather than accept WhatsApp videos is that Dawuro can say <em>where a file came from</em> and <em>how far anyone has got in checking what it shows</em> — and can prove it never conflated the two. §4 is that model. If the backend gets one thing exactly right, it is §4.</p>
+<hr>
+<h2 id="2-conventions">2. Conventions</h2>
+<h3 id="21-base-url-and-versioning">2.1 Base URL and versioning</h3>
+<pre><code>https://api.dawuro.gh/v1
+</code></pre>
+<p>The version is in the path. Additive changes (new optional field, new enum member accompanied by a client release) do not bump it. Anything that would break a shipped client does.</p>
+<p>Clients in the field cannot be assumed to update. Every enumeration in this document is a <strong>closed union</strong> in client code, so a server returning an unknown enum value is a client crash, not a graceful degradation. <strong>Do not add enum values without a coordinated client release.</strong></p>
+<h3 id="22-authentication">2.2 Authentication</h3>
+<p>Three kinds of credential.</p>
+<p><strong>Device token.</strong> Issued by <code>POST /devices</code> with no prior auth. Identifies an installation, not a person. Sufficient to read the public feed and to submit anonymously. This is what makes anonymous reporting real rather than cosmetic.</p>
+<p><strong>User token.</strong> Issued by the auth endpoints. Identifies a person. Required for earnings, personal history, and anything an account owns.</p>
+<p><strong>Organisation context.</strong> A user token carries zero or more organisation memberships. Requests acting on behalf of an institution MUST carry <code>X-Dawuro-Org: {businessId}</code>, and the server MUST verify the caller actually holds a membership in that organisation with the required capability (§8.4). Never infer the organisation from anything else.</p>
+<pre><code class="language-http">Authorization: Bearer {token}
+X-Dawuro-Org: biz_01JBX7Q2K9        # only when acting as an institution
+</code></pre>
+<p>Access tokens SHOULD be short-lived (~1 hour) with refresh tokens rotated on use. The console stores its session in an <strong>httpOnly cookie</strong> so browser JavaScript can never read it; when the backend lands, the backend access token is held server-side inside that session and attached by Next.js route handlers. <strong>The browser must never see the backend token.</strong></p>
+<h3 id="23-required-headers">2.3 Required headers</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Header</th>
+<th>On</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>Authorization</code></td>
+<td>all but <code>POST /devices</code></td>
+<td><code>Bearer {token}</code></td>
+</tr>
+<tr>
+<td><code>X-Dawuro-Org</code></td>
+<td>institution endpoints</td>
+<td>Which organisation is acting</td>
+</tr>
+<tr>
+<td><code>Idempotency-Key</code></td>
+<td>all POST that create</td>
+<td>UUIDv4. See §2.6</td>
+</tr>
+<tr>
+<td><code>X-Client-Version</code></td>
+<td>all</td>
+<td>e.g. <code>mobile/1.0.0</code>, <code>console/1.0.0</code></td>
+</tr>
+<tr>
+<td><code>X-Request-Id</code></td>
+<td>all</td>
+<td>UUIDv4 from the client; echo it back in every response and error</td>
+</tr>
+</tbody></table></div>
+<h3 id="24-content-types">2.4 Content types</h3>
+<p><code>application/json; charset=utf-8</code> everywhere, except chunk upload bodies which are <code>application/octet-stream</code>.</p>
+<h3 id="25-errors">2.5 Errors</h3>
+<p>Every non-2xx response MUST use this envelope. No bare strings, no HTML error pages, no variation.</p>
+<pre><code class="language-json">{
+  &quot;error&quot;: {
+    &quot;code&quot;: &quot;GPS_ACCURACY_REJECTED&quot;,
+    &quot;message&quot;: &quot;Location accuracy of 210m exceeds the 100m limit for this category.&quot;,
+    &quot;requestId&quot;: &quot;req_01JBX7Q2K9&quot;,
+    &quot;details&quot;: { &quot;accuracyM&quot;: 210, &quot;limitM&quot;: 100 }
+  }
+}
+</code></pre>
+<p><code>message</code> is shown to users. Write it in plain English, name the actual problem, and say what to do. <code>details</code> is optional and free-form.</p>
+<pre><code class="language-ts">export type ApiErrorCode =
+  | &#39;VALIDATION_FAILED&#39;      // 400
+  | &#39;TOKEN_EXPIRED&#39;          // 401  client refreshes and retries
+  | &#39;TOKEN_INVALID&#39;          // 401  client signs out
+  | &#39;FORBIDDEN&#39;              // 403
+  | &#39;INCIDENT_NOT_FOUND&#39;     // 404
+  | &#39;IDEMPOTENCY_CONFLICT&#39;   // 409
+  | &#39;UPLOAD_EXPIRED&#39;         // 410  client restarts from POST /incidents
+  | &#39;MEDIA_TOO_LARGE&#39;        // 413
+  | &#39;GPS_ACCURACY_REJECTED&#39;  // 422
+  | &#39;MEDIA_HASH_MISMATCH&#39;    // 422  client re-uploads
+  | &#39;RATE_LIMITED&#39;           // 429
+  | &#39;INTERNAL&#39;               // 500
+  | &#39;MAINTENANCE&#39;            // 503
+  | &#39;NETWORK_UNAVAILABLE&#39;;   // client-side only, never sent by the server
+</code></pre>
+<p><strong>Retryability drives the mobile outbox and MUST be correct.</strong> These four are retryable: <code>RATE_LIMITED</code>, <code>INTERNAL</code>, <code>MAINTENANCE</code>, <code>NETWORK_UNAVAILABLE</code>. Everything else is permanent. Returning a permanent code for a transient failure strands a report on someone&#39;s phone forever; returning a retryable code for a permanent one makes thousands of devices retry hourly for eternity.</p>
+<h3 id="26-idempotency">2.6 Idempotency</h3>
+<p>Every creating POST MUST accept <code>Idempotency-Key</code> and MUST be safe to replay. The mobile outbox retries aggressively over bad connections, and a duplicated report means a duplicated commission payment.</p>
+<p>Store the key with the response for <strong>at least 24 hours</strong>. A replay with the same key returns the original response and status. A replay with the same key but a <em>different</em> body returns <code>409 IDEMPOTENCY_CONFLICT</code>.</p>
+<h3 id="27-pagination">2.7 Pagination</h3>
+<p>Cursor-based everywhere. Never offsets — reports change state constantly, and an offset page 2 would skip and duplicate rows as items clear review.</p>
+<pre><code class="language-ts">export interface Page&lt;T&gt; {
+  items: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+</code></pre>
+<p>Cursors are opaque to the client. Default page size 20, maximum 100.</p>
+<h3 id="28-rate-limiting">2.8 Rate limiting</h3>
+<p>Return <code>429 RATE_LIMITED</code> with a <code>Retry-After</code> header in seconds. The client honours it. Suggested starting points: 60 writes/minute per device, 600 reads/minute per token, 5 <code>POST /devices</code>/hour per IP.</p>
+<h3 id="29-time">2.9 Time</h3>
+<p>All timestamps are <strong>ISO 8601 UTC with milliseconds</strong>: <code>2026-08-27T14:31:00.000Z</code>. Never local time, never a bare date, never a Unix integer. Fields ending <code>Iso</code> are strings in this format.</p>
+<p>The server clock is authoritative. §5.4 covers what to do when a device clock disagrees.</p>
+<h3 id="210-coordinates">2.10 Coordinates</h3>
+<p>WGS84 decimal degrees. Latitude <code>-90..90</code>, longitude <code>-180..180</code>, six decimal places (~11 cm). Distances in <strong>metres</strong>, always integers, always named <code>...M</code> or <code>...Metres</code>.</p>
+<h3 id="211-money-read-this-twice">2.11 Money — read this twice</h3>
+<p><strong>Every monetary amount in this system is an integer number of pesewas.</strong> 100 pesewas = 1 Ghana cedi (GHS). Fields are named <code>...Pesewas</code> without exception.</p>
+<ul>
+<li><strong>Never</strong> use a float, a decimal string, or a <code>Number</code> holding cedis anywhere in the system — not in the database, not in JSON, not in an intermediate calculation.</li>
+<li><strong>Never</strong> round in the client. The server computes; the client displays.</li>
+<li>Where a calculation involves multipliers (commission, §10.2), <strong>round once at the end</strong>. Rounding at each step compounds error across a payout batch, and a ledger that does not balance is worse than no ledger.</li>
+<li>Reconciliation is by subtraction, not by a second rounding: <code>reporterPesewas = grossPesewas − platformFeePesewas</code>.</li>
+</ul>
+<h2 id="use-a-64-bit-integer-column-numericdecimal-is-acceptable-floatrealdouble-is-a-defect">Use a 64-bit integer column. <code>NUMERIC</code>/<code>DECIMAL</code> is acceptable; <code>FLOAT</code>/<code>REAL</code>/<code>DOUBLE</code> is a defect.</h2>
+<h2 id="3-domain-model">3. Domain model</h2>
+<h3 id="31-incident-categories">3.1 Incident categories</h3>
+<p>23 categories in 6 groups. The groups exist for interface organisation; the category is what is stored and routed on.</p>
+<pre><code class="language-ts">export const INCIDENT_CATEGORIES = [
+  // Emergency
+  &#39;fire&#39;, &#39;accident&#39;, &#39;flood&#39;, &#39;weather&#39;, &#39;health&#39;,
+  // Crime and safety
+  &#39;crime&#39;, &#39;disorder&#39;, &#39;protest&#39;,
+  // Public services
+  &#39;utility&#39;, &#39;water&#39;, &#39;sanitation&#39;, &#39;road&#39;, &#39;transport&#39;, &#39;infrastructure&#39;, &#39;education&#39;,
+  // Governance
+  &#39;corruption&#39;, &#39;election&#39;, &#39;chieftaincy&#39;, &#39;land&#39;,
+  // Environment
+  &#39;galamsey&#39;, &#39;environment&#39;, &#39;wildlife&#39;,
+  // Catch-all
+  &#39;other&#39;,
+] as const;
+
+export type IncidentCategory = (typeof INCIDENT_CATEGORIES)[number];
+</code></pre>
+<p><code>galamsey</code> is illegal small-scale mining. <code>chieftaincy</code> covers traditional-authority disputes. Both are specific to the Ghanaian context and are not synonyms for <code>crime</code> or <code>disorder</code>.</p>
+<h3 id="32-severity">3.2 Severity</h3>
+<p>The reporter&#39;s own account of urgency. <strong>A claim, not a dispatch.</strong></p>
+<pre><code class="language-ts">export type Severity = &#39;observation&#39; | &#39;concern&#39; | &#39;urgent&#39; | &#39;emergency&#39;;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Value</th>
+<th>Meaning</th>
+<th>Weight</th>
+<th>Warns about 112</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>observation</code></td>
+<td>Worth recording. Nobody at risk.</td>
+<td>1</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>concern</code></td>
+<td>Should be looked at. Worse if ignored.</td>
+<td>2</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>urgent</code></td>
+<td>Needs attention today. Property or services affected.</td>
+<td>3</td>
+<td>no</td>
+</tr>
+<tr>
+<td><code>emergency</code></td>
+<td>People are in danger right now.</td>
+<td>4</td>
+<td><strong>yes</strong></td>
+</tr>
+</tbody></table></div>
+<p>Ghana&#39;s emergency number is <strong>112</strong>. Dawuro is not an emergency service and must never be mistaken for one — selecting <code>emergency</code> shows the reporter a warning to call 112 before the report can be sent. The backend MUST NOT treat <code>emergency</code> as a dispatch trigger to any emergency service. It affects queue ordering and the acknowledgement target (§11) and nothing else.</p>
+<h3 id="33-consent-flags-and-handling-requirements">3.3 Consent flags and handling requirements</h3>
+<p>What the footage contains, as the reporter describes it. These drive <strong>handling</strong>, not sorting.</p>
+<pre><code class="language-ts">export interface ConsentFlags {
+  subjectsConsented: boolean;      // identifiable people who agreed
+  publicPlace: boolean;            // consent not ordinarily required
+  containsMinors: boolean;         // children identifiable
+  distressing: boolean;            // injury, death, distressing to view
+  showsPrivateProperty: boolean;   // a private home, interior or entrance
+}
+
+export type HandlingRequirement =
+  | &#39;redact_before_publication&#39;
+  | &#39;viewer_warning&#39;
+  | &#39;restrict_location&#39;
+  | &#39;editorial_review_required&#39;;
+</code></pre>
+<p><strong>Handling is derived, never chosen.</strong> A reporter ticking &quot;there are children in it&quot; is describing the footage; deciding it therefore cannot be published unredacted is the platform&#39;s job. The server MUST compute this and MUST NOT accept a client-supplied handling list.</p>
+<pre><code class="language-ts">export function handlingRequirements(consent: ConsentFlags): HandlingRequirement[] {
+  const required: HandlingRequirement[] = [];
+
+  if (consent.containsMinors) {
+    required.push(&#39;redact_before_publication&#39;, &#39;editorial_review_required&#39;);
+  }
+  if (consent.distressing) {
+    required.push(&#39;viewer_warning&#39;, &#39;editorial_review_required&#39;);
+  }
+  if (consent.showsPrivateProperty) {
+    required.push(&#39;restrict_location&#39;);
+    // Identifiable people at a private address who did not agree to be filmed
+    // is the case most likely to cause real harm.
+    if (!consent.subjectsConsented &amp;&amp; !consent.publicPlace) {
+      required.push(&#39;redact_before_publication&#39;);
+    }
+  }
+
+  return [...new Set(required)];
+}
+</code></pre>
+<p><code>redact_before_publication</code> is a hard block on the public feed regardless of how well corroborated a report is. See §14.</p>
+<h3 id="34-media-location-time-precision">3.4 Media, location, time precision</h3>
+<pre><code class="language-ts">export type MediaKind = &#39;photo&#39; | &#39;video&#39; | &#39;audio&#39;;
+</code></pre>
+<p>Audio is a <strong>first-class</strong> report type, not a lesser one. Describing an incident from somewhere safe carries none of the risk of filming it, and it is the only mode that works in the dark or in a crowd. It is priced accordingly (§10.2).</p>
+<pre><code class="language-ts">export type LocationConfidence = &#39;high&#39; | &#39;low&#39;;   // &#39;low&#39; = reporter used the reduced-accuracy escape hatch
+export type TimePrecision = &#39;exact&#39; | &#39;date_only&#39; | &#39;hidden&#39;;
+
+export interface IncidentMedia {
+  kind: MediaKind;
+  url: string;
+  posterUrl: string;      // still frame for video; shown while the player warms up
+  width: number;
+  height: number;
+  durationMs?: number;
+  byteSize?: number;
+}
+
+export interface PublicLocation {
+  latitude: number | null;
+  longitude: number | null;
+  label: string | null;          // &quot;Kaneshie, Accra&quot;
+  confidence: LocationConfidence;
+}
+
+export interface PreciseLocation extends PublicLocation {
+  accuracyM: number;
+  altitude: number | null;
+  heading: number | null;
+  speed: number | null;
+  isMocked: boolean;
+}
+</code></pre>
+<p><code>PreciseLocation</code> is <strong>author-only and MUST NEVER appear on a public endpoint.</strong></p>
+<p><code>TimePrecision</code> is explicit rather than inferred, and this matters: when <code>showTime</code> is false the server truncates <code>capturedAtIso</code> to midnight UTC. A client inferring precision from the value alone could not distinguish a suppressed time from an incident that genuinely happened at 00:00, and would either leak a real midnight capture or mislabel a hidden one.</p>
+<h3 id="35-display-flags">3.5 Display flags</h3>
+<pre><code class="language-ts">export interface DisplayFlags {
+  showLocation: boolean;
+  showDate: boolean;
+  showTime: boolean;
+}
+</code></pre>
+<p>Set by the reporter at review, editable later by the account owner. These are <strong>display</strong> flags, not storage flags: the server retains the true values for vetting and lawful process, and MUST null them out on public responses.</p>
+<p>Both layers enforce this independently. Client-only hiding leaks coordinates into every phone&#39;s cache; server-only hiding breaks the moment one client has a bug. Implement it server-side regardless of what the client does.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Flag false</th>
+<th>Server MUST null / truncate</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>showLocation</code></td>
+<td><code>location.latitude</code>, <code>location.longitude</code>, <code>location.label</code></td>
+</tr>
+<tr>
+<td><code>showDate</code></td>
+<td><code>capturedAtIso</code> → <code>null</code>, <code>capturedAtPrecision</code> → <code>&#39;hidden&#39;</code></td>
+</tr>
+<tr>
+<td><code>showTime</code></td>
+<td><code>capturedAtIso</code> → midnight UTC of that date, <code>capturedAtPrecision</code> → <code>&#39;date_only&#39;</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="36-the-incident">3.6 The incident</h3>
+<pre><code class="language-ts">export type VettingState = &#39;pending_review&#39; | &#39;published&#39; | &#39;rejected&#39; | &#39;restricted&#39;;
+
+export type Publisher =
+  | { kind: &#39;anonymous&#39; }
+  | { kind: &#39;user&#39;; id: string; displayName: string; avatarUrl: string | null };
+
+export interface IncidentCounts { reactions: number; comments: number }
+
+export interface Incident {
+  id: string;
+  reportId: string;                       // see §3.7
+  category: IncidentCategory;
+  description: string;
+  vettingState: VettingState;
+  publishedAt: string;
+  media: IncidentMedia;
+  location: PublicLocation;
+  capturedAtIso: string | null;           // null / truncated per display flags
+  capturedAtPrecision: TimePrecision;
+  publisher: Publisher;
+  assurance: AssuranceClass;              // a technical fact — §4.1
+  verification: VerificationState;        // an editorial judgement — §4.2
+  severity: Severity;
+  landmark: string | null;
+  handling: HandlingRequirement[];        // derived, §3.3
+  counts: IncidentCounts;
+  viewerHasReacted: boolean;
+  distanceM?: number;                     // only when the query passed `near`
+}
+
+/** The author&#39;s own view — adds everything the public must not see. */
+export interface AuthoredIncident extends Omit&lt;Incident, &#39;location&#39;&gt; {
+  location: PreciseLocation;
+  displayFlags: DisplayFlags;
+  isAnonymous: boolean;
+  rejectionReason: string | null;
+  clientId: string;                       // mirrors the device&#39;s local row id
+}
+</code></pre>
+<p><code>assurance</code> and <code>verification</code> are separate fields and MUST remain separate. See §4.</p>
+<h3 id="37-report-id">3.7 Report ID</h3>
+<p><code>id</code> is for machines. <code>reportId</code> is the human reference <strong>burned into the video frame at capture</strong>, read down a phone line, and typed into the public verification page. Both clients generate it with this exact function and the server MUST produce identical output.</p>
+<pre><code class="language-ts">// Excludes every vowel, so an id can never spell a word — nobody should have
+// to read an unfortunate code back to a call centre. Also drops the pairs
+// people confuse in a low-resolution overlay burned into video:
+// 0/O, 1/I/L, 2/Z, 5/S, 8/B.
+const ID_ALPHABET = &#39;34679CDFGHJKMNPQRTVWXY&#39;;
+
+export function formatReportId(seed: string): string {
+  let hash = 2166136261;                      // FNV-1a 32-bit offset basis
+  for (let i = 0; i &lt; seed.length; i += 1) {
+    hash ^= seed.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);         // FNV prime, 32-bit wraparound
+  }
+
+  let value = hash &gt;&gt;&gt; 0;
+  let out = &#39;&#39;;
+  for (let i = 0; i &lt; 6; i += 1) {
+    out += ID_ALPHABET[value % ID_ALPHABET.length];
+    value = Math.floor(value / ID_ALPHABET.length);
+  }
+  return `DW-${out.slice(0, 3)}-${out.slice(3)}`;
+}
+</code></pre>
+<p><code>Math.imul</code> is a 32-bit signed multiply with wraparound. In other languages, multiply as unsigned 32-bit and mask to <code>0xFFFFFFFF</code>. Test vectors are in §15.</p>
+<p>Format: <code>DW-XXX-XXX</code>. Lookups MUST be case-insensitive.</p>
+<p><strong>This is a hash, so collisions are possible.</strong> For production, either persist a generated <code>reportId</code> with a uniqueness constraint and re-seed on collision, or switch to a sequence. Do not assume the hash alone is unique across millions of rows.</p>
+<hr>
+<h2 id="4-the-trust-model">4. The trust model</h2>
+<p>This is the core of the product. Read it completely before implementing anything that touches it.</p>
+<p>Dawuro answers two separate questions about every piece of media, and <strong>must never allow them to merge</strong>:</p>
+<ul>
+<li><strong>Assurance class</strong> — <em>was this captured through the trusted app, and is the stored file unchanged?</em> A technical fact a machine establishes.</li>
+<li><strong>Verification state</strong> — <em>is the claim about what it depicts substantively true?</em> An editorial judgement no amount of cryptography can produce.</li>
+</ul>
+<p>A file can be Class A — perfect integrity, valid signature, clock and GPS agreeing — and still show a staged event. <strong>Saying &quot;verified&quot; because a hash checked out is the single most damaging mistake this platform could make.</strong> The two are modelled apart, stored apart, and the language permitted for each is enumerated rather than left to whoever writes the interface.</p>
+<h3 id="41-assurance-class">4.1 Assurance class</h3>
+<pre><code class="language-ts">export type AssuranceClass = &#39;A&#39; | &#39;B&#39; | &#39;C&#39; | &#39;D&#39;;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Class</th>
+<th>Label</th>
+<th>The only phrase that may be shown</th>
+<th>Expedited</th>
+<th>Usable alone</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong>A</strong></td>
+<td>Trusted capture</td>
+<td><em>Assured capture integrity</em></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><strong>B</strong></td>
+<td>Trusted capture with flags</td>
+<td><em>Capture integrity partially verified</em></td>
+<td>no</td>
+<td>yes</td>
+</tr>
+<tr>
+<td><strong>C</strong></td>
+<td>External upload</td>
+<td><em>Origin not technically verified</em></td>
+<td>no</td>
+<td><strong>no</strong></td>
+</tr>
+<tr>
+<td><strong>D</strong></td>
+<td>Institutional evidence</td>
+<td><em>Authorised institutional capture</em></td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody></table></div>
+<p>Class C is usable <strong>only as a lead</strong> unless independently corroborated. That is a rule, not a guideline (§4.5).</p>
+<p>The class is derived from facts a machine can establish. Nothing here is a judgement, which is what keeps the classification reproducible.</p>
+<pre><code class="language-ts">export interface CaptureFacts {
+  capturedInApp: boolean;             // false for anything imported
+  integritySignatureValid: boolean;   // stored file still matches the capture signature
+  timeCheckPassed: boolean;           // device clock agreed with server time within tolerance
+  locationCheckPassed: boolean;       // a fix of usable accuracy was held throughout
+  deviceCheckPassed: boolean;         // not rooted, emulated or otherwise flagged
+  originalPreserved: boolean;         // the untouched original is still held
+  institutionalCapture: boolean;      // accredited officer under institutional controls
+}
+
+export function assuranceClass(facts: CaptureFacts): AssuranceClass {
+  // Order is deliberate and MUST NOT be rearranged. An import can never be
+  // rescued into a trusted class by other checks passing — otherwise a gallery
+  // file with a plausible clock would classify as institutional evidence.
+  if (!facts.capturedInApp) return &#39;C&#39;;
+  if (facts.institutionalCapture) return &#39;D&#39;;
+
+  const allChecksPassed =
+    facts.integritySignatureValid &amp;&amp;
+    facts.timeCheckPassed &amp;&amp;
+    facts.locationCheckPassed &amp;&amp;
+    facts.deviceCheckPassed &amp;&amp;
+    facts.originalPreserved;
+
+  return allChecksPassed ? &#39;A&#39; : &#39;B&#39;;
+}
+</code></pre>
+<p><strong>The server computes this. It MUST NOT accept an assurance class from a client.</strong> The client displays what the server returns.</p>
+<h3 id="42-verification-state">4.2 Verification state</h3>
+<pre><code class="language-ts">export type VerificationState =
+  | &#39;received_unreviewed&#39;
+  | &#39;integrity_passed&#39;
+  | &#39;integrity_flagged&#39;
+  | &#39;corroboration_in_progress&#39;
+  | &#39;verified_high_confidence&#39;
+  | &#39;verified_in_part&#39;
+  | &#39;disputed&#39;
+  | &#39;rejected&#39;;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>State</th>
+<th>Meaning</th>
+<th align="center">Publish</th>
+<th align="center">License</th>
+<th align="center">May say &quot;verified&quot;</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>received_unreviewed</code></td>
+<td>Exists; no editorial conclusion</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+</tr>
+<tr>
+<td><code>integrity_passed</code></td>
+<td>Capture and file controls passed</td>
+<td align="center">✗</td>
+<td align="center">✓</td>
+<td align="center">✗</td>
+</tr>
+<tr>
+<td><code>integrity_flagged</code></td>
+<td>One or more technical checks need review</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+</tr>
+<tr>
+<td><code>corroboration_in_progress</code></td>
+<td>Editorial is checking source and claim</td>
+<td align="center">✗</td>
+<td align="center">✓</td>
+<td align="center">✗</td>
+</tr>
+<tr>
+<td><code>verified_high_confidence</code></td>
+<td>Sufficient corroboration for the stated facts</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center"><strong>✓</strong></td>
+</tr>
+<tr>
+<td><code>verified_in_part</code></td>
+<td>Some elements established, others unresolved</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center"><strong>✓</strong></td>
+</tr>
+<tr>
+<td><code>disputed</code></td>
+<td>Credible contradictory information exists</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Fabricated, harmful, illegal, unsafe, compromised</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+<td align="center">✗</td>
+</tr>
+</tbody></table></div>
+<p><strong>Permitted representation.</strong> Each state carries the one sentence the interface is allowed to show. This is legal exposure, not a copy decision — &quot;capture integrity verified&quot; and &quot;event verified&quot; are different claims, and a product that lets them blur will eventually publish the second while having established only the first. The API MUST return this string and the clients MUST render it verbatim.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>State</th>
+<th><code>permittedRepresentation</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>received_unreviewed</code></td>
+<td>Never describe as verified.</td>
+</tr>
+<tr>
+<td><code>integrity_passed</code></td>
+<td><strong>Capture integrity verified — not event verified.</strong></td>
+</tr>
+<tr>
+<td><code>integrity_flagged</code></td>
+<td>Show the specific flag to authorised reviewers only.</td>
+</tr>
+<tr>
+<td><code>corroboration_in_progress</code></td>
+<td>May be shared only as a lead, where policy allows.</td>
+</tr>
+<tr>
+<td><code>verified_high_confidence</code></td>
+<td>Publish or license, stating the basis and its limitations.</td>
+</tr>
+<tr>
+<td><code>verified_in_part</code></td>
+<td>State precisely what is and is not verified.</td>
+</tr>
+<tr>
+<td><code>disputed</code></td>
+<td>Attach the update history; do not syndicate stale copies.</td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td>Restricted audit retention only.</td>
+</tr>
+</tbody></table></div>
+<h3 id="43-allowed-transitions">4.3 Allowed transitions</h3>
+<p>The server MUST reject any transition not in this table, with <code>403 FORBIDDEN</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>From</th>
+<th>May move to</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>received_unreviewed</code></td>
+<td><code>integrity_passed</code>, <code>integrity_flagged</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>integrity_passed</code></td>
+<td><code>corroboration_in_progress</code>, <code>integrity_flagged</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>integrity_flagged</code></td>
+<td><code>integrity_passed</code>, <code>corroboration_in_progress</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>corroboration_in_progress</code></td>
+<td><code>verified_high_confidence</code>, <code>verified_in_part</code>, <code>disputed</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>verified_high_confidence</code></td>
+<td><code>verified_in_part</code>, <code>disputed</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>verified_in_part</code></td>
+<td><code>verified_high_confidence</code>, <code>disputed</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>disputed</code></td>
+<td><code>corroboration_in_progress</code>, <code>verified_in_part</code>, <code>rejected</code></td>
+</tr>
+<tr>
+<td><code>rejected</code></td>
+<td><strong>nothing — terminal</strong></td>
+</tr>
+</tbody></table></div>
+<p>Two rules here are structural rather than procedural:</p>
+<ol>
+<li><strong>Nothing reaches a verified state without passing through <code>corroboration_in_progress</code>.</strong> Verification <em>is</em> the act of corroborating. Allowing the jump would let one click turn an unreviewed submission into a published fact.</li>
+<li><strong><code>rejected</code> is terminal.</strong> Reinstating something judged fabricated or unsafe must be a new submission with a new record, not an edit that quietly erases the judgement.</li>
+</ol>
+<h3 id="44-corroboration">4.4 Corroboration</h3>
+<p>Moving into a verified state requires corroboration strength above a threshold, and independence is checked <strong>before</strong> strength.</p>
+<pre><code class="language-ts">const REQUIRED_STRENGTH = {
+  verified_high_confidence: 0.5,
+  verified_in_part: 0.15,
+};
+
+// Independence first: a Class C upload corroborated only by things that share
+// its source is not corroborated at all.
+if (!ASSURANCE_META[assurance].usableAlone &amp;&amp; !hasIndependentCorroboration(record)) {
+  return &#39;needs_independent_corroboration&#39;;
+}
+if (corroborationStrength(record) &lt; required) {
+  return &#39;insufficient_corroboration&#39;;
+}
+</code></pre>
+<p>Corroboration checks are recorded individually against a report, each with a weight and a source. <code>corroborationStrength</code> is the normalised sum of passed checks. An independent check is one whose source is not the reporter and not another party the reporter supplied.</p>
+<h3 id="45-the-publish-and-license-gates">4.5 The publish and license gates</h3>
+<pre><code class="language-ts">export function canPublishReport(
+  state: VerificationState,
+  assurance: AssuranceClass,
+  independentlyCorroborated = false,
+): boolean {
+  if (!VERIFICATION_META[state].publishable) return false;
+  // The class gates the state, not the other way round. An external file an
+  // editor marked verified is still only usable as corroborated material.
+  if (!ASSURANCE_META[assurance].usableAlone &amp;&amp; !independentlyCorroborated) return false;
+  return true;
+}
+
+export function canLicenseReport(state: VerificationState): boolean {
+  return VERIFICATION_META[state].licensable;
+}
+</code></pre>
+<p>The server MUST enforce both at the point of publication and licensing, not merely when the state changes.</p>
+<h3 id="46-mapping-to-the-legacy-public-state">4.6 Mapping to the legacy public state</h3>
+<p>The public feed still renders the coarse four-state value. Everything collapses toward the safer answer — anything not publishable reads as pending rather than published.</p>
+<pre><code class="language-ts">export function vettingStateFor(state: VerificationState): VettingState {
+  if (state === &#39;rejected&#39;) return &#39;rejected&#39;;
+  if (state === &#39;disputed&#39; || state === &#39;integrity_flagged&#39;) return &#39;restricted&#39;;
+  if (VERIFICATION_META[state].publishable) return &#39;published&#39;;
+  return &#39;pending_review&#39;;
+}
+</code></pre>
+<hr>
+<h2 id="5-capture-and-upload">5. Capture and upload</h2>
+<h3 id="51-the-protocol">5.1 The protocol</h3>
+<p>A 60-second video over Ghanaian mobile data <strong>will</strong> drop mid-flight. Uploads are resumable and chunked, in three phases.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Call</th>
+<th>Carries</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td><code>POST /incidents</code></td>
+<td>Metadata only. Returns <code>uploadId</code> and the chunk plan.</td>
+</tr>
+<tr>
+<td>2</td>
+<td><code>PUT /uploads/{id}/chunks/{n}</code></td>
+<td>Raw bytes. Repeatable, order-independent.</td>
+</tr>
+<tr>
+<td>3</td>
+<td><code>POST /uploads/{id}/complete</code></td>
+<td>Nothing. Server assembles, verifies hash, enqueues.</td>
+</tr>
+</tbody></table></div>
+<p>If the app dies mid-upload, the client calls <code>GET /uploads/{id}</code> on next launch to learn which chunks you already hold and resumes. <strong>It does not restart from zero.</strong></p>
+<h3 id="52-post-devices-register-a-device-no-auth">5.2 <code>POST /devices</code> — register a device <em>(no auth)</em></h3>
+<pre><code class="language-json">{ &quot;platform&quot;: &quot;ios&quot;, &quot;appVersion&quot;: &quot;1.0.0&quot;, &quot;installId&quot;: &quot;e3a1…&quot; }
+</code></pre>
+<p>Returns <code>201</code> with <code>{ &quot;deviceToken&quot;: &quot;…&quot;, &quot;deviceId&quot;: &quot;dev_…&quot; }</code>.</p>
+<h3 id="53-post-incidents-initialise-auth-device-or-user">5.3 <code>POST /incidents</code> — initialise <em>(auth: device or user)</em></h3>
+<p>Metadata only, no bytes. Requires <code>Idempotency-Key</code>.</p>
+<pre><code class="language-json">{
+  &quot;clientId&quot;: &quot;e3a1…&quot;,
+  &quot;category&quot;: &quot;flood&quot;,
+  &quot;description&quot;: &quot;Culvert blocked, road impassable at the junction.&quot;,
+  &quot;isAnonymous&quot;: true,
+  &quot;displayFlags&quot;: { &quot;showLocation&quot;: true, &quot;showDate&quot;: true, &quot;showTime&quot;: false },
+
+  &quot;severity&quot;: &quot;urgent&quot;,
+  &quot;landmark&quot;: &quot;Kaneshie First Light&quot;,
+  &quot;consent&quot;: {
+    &quot;subjectsConsented&quot;: false,
+    &quot;publicPlace&quot;: true,
+    &quot;containsMinors&quot;: false,
+    &quot;distressing&quot;: false,
+    &quot;showsPrivateProperty&quot;: false
+  },
+  &quot;requestedAction&quot;: &quot;Clear the culvert before the next rain.&quot;,
+  &quot;observedSubjects&quot;: null,
+
+  &quot;destination&quot;: &quot;marketplace&quot;,
+  &quot;requestedBusinessIds&quot;: [],
+
+  &quot;location&quot;: {
+    &quot;latitude&quot;: 5.603717, &quot;longitude&quot;: -0.186964,
+    &quot;accuracyM&quot;: 8.4, &quot;altitude&quot;: 61.2, &quot;heading&quot;: 142.0, &quot;speed&quot;: 0.0,
+    &quot;confidence&quot;: &quot;high&quot;, &quot;isMocked&quot;: false
+  },
+
+  &quot;capturedAtIso&quot;: &quot;2026-08-27T14:31:00.000Z&quot;,
+  &quot;capturedAtUtcOffsetMinutes&quot;: 0,
+  &quot;deviceUptimeMs&quot;: 184523110,
+
+  &quot;media&quot;: {
+    &quot;kind&quot;: &quot;video&quot;, &quot;mimeType&quot;: &quot;video/mp4&quot;,
+    &quot;byteSize&quot;: 8421376, &quot;durationMs&quot;: 24500,
+    &quot;width&quot;: 1080, &quot;height&quot;: 1920,
+    &quot;sha256&quot;: &quot;9f86d081884c7d65…&quot;
+  }
+}
+</code></pre>
+<p>Returns <code>201</code>:</p>
+<pre><code class="language-json">{
+  &quot;incidentId&quot;: &quot;inc_01JBX7Q2K9&quot;,
+  &quot;reportId&quot;: &quot;DW-WQD-JW4&quot;,
+  &quot;uploadId&quot;: &quot;upl_01JBX7Q2K9&quot;,
+  &quot;chunkSizeBytes&quot;: 5242880,
+  &quot;chunkCount&quot;: 2,
+  &quot;expiresAt&quot;: &quot;2026-08-28T14:31:00.000Z&quot;
+}
+</code></pre>
+<p><code>clientId</code> is the device&#39;s local row id. <strong>Return it on the resulting incident</strong> so the outbox can reconcile without relying on ordering.</p>
+<p><code>sha256</code> is of the complete media file. Verify at <code>complete</code> and reject with <code>MEDIA_HASH_MISMATCH</code> if it differs — that is the client&#39;s signal to re-upload rather than the platform silently publishing corrupt footage.</p>
+<p>The client proposes <code>chunkSizeBytes = 5 MiB</code>; <strong>your response is authoritative</strong> and the client uses whatever you return.</p>
+<p><code>mimeType</code> for audio is <code>audio/m4a</code>, and <code>width</code>/<code>height</code> are <code>null</code>.</p>
+<h3 id="54-what-the-server-must-establish-at-submission">5.4 What the server MUST establish at submission</h3>
+<p>This is what the mobile app cannot do for itself and what the whole trust model rests on. <strong>None of it is currently implemented anywhere.</strong></p>
+<p><strong>Server-side integrity signature.</strong> On <code>complete</code>, hash the assembled file and sign the tuple <code>(sha256, incidentId, serverReceivedAtIso, deviceId)</code> with a server-held key. Store the signature. This is what <code>integritySignatureValid</code> checks against later. The device cannot be trusted to sign for itself — a compromised device signs whatever it likes.</p>
+<p><strong>Server-time comparison.</strong> Compare <code>capturedAtIso</code> against the time the server received the initialisation, accounting for <code>deviceUptimeMs</code> and <code>capturedAtUtcOffsetMinutes</code>. Set <code>timeCheckPassed</code> false when the gap is implausible for the upload path. A device clock set to last year is the cheapest way to fake a capture time, and <code>capturedAtIso</code> is otherwise entirely device-controlled. <strong>Suggested tolerance: 5 minutes of drift plus the observed upload delay; confirm with the team (§16).</strong></p>
+<p><strong>Location plausibility.</strong> Set <code>locationCheckPassed</code> false when <code>accuracyM</code> exceeds the category limit, <code>isMocked</code> is true, or the fix is inconsistent with the device&#39;s recent history.</p>
+<p><strong>Device integrity.</strong> Set <code>deviceCheckPassed</code> from attestation (Play Integrity / App Attest) where available.</p>
+<p><strong>Original preservation.</strong> Store the original bytes immutably and separately from any derived or transcoded copy. <code>originalPreserved</code> is false the moment you cannot produce the file the device sent.</p>
+<p><strong>Malware and duplicate screening.</strong> Scan on <code>complete</code>. Perceptual-hash against existing media to catch a file resubmitted as a fresh incident.</p>
+<p>Only once these are set does <code>assuranceClass()</code> (§4.1) run. Until it has, the report sits at <code>received_unreviewed</code>.</p>
+<h3 id="55-put-uploadsuploadidchunksindex-auth-same-as-init">5.5 <code>PUT /uploads/{uploadId}/chunks/{index}</code> <em>(auth: same as init)</em></h3>
+<p><code>index</code> is <strong>0-based</strong>. Body is <code>application/octet-stream</code>, raw bytes, no multipart wrapper.</p>
+<p>Returns <code>200</code> with <code>{ &quot;index&quot;: 0, &quot;received&quot;: true, &quot;bytesReceived&quot;: 5242880 }</code>.</p>
+<p>MUST be <strong>idempotent</strong> — re-sending a chunk you already hold returns <code>200</code>, not an error. Chunks may arrive in any order; the client sends sequentially but retries reorder them.</p>
+<h3 id="56-post-uploadsuploadidcomplete-auth-same-as-init">5.6 <code>POST /uploads/{uploadId}/complete</code> <em>(auth: same as init)</em></h3>
+<p>Empty body. Assembles, verifies the hash, runs §5.4, enqueues for vetting. Returns <code>200</code> with the full incident in its author shape.</p>
+<p>Only after this succeeds does the client delete its local media file. <strong>It keeps the metadata row</strong> so the user retains a personal history.</p>
+<h3 id="57-get-uploadsuploadid-resume-auth-same-as-init">5.7 <code>GET /uploads/{uploadId}</code> — resume <em>(auth: same as init)</em></h3>
+<pre><code class="language-json">{
+  &quot;uploadId&quot;: &quot;upl_01JBX7Q2K9&quot;,
+  &quot;chunkSizeBytes&quot;: 5242880,
+  &quot;chunkCount&quot;: 2,
+  &quot;receivedChunks&quot;: [0],
+  &quot;expiresAt&quot;: &quot;2026-08-28T14:31:00.000Z&quot;
+}
+</code></pre>
+<p>Expired uploads return <code>410 UPLOAD_EXPIRED</code> and the client restarts from <code>POST /incidents</code>.</p>
+<hr>
+<h2 id="6-routing-which-institutions-receive-a-report">6. Routing — which institutions receive a report</h2>
+<p>Reports reach institutions on their own. A reporter picks a category and optionally names organisations; everything else is matching. Requiring a human to touch every submission does not survive contact with volume.</p>
+<p>The platform operator&#39;s desk sits <em>above</em> this: they see every submission and what it was auto-routed to, and can add or remove recipients. <strong>Oversight and override, not a gate.</strong></p>
+<pre><code class="language-ts">export type SubmissionDestination = &#39;public&#39; | &#39;marketplace&#39; | &#39;directed&#39; | &#39;both&#39;;
+</code></pre>
+<p>A reporter chooses this at review time and it changes everything downstream: who sees the report, whether it earns, and who reviews it.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Destination</th>
+<th align="center">Public feed</th>
+<th align="center">Offered to institutions</th>
+<th align="center">Earns</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>public</code></td>
+<td align="center">✓</td>
+<td align="center">✗</td>
+<td align="center"><strong>✗ — visibility is the reward</strong></td>
+</tr>
+<tr>
+<td><code>marketplace</code></td>
+<td align="center">✗</td>
+<td align="center">✓</td>
+<td align="center">✓ if licensed</td>
+</tr>
+<tr>
+<td><code>directed</code></td>
+<td align="center">✗</td>
+<td align="center">only those named</td>
+<td align="center">✓ if licensed, ×1.25</td>
+</tr>
+<tr>
+<td><code>both</code></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓ if licensed</td>
+</tr>
+</tbody></table></div>
+<p><code>marketplace</code> and <code>both</code> route identically; they differ only in whether the report also appears publicly.</p>
+<pre><code class="language-ts">export interface RoutableSubmission {
+  category: IncidentCategory;
+  destination: SubmissionDestination;
+  requestedBusinessIds: string[];
+  location: { latitude: number; longitude: number } | null;   // null when suppressed
+}
+
+export interface BusinessWatchArea {
+  businessId: string;
+  latitude: number; longitude: number; radiusM: number;
+}
+
+export type RouteReason = &#39;requested&#39; | &#39;interest_match&#39; | &#39;in_watch_area&#39; | &#39;has_allowance&#39;;
+
+export interface RouteMatch {
+  businessId: string;
+  score: number;          // higher is a better fit; drives operator review order
+  reasons: RouteReason[];
+}
+</code></pre>
+<h3 id="the-algorithm">The algorithm</h3>
+<pre><code class="language-ts">export function autoRoute(
+  submission: RoutableSubmission,
+  businesses: readonly BusinessAccount[],
+  watchAreas: readonly BusinessWatchArea[] = [],
+): RouteMatch[] {
+  // A public-only report is never offered to businesses. Routing it would
+  // quietly turn a free contribution into a commercial one.
+  if (submission.destination === &#39;public&#39;) return [];
+
+  const matches: RouteMatch[] = [];
+
+  for (const business of businesses) {
+    if (!canReceive(business)) continue;      // subscription must be active or trialing
+
+    const reasons: RouteReason[] = [];
+    let score = 0;
+
+    const requested = submission.requestedBusinessIds.includes(business.id);
+    if (requested) {
+      reasons.push(&#39;requested&#39;);
+      score += 100;                            // an explicit request outranks every heuristic
+    }
+
+    if (business.interests.includes(submission.category)) {
+      reasons.push(&#39;interest_match&#39;);
+      score += 40;
+    }
+
+    // Geography applies only when a location was published. A suppressed
+    // location must not silently exclude anyone — it means we cannot tell,
+    // not that the answer is no.
+    if (submission.location) {
+      const areas = watchAreas.filter((a) =&gt; a.businessId === business.id);
+      const inside = areas.some((area) =&gt; distanceMetres(submission.location!, area) &lt;= area.radiusM);
+      if (inside) {
+        reasons.push(&#39;in_watch_area&#39;);
+        score += 30;
+      } else if (areas.length &gt; 0 &amp;&amp; !requested) {
+        continue;                              // they drew a boundary; respect it
+      }
+    }
+
+    if (business.reportsUsedThisPeriod &lt; 1_000) {
+      reasons.push(&#39;has_allowance&#39;);
+      score += 10;
+    }
+
+    // A directed submission goes only to the named institutions.
+    if (submission.destination === &#39;directed&#39; &amp;&amp; !requested) continue;
+
+    // Everything else needs a positive reason. Matching on &quot;has allowance&quot;
+    // alone would send a wildlife report to an insurer purely because they
+    // had budget left.
+    if (!requested &amp;&amp; !reasons.includes(&#39;interest_match&#39;) &amp;&amp; !reasons.includes(&#39;in_watch_area&#39;)) {
+      continue;
+    }
+
+    matches.push({ businessId: business.id, score, reasons });
+  }
+
+  return matches.sort((a, b) =&gt; b.score - a.score);
+}
+</code></pre>
+<p>Distance is haversine on a sphere of radius <strong>6,371,008.8 m</strong>.</p>
+<p><strong>An empty result is a legitimate outcome</strong>, not an error. A report nobody declared an interest in surfaces on the operator&#39;s desk rather than being forced onto an arbitrary recipient.</p>
+<pre><code class="language-ts">export function needsReview(submission: RoutableSubmission, matches: RouteMatch[]): boolean {
+  if (matches.length === 0) return true;                       // an operator may know a recipient the rules do not
+  const matched = new Set(matches.map((m) =&gt; m.businessId));
+  return submission.requestedBusinessIds.some((id) =&gt; !matched.has(id));
+}
+</code></pre>
+<p><strong>Routing must run in real time on submission</strong>, not on a nightly batch. A flood report routed tomorrow is worthless.</p>
+<hr>
+<h2 id="7-assignment-which-employee-handles-it">7. Assignment — which employee handles it</h2>
+<p>Once a report reaches an institution, it is assigned to a person. Two stages: hard gates, then a weighted score. Location alone is not enough — the nearest person may be off duty, at capacity, or unqualified.</p>
+<h3 id="71-hard-gates">7.1 Hard gates</h3>
+<p>Any of these blocks assignment outright.</p>
+<pre><code class="language-ts">export type AssignmentBlock =
+  | &#39;inactive&#39; | &#39;on_leave&#39; | &#39;off_duty&#39;
+  | &#39;at_capacity&#39; | &#39;not_qualified&#39; | &#39;outside_jurisdiction&#39;;
+
+export function blockingReason(employee, incident, branch): AssignmentBlock | null {
+  if (!employee.active) return &#39;inactive&#39;;
+  if (employee.shiftStatus === &#39;on_leave&#39;) return &#39;on_leave&#39;;
+  if (employee.shiftStatus === &#39;off_duty&#39;) return &#39;off_duty&#39;;
+  if (employee.openAssignments &gt;= employee.maxConcurrentAssignments) return &#39;at_capacity&#39;;
+
+  // An empty specialisation list means generalist — eligible for anything
+  // rather than nothing. Empty far more often means &quot;not filled in yet&quot; than
+  // &quot;qualified for no incident on earth&quot;, and defaulting to exclusion would
+  // quietly empty an organisation&#39;s routing.
+  if (employee.specialisations.length &gt; 0 &amp;&amp; !employee.specialisations.includes(incident.category))
+    return &#39;not_qualified&#39;;
+
+  if (branch &amp;&amp; incident.location) {
+    if (haversineMetres(branch.location, incident.location) &gt; branch.jurisdictionRadiusM)
+      return &#39;outside_jurisdiction&#39;;
+  }
+  return null;
+}
+</code></pre>
+<h3 id="72-weighted-score">7.2 Weighted score</h3>
+<p>Applied to everyone who passes the gates. Highest wins.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Factor</th>
+<th align="right">Weight</th>
+<th>Awarded when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>specialisation</code></td>
+<td align="right">40</td>
+<td>The incident category is in their specialisations</td>
+</tr>
+<tr>
+<td><code>proximity</code></td>
+<td align="right">30</td>
+<td>Scaled by nearness of their last known position</td>
+</tr>
+<tr>
+<td><code>fieldDuty</code></td>
+<td align="right">25</td>
+<td>They hold a duty suited to the category</td>
+</tr>
+<tr>
+<td><code>capacity</code></td>
+<td align="right">20</td>
+<td>Scaled by the share of their capacity still free</td>
+</tr>
+<tr>
+<td><code>seniorUrgent</code></td>
+<td align="right">20</td>
+<td>Senior staff on <code>urgent</code> or <code>emergency</code> reports</td>
+</tr>
+<tr>
+<td><code>branchArea</code></td>
+<td align="right">15</td>
+<td>The incident falls inside their branch&#39;s jurisdiction</td>
+</tr>
+<tr>
+<td><code>reliability</code></td>
+<td align="right">15</td>
+<td>Scaled by acknowledgement rate</td>
+</tr>
+<tr>
+<td><code>language</code></td>
+<td align="right">10</td>
+<td>They speak a language the reporter used</td>
+</tr>
+</tbody></table></div>
+<p><code>acknowledgementRate</code> is <strong>reliability, not productivity</strong>. Someone who never acknowledges should stop receiving urgent work regardless of how close they are.</p>
+<p><code>lastKnownLocation</code> is null for office staff and for anyone who has not consented, and <strong>MUST NEVER be inferred from a branch address</strong>. A desk is not a person, and pretending otherwise sends a patrol to a building.</p>
+<hr>
+<h2 id="8-organisations">8. Organisations</h2>
+<p>An organisation is rarely one office. A metropolitan assembly has sub-metros, a utility has district depots, a media house has regional bureaux — and an incident that belongs to one does not belong to the others.</p>
+<h3 id="81-the-account">8.1 The account</h3>
+<pre><code class="language-ts">export type BusinessSector =
+  | &#39;government&#39; | &#39;media&#39; | &#39;utility&#39; | &#39;insurance&#39; | &#39;ngo&#39; | &#39;research&#39; | &#39;other&#39;;
+
+export interface BusinessAccount {
+  id: string;
+  name: string;
+  sector: BusinessSector;
+  verified: boolean;
+  tier: SubscriptionTier;
+  subscriptionStatus: &#39;trialing&#39; | &#39;active&#39; | &#39;past_due&#39; | &#39;cancelled&#39;;
+  renewsAtIso: string;
+  seatsUsed: number;
+  reportsUsedThisPeriod: number;
+  interests: IncidentCategory[];
+  logoUrl: string | null;
+}
+</code></pre>
+<h3 id="82-branches">8.2 Branches</h3>
+<pre><code class="language-ts">export interface Branch {
+  id: string;
+  businessId: string;
+  name: string;
+  location: LatLng;
+  jurisdictionRadiusM: number;
+  areaLabel: string;
+}
+</code></pre>
+<p>A circle is a crude stand-in for a real administrative boundary, which is a polygon. It is deliberately crude: the shape of these boundaries is each organisation&#39;s decision, and guessing at polygons would bake in borders nobody agreed to. Scoring treats it as a hard limit, so replacing it with real geometry later changes one function.</p>
+<p>Set radii realistically. A metropolitan assembly covering 7 km will route almost nothing.</p>
+<h3 id="83-employees">8.3 Employees</h3>
+<pre><code class="language-ts">export type EmployeeDuty =
+  | &#39;field_response&#39; | &#39;dispatch&#39; | &#39;investigation&#39;
+  | &#39;inspection&#39; | &#39;media&#39; | &#39;community_liaison&#39; | &#39;admin&#39;;
+
+export type ShiftStatus = &#39;on_duty&#39; | &#39;off_duty&#39; | &#39;on_leave&#39;;
+export type WorkingLanguage = &#39;en&#39; | &#39;twi&#39; | &#39;ga&#39; | &#39;ewe&#39; | &#39;dagbani&#39; | &#39;hausa&#39;;
+
+export interface Employee {
+  id: string;
+  businessId: string;
+  branchId: string | null;              // null = unassigned, still routable org-wide
+  displayName: string;
+  email: string;
+  phone: string | null;
+
+  role: OrgRole;                        // software permissions
+  duties: EmployeeDuty[];               // field responsibilities
+  specialisations: IncidentCategory[];  // empty = generalist
+  languages: WorkingLanguage[];
+
+  shiftStatus: ShiftStatus;
+  openAssignments: number;
+  maxConcurrentAssignments: number;
+
+  lastKnownLocation: LatLng | null;
+  lastSeenAtIso: string | null;
+  acknowledgementRate: number;          // 0..1
+
+  joinedAtIso: string;
+  active: boolean;
+}
+</code></pre>
+<p><code>EmployeeDuty</code> is deliberately separate from <code>OrgRole</code>. A dispatcher and a field responder may both be <code>analyst</code> in permission terms while being completely different people to send to a fire. Collapsing the two would mean granting software access in order to describe someone&#39;s job, which is how permission systems rot.</p>
+<h3 id="84-roles-and-capabilities">8.4 Roles and capabilities</h3>
+<pre><code class="language-ts">export type OrgRole = &#39;owner&#39; | &#39;admin&#39; | &#39;analyst&#39; | &#39;dispatcher&#39; | &#39;viewer&#39;;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Capability</th>
+<th align="center">viewer</th>
+<th align="center">analyst</th>
+<th align="center">dispatcher</th>
+<th align="center">admin</th>
+<th align="center">owner</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>view_reports</code></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>export_data</code></td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>triage_reports</code></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>dispatch_units</code></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>manage_queries</code></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>manage_members</code></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>manage_org</code></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center"></td>
+<td align="center">✓</td>
+</tr>
+</tbody></table></div>
+<p><code>dispatcher</code> sits above <code>analyst</code> deliberately: sending a patrol car to a location is a heavier action than reading a trend chart, even though the dispatcher sees less data.</p>
+<p>Three rules the server MUST enforce:</p>
+<ul>
+<li>An admin cannot change or remove an <strong>owner</strong>. Without this an admin demotes the owner and takes the organisation.</li>
+<li><strong>The last owner can never be removed.</strong> An organisation with no owner has nobody who can restore access, and recovery becomes a support ticket.</li>
+<li>Only an owner can create another owner.</li>
+</ul>
+<p><strong>These are advisory in the client and authoritative in the server.</strong> The console hides buttons as a courtesy; hiding a button secures nothing.</p>
+<h3 id="85-employees-joining">8.5 Employees joining</h3>
+<pre><code class="language-ts">export type MembershipStatus = &#39;pending&#39; | &#39;accepted&#39; | &#39;rejected&#39;;
+
+export interface MembershipRequest {
+  id: string;
+  businessId: string;
+  requestedBranchId: string | null;
+  displayName: string;
+  email: string;
+  phone: string | null;
+  statedRole: string;                        // what they say they do, pending confirmation
+  signUpMethod: &#39;password&#39; | &#39;google&#39;;
+  emailVerified: boolean;
+  requestedAtIso: string;
+  status: MembershipStatus;
+  note: string | null;
+}
+</code></pre>
+<p>Employees sign themselves up and name their employer; <strong>the organisation decides whether that is true.</strong> Self-service in both directions would let anyone claim to work for the Electoral Commission and start receiving election footage. Acceptance is always an act by someone already inside who holds <code>manage_members</code>.</p>
+<h3 id="86-internal-submissions">8.6 Internal submissions</h3>
+<p>A report an employee sent straight to their own organisation. These bypass the marketplace entirely — the organisation already employs the person, so there is nothing to license and no commission to pay.</p>
+<pre><code class="language-ts">export interface InternalSubmission {
+  id: string;
+  businessId: string;
+  employeeId: string;
+  employeeName: string;
+  branchId: string | null;
+  category: IncidentCategory;
+  summary: string;
+  posterUrl: string;
+  locationLabel: string | null;
+  location: LatLng | null;
+  capturedAtIso: string;
+  submittedAtIso: string;
+  status: &#39;new&#39; | &#39;assigned&#39; | &#39;resolved&#39; | &#39;dismissed&#39;;
+  assignedToEmployeeId: string | null;
+}
+</code></pre>
+<p><strong>Internal submissions are never anonymous.</strong> An internal report is only actionable if you know which member of staff filed it.</p>
+<h3 id="87-invites-and-affiliations">8.7 Invites and affiliations</h3>
+<p>Organisations send links to employees, agents and affiliates.</p>
+<pre><code class="language-ts">export type InviteKind = &#39;employee&#39; | &#39;agent&#39; | &#39;affiliate_org&#39; | &#39;reporter&#39;;
+export type InviteProblem = &#39;revoked&#39; | &#39;expired&#39; | &#39;exhausted&#39;;
+
+export function inviteProblem(invite: Invite, nowIso: string): InviteProblem | null {
+  if (invite.revokedAtIso) return &#39;revoked&#39;;
+  if (Date.parse(invite.expiresAtIso) &lt;= Date.parse(nowIso)) return &#39;expired&#39;;
+  if (invite.maxUses !== null &amp;&amp; invite.usedCount &gt;= invite.maxUses) return &#39;exhausted&#39;;
+  return null;
+}
+</code></pre>
+<p>An organisation may be affiliated to another organisation. Affiliation is directional and MUST NOT be allowed to form a cycle — <code>canAffiliate</code> rejects an affiliation that would make an organisation its own ancestor.</p>
+<h2 id="an-individual-reporter-declares-an-institution-they-are-affiliated-with-or-declares-themselves-independent-both-are-first-class-independence-is-not-a-missing-value">An individual reporter declares an institution they are affiliated with, or declares themselves <strong>independent</strong>. Both are first-class; independence is not a missing value.</h2>
+<h2 id="9-institutional-onboarding">9. Institutional onboarding</h2>
+<p>Registration says who is asking. Onboarding is the evidence, and it is a different shape of thing: a sequence of steps an applicant works through at their own pace, each one submitted and then reviewed by a platform administrator before any of it counts.</p>
+<p>Two rules give the flow its shape:</p>
+<ol>
+<li><strong>The applicant submits; the platform approves.</strong> Completing a step never approves it. An organisation that could mark its own evidence acceptable is an organisation that has not been checked.</li>
+<li><strong>Approval is per step, and the final decision is gated on all of them.</strong> Reviewing an application as one blob means a reviewer accepts everything or rejects everything, and the applicant is told &quot;declined&quot; with no idea which document was wrong.</li>
+</ol>
+<h3 id="91-the-flow">9.1 The flow</h3>
+<pre><code>register (3 steps: organisation → interests → plan)
+        ↓ account created immediately
+onboarding (4 evidence steps, each reviewed separately)
+        ↓ all steps approved + screening clear
+platform administrator approves → institution can receive footage
+</code></pre>
+<p>Registration collects what an officer can answer from memory in under a minute. <strong>Onboarding collects evidence and only evidence</strong> — categories and the plan are chosen at registration and are deliberately not asked again, because asking twice makes the first pass look pointless and the second look like the form forgot.</p>
+<h3 id="92-steps">9.2 Steps</h3>
+<pre><code class="language-ts">export type OnboardingStepId = &#39;organisation&#39; | &#39;officer&#39; | &#39;coverage&#39; | &#39;documents&#39;;
+
+export type StepStatus =
+  | &#39;not_started&#39;   // not opened
+  | &#39;in_progress&#39;   // opened, partly filled, not sent
+  | &#39;submitted&#39;     // sent for review; the applicant can no longer edit it
+  | &#39;approved&#39;      // a reviewer accepted it
+  | &#39;rejected&#39;;     // a reviewer sent it back, with a reason
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Step</th>
+<th>Collects</th>
+<th>Documents</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>organisation</code></td>
+<td>Legal name, sector, registration number</td>
+<td><code>business_registration</code>, <code>tax_identification</code></td>
+</tr>
+<tr>
+<td><code>officer</code></td>
+<td>The person who signs for this account</td>
+<td><code>officer_id</code>, <code>authorisation_letter</code></td>
+</tr>
+<tr>
+<td><code>coverage</code></td>
+<td>Where you operate — decides which incidents can reach your staff</td>
+<td><code>premises_proof</code></td>
+</tr>
+<tr>
+<td><code>documents</code></td>
+<td>Everything attached, and anything still missing</td>
+<td>—</td>
+</tr>
+</tbody></table></div>
+<h3 id="93-documents">9.3 Documents</h3>
+<pre><code class="language-ts">export type DocumentId =
+  | &#39;business_registration&#39; | &#39;tax_identification&#39;
+  | &#39;officer_id&#39; | &#39;authorisation_letter&#39;
+  | &#39;premises_proof&#39; | &#39;utility_bill&#39; | &#39;lease_agreement&#39;;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Document</th>
+<th align="center">Required</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>business_registration</code></td>
+<td align="center">✓</td>
+<td>Certificate of incorporation, or equivalent for a public body</td>
+</tr>
+<tr>
+<td><code>tax_identification</code></td>
+<td align="center">✓</td>
+<td>TIN certificate</td>
+</tr>
+<tr>
+<td><code>officer_id</code></td>
+<td align="center">✓</td>
+<td>Ghana Card, passport or driver&#39;s licence</td>
+</tr>
+<tr>
+<td><code>authorisation_letter</code></td>
+<td align="center">✓</td>
+<td>On letterhead, confirming this person may act for the organisation</td>
+</tr>
+<tr>
+<td><code>premises_proof</code></td>
+<td align="center">✓</td>
+<td>Satisfied by a lease <strong>or</strong> a utility bill</td>
+</tr>
+<tr>
+<td><code>lease_agreement</code></td>
+<td align="center"></td>
+<td>Alternative for <code>premises_proof</code></td>
+</tr>
+<tr>
+<td><code>utility_bill</code></td>
+<td align="center"></td>
+<td>Alternative for <code>premises_proof</code>; within the last three months</td>
+</tr>
+</tbody></table></div>
+<p><strong>Alternatives.</strong> A lease and a utility bill both prove occupancy, and demanding both is how an application stalls on paperwork that adds nothing. Any one member of an <code>alternativeGroup</code> satisfies the requirement.</p>
+<pre><code class="language-ts">export function documentSatisfied(application, id: DocumentId): boolean {
+  const requirement = DOCUMENT_REQUIREMENTS[id];
+  const uploaded = new Set(application.documents.map((d) =&gt; d.id));
+
+  if (uploaded.has(id)) return true;
+  if (!requirement.alternativeGroup) return false;
+
+  return Object.values(DOCUMENT_REQUIREMENTS).some(
+    (other) =&gt; other.alternativeGroup === requirement.alternativeGroup &amp;&amp; uploaded.has(other.id),
+  );
+}
+</code></pre>
+<h3 id="94-the-gates">9.4 The gates</h3>
+<pre><code class="language-ts">export type SubmitProblem = &#39;steps_outstanding&#39; | &#39;documents_missing&#39; | &#39;already_submitted&#39;;
+
+export type ApprovalProblem =
+  | &#39;not_submitted&#39; | &#39;steps_not_approved&#39;
+  | &#39;screening_not_run&#39; | &#39;screening_not_clear&#39; | &#39;already_approved&#39;;
+
+export function approvalProblem(application): ApprovalProblem | null {
+  if (application.approvedAtIso) return &#39;already_approved&#39;;
+  if (!application.submittedAtIso) return &#39;not_submitted&#39;;
+
+  const unapproved = ONBOARDING_STEPS.some(
+    (meta) =&gt; stepState(application, meta.id).status !== &#39;approved&#39;,
+  );
+  if (unapproved) return &#39;steps_not_approved&#39;;
+
+  if (application.screeningRunAtIso === null) return &#39;screening_not_run&#39;;
+  if (application.screeningClear !== true) return &#39;screening_not_clear&#39;;
+
+  return null;
+}
+</code></pre>
+<p><strong>Screening</strong> is a sanctions and adverse-media check on both the organisation and its named officer. It MUST have been run and MUST have come back clear.</p>
+<p>Approval is what grants an organisation access to footage of the public, so it is the one decision in the product that no single click should be able to reach.</p>
+<p><strong>A rejected step jumps the queue</strong> in <code>nextStepFor</code>, because everything after it may depend on the thing that was wrong, and leaving it buried is how an application sits untouched for a fortnight.</p>
+<p>Reference format: <code>ONB-ORG-000042</code>, quoted in every email about the application.</p>
+<hr>
+<h2 id="10-money">10. Money</h2>
+<h3 id="101-subscription-plans">10.1 Subscription plans</h3>
+<p>Every figure is integer pesewas. 100 pesewas = GHS 1.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th><strong>Basic</strong></th>
+<th><strong>Standard</strong></th>
+<th><strong>Enterprise</strong></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Billing period</td>
+<td>monthly</td>
+<td>monthly</td>
+<td><strong>annual</strong></td>
+</tr>
+<tr>
+<td>Fee</td>
+<td>45,000 (GHS 450/mo)</td>
+<td>180,000 (GHS 1,800/mo)</td>
+<td>2,400,000 (GHS 24,000/yr)</td>
+</tr>
+<tr>
+<td>Per download</td>
+<td>2,000 (GHS 20)</td>
+<td>1,200 (GHS 12)</td>
+<td><strong>null — unlimited</strong></td>
+</tr>
+<tr>
+<td>Seats</td>
+<td>3</td>
+<td>12</td>
+<td>50</td>
+</tr>
+<tr>
+<td>Concurrent surveys</td>
+<td>1</td>
+<td>5</td>
+<td>25</td>
+</tr>
+<tr>
+<td>Can direct-request</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+</tr>
+</tbody></table></div>
+<pre><code class="language-ts">export interface SubscriptionPlan {
+  tier: SubscriptionTier;                 // &#39;basic&#39; | &#39;standard&#39; | &#39;enterprise&#39;
+  billingPeriod: BillingPeriod;           // &#39;monthly&#39; | &#39;annual&#39;
+  feePesewas: number;
+  perDownloadPesewas: number | null;      // null means unlimited
+  seats: number;
+  concurrentSurveys: number;
+  canDirectRequest: boolean;
+}
+</code></pre>
+<pre><code class="language-ts">export function isUnlimited(plan)  { return plan.perDownloadPesewas === null; }
+export function downloadCharge(plan) { return plan.perDownloadPesewas ?? 0; }
+
+export function periodCost(plan, downloads: number): number {
+  const taken = Math.max(0, Math.floor(downloads));   // negative/fractional is a programming error
+  return plan.feePesewas + downloadCharge(plan) * taken;
+}
+
+export function annualCost(plan, downloadsPerYear: number): number {
+  const taken = Math.max(0, Math.floor(downloadsPerYear));
+  const periods = plan.billingPeriod === &#39;annual&#39; ? 1 : 12;
+  return plan.feePesewas * periods + downloadCharge(plan) * taken;
+}
+
+/** Downloads per year at which unlimited becomes cheaper. Null when metered never loses. */
+export function breakEvenDownloads(metered, unlimited): number | null {
+  const perDownload = metered.perDownloadPesewas;
+  if (perDownload === null || perDownload &lt;= 0) return null;
+
+  const meteredAnnualFee   = metered.feePesewas   * (metered.billingPeriod   === &#39;annual&#39; ? 1 : 12);
+  const unlimitedAnnualFee = unlimited.feePesewas * (unlimited.billingPeriod === &#39;annual&#39; ? 1 : 12);
+
+  const gap = unlimitedAnnualFee - meteredAnnualFee;
+  if (gap &lt;= 0) return 0;
+  return Math.ceil(gap / perDownload);
+}
+</code></pre>
+<p><strong>The price of one more download belongs on the download button.</strong> An organisation should never discover the price of a report on next month&#39;s invoice.</p>
+<p>Note that standard&#39;s annual fee (GHS 21,600) already sits close to enterprise&#39;s (GHS 24,000), so standard breaks even at far fewer downloads than basic. That is intentional and the console shows the arithmetic rather than a sales claim.</p>
+<h3 id="102-reporter-commission">10.2 Reporter commission</h3>
+<p>What a reporter earns when an institution licenses their report.</p>
+<p><strong>Base rate per category, in pesewas.</strong> Deliberately uneven — a fire or a road accident has a short window in which it is worth anything to a responder, and paying the same for it as for a pothole would tell reporters their urgency is worthless.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Category</th>
+<th align="right">Base</th>
+<th></th>
+<th>Category</th>
+<th align="right">Base</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>corruption</code></td>
+<td align="right">3,000</td>
+<td></td>
+<td><code>utility</code></td>
+<td align="right">1,500</td>
+</tr>
+<tr>
+<td><code>election</code></td>
+<td align="right">3,000</td>
+<td></td>
+<td><code>water</code></td>
+<td align="right">1,500</td>
+</tr>
+<tr>
+<td><code>galamsey</code></td>
+<td align="right">3,000</td>
+<td></td>
+<td><code>education</code></td>
+<td align="right">1,500</td>
+</tr>
+<tr>
+<td><code>fire</code></td>
+<td align="right">2,500</td>
+<td></td>
+<td><code>wildlife</code></td>
+<td align="right">1,500</td>
+</tr>
+<tr>
+<td><code>accident</code></td>
+<td align="right">2,500</td>
+<td></td>
+<td><code>sanitation</code></td>
+<td align="right">1,400</td>
+</tr>
+<tr>
+<td><code>environment</code></td>
+<td align="right">2,200</td>
+<td></td>
+<td><code>transport</code></td>
+<td align="right">1,300</td>
+</tr>
+<tr>
+<td><code>flood</code></td>
+<td align="right">2,000</td>
+<td></td>
+<td><code>road</code></td>
+<td align="right">1,200</td>
+</tr>
+<tr>
+<td><code>crime</code></td>
+<td align="right">2,000</td>
+<td></td>
+<td><code>infrastructure</code></td>
+<td align="right">1,200</td>
+</tr>
+<tr>
+<td><code>disorder</code></td>
+<td align="right">2,000</td>
+<td></td>
+<td><code>other</code></td>
+<td align="right">1,000</td>
+</tr>
+<tr>
+<td><code>chieftaincy</code></td>
+<td align="right">2,000</td>
+<td></td>
+<td></td>
+<td align="right"></td>
+</tr>
+<tr>
+<td><code>weather</code></td>
+<td align="right">1,800</td>
+<td></td>
+<td></td>
+<td align="right"></td>
+</tr>
+<tr>
+<td><code>health</code></td>
+<td align="right">1,800</td>
+<td></td>
+<td></td>
+<td align="right"></td>
+</tr>
+<tr>
+<td><code>protest</code></td>
+<td align="right">1,800</td>
+<td></td>
+<td></td>
+<td align="right"></td>
+</tr>
+<tr>
+<td><code>land</code></td>
+<td align="right">1,800</td>
+<td></td>
+<td></td>
+<td align="right"></td>
+</tr>
+</tbody></table></div>
+<p>Governance categories pay most: hardest to capture, most consequential once captured, and the footage most likely to cost the reporter something to obtain. A lawful demonstration (<code>protest</code>) sits below <code>disorder</code> because it is newsworthy but rarely time-critical to a responder.</p>
+<p><strong>Multipliers</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Multiplier</th>
+<th align="right">Value</th>
+<th>Applies when</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Video</td>
+<td align="right">×1.5</td>
+<td><code>mediaKind === &#39;video&#39;</code></td>
+</tr>
+<tr>
+<td>Audio</td>
+<td align="right">×1.25</td>
+<td><code>mediaKind === &#39;audio&#39;</code></td>
+</tr>
+<tr>
+<td>Directed</td>
+<td align="right">×1.25</td>
+<td><code>destination === &#39;directed&#39;</code> — exclusivity is worth more</td>
+</tr>
+<tr>
+<td>Low confidence</td>
+<td align="right">×0.7</td>
+<td><code>locationConfidence === &#39;low&#39;</code></td>
+</tr>
+<tr>
+<td>Additional licensees</td>
+<td align="right">+0.5 share each</td>
+<td>Second and subsequent buyers</td>
+</tr>
+</tbody></table></div>
+<p>Audio sits between a photograph and a video on purpose. Speaking an account takes more of a reporter than pointing a lens, so it pays above a still; it shows less than footage, so it pays below one. Pricing it like a photo would tell people the safest way to report is the least valuable, which is the opposite of what this platform should encourage.</p>
+<p><strong>Platform share: <code>PLATFORM_FEE_RATE = 0.3</code></strong></p>
+<pre><code class="language-ts">export function estimateCommission(input: CommissionInput): CommissionBreakdown {
+  // The public feed pays nothing. Visibility is the reward, and pretending
+  // otherwise would set an expectation the model cannot meet.
+  if (input.destination === &#39;public&#39;) {
+    return { grossPesewas: 0, platformFeePesewas: 0, reporterPesewas: 0 };
+  }
+
+  let gross = BASE_PESEWAS[input.category];
+  if (input.mediaKind === &#39;video&#39;) gross *= 1.5;
+  if (input.mediaKind === &#39;audio&#39;) gross *= 1.25;
+  if (input.destination === &#39;directed&#39;) gross *= 1.25;
+  if (input.locationConfidence === &#39;low&#39;) gross *= 0.7;
+
+  // The second buyer of the same footage values it less than the first, but
+  // the reporter should still gain.
+  const licensees = Math.max(1, input.licensedBy ?? 1);
+  gross *= 1 + (licensees - 1) * 0.5;
+
+  // Round ONCE, at the end. Rounding each multiplier compounds the error.
+  const grossPesewas = Math.round(gross);
+  const platformFeePesewas = Math.round(grossPesewas * 0.3);
+
+  return {
+    grossPesewas,
+    platformFeePesewas,
+    // Subtraction, not a second rounding, so the three always reconcile.
+    reporterPesewas: grossPesewas - platformFeePesewas,
+  };
+}
+</code></pre>
+<p><strong>The same function produces the estimate shown to the reporter before they submit and the amount recorded in the ledger afterwards.</strong> They must never disagree. If you reimplement this server-side, verify it against §15.</p>
+<h3 id="103-the-ledger-and-payouts">10.3 The ledger and payouts</h3>
+<pre><code class="language-ts">export type CommissionStatus =
+  | &#39;pending&#39;   // submitted; nobody has licensed it yet
+  | &#39;earned&#39;    // a business licensed it — the amount is fixed at this point
+  | &#39;paid&#39;      // included in a payout batch
+  | &#39;void&#39;;     // report rejected or withdrawn; nothing owed
+
+export interface EarningsSummary {
+  pendingPesewas: number;
+  paidPesewas: number;
+  lifetimePesewas: number;
+  reportsLicensed: number;
+  payoutThresholdPesewas: number;   // payouts run once a reporter clears this floor
+  nextPayoutIso: string | null;
+}
+</code></pre>
+<p>The amount is <strong>fixed at the moment of licensing</strong> and MUST NOT be recomputed later. Rates change; a reporter&#39;s settled earnings do not.</p>
+<p><strong>Mobile money is how Ghana pays.</strong> Payout destinations will be MTN MoMo, Telecel Cash and AirtelTigo Money. The payout provider integration is not yet specified — see §16.</p>
+<hr>
+<h2 id="11-response-and-sla">11. Response and SLA</h2>
+<p>Until now a subscriber could license footage and nothing more, and the platform had no idea whether anyone acted on it. That gap matters in both directions: a reporter who never learns anything happened stops filing, and an agency that cannot show it responded has no evidence of its own work.</p>
+<p><strong>The response log is append-only.</strong> &quot;We closed this with no action&quot; is a decision someone made and should have to stand behind, not something that can be quietly rewritten later.</p>
+<pre><code class="language-ts">export type ResponseAction =
+  | &#39;acknowledged&#39;          // seen by a human; nothing done yet
+  | &#39;more_info_requested&#39;   // cannot act without something more from the reporter
+  | &#39;inspecting&#39;            // someone has gone to look
+  | &#39;referred&#39;              // passed to a different body
+  | &#39;resolved&#39;              // dealt with
+  | &#39;closed_no_action&#39;;     // considered and deliberately not acted on
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Action</th>
+<th align="center">Terminal</th>
+<th align="center">Notifies reporter</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>acknowledged</code></td>
+<td align="center">no</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>more_info_requested</code></td>
+<td align="center">no</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>inspecting</code></td>
+<td align="center">no</td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>referred</code></td>
+<td align="center"><strong>yes</strong></td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>resolved</code></td>
+<td align="center"><strong>yes</strong></td>
+<td align="center">✓</td>
+</tr>
+<tr>
+<td><code>closed_no_action</code></td>
+<td align="center"><strong>yes</strong></td>
+<td align="center">✓</td>
+</tr>
+</tbody></table></div>
+<p>Every action notifies the reporter, including the ones nobody enjoys sending.</p>
+<h3 id="acknowledgement-targets">Acknowledgement targets</h3>
+<pre><code class="language-ts">export const ACK_TARGET_HOURS: Record&lt;Severity, number&gt; = {
+  emergency: 1,
+  urgent: 4,
+  concern: 24,
+  observation: 72,
+};
+
+export type SlaStatus = &#39;met&#39; | &#39;due&#39; | &#39;at_risk&#39; | &#39;breached&#39;;
+</code></pre>
+<pre><code class="language-ts">export function slaState(severity, submittedAtIso, acknowledgedAtIso, nowIso): SlaState {
+  const targetHours = ACK_TARGET_HOURS[severity];
+  const submitted = Date.parse(submittedAtIso);
+  // Once acknowledged the clock STOPS. Recomputing against the current time
+  // would make met cases silently drift into breached ones.
+  const reference = Date.parse(acknowledgedAtIso ?? nowIso);
+
+  const elapsed = Math.max(0, (reference - submitted) / 3_600_000);
+  const hoursRemaining = targetHours - elapsed;
+
+  if (acknowledgedAtIso) {
+    return { status: elapsed &lt;= targetHours ? &#39;met&#39; : &#39;breached&#39;, targetHours, hoursRemaining };
+  }
+  if (hoursRemaining &lt;= 0) return { status: &#39;breached&#39;, targetHours, hoursRemaining };
+  // The last quarter of the window is where a nudge still changes the outcome.
+  if (hoursRemaining &lt;= targetHours * 0.25) {
+    return { status: &#39;at_risk&#39;, targetHours, hoursRemaining };
+  }
+  return { status: &#39;due&#39;, targetHours, hoursRemaining };
+}
+
+/** Only UNACKNOWLEDGED breaches escalate — a case acknowledged late is already
+ *  with a person, and escalating would tell a supervisor to chase work in hand. */
+export function needsEscalation(sla: SlaState, acknowledged: boolean): boolean {
+  return sla.status === &#39;breached&#39; &amp;&amp; !acknowledged;
+}
+</code></pre>
+<hr>
+<h2 id="12-surveys">12. Surveys</h2>
+<p>Institutions can pay reporters to answer structured questions from a target area.</p>
+<pre><code class="language-ts">export type SurveyQuestionKind = &#39;single_choice&#39; | &#39;multi_choice&#39; | &#39;scale&#39; | &#39;text&#39; | &#39;photo&#39;;
+
+export interface Survey {
+  id: string;
+  businessId: string;
+  businessName: string;
+  title: string;
+  description: string;
+  questions: SurveyQuestion[];
+  rewardPesewas: number;
+  targetArea: { latitude: number; longitude: number; radiusM: number } | null;
+  responsesTarget: number;
+  responsesReceived: number;
+  closesAtIso: string;
+  status: &#39;draft&#39; | &#39;live&#39; | &#39;closed&#39;;
+}
+</code></pre>
+<p>Constants: <code>MIN_REWARD_PESEWAS = 100</code> (GHS 1 — below this a survey is not worth a reporter&#39;s attention). <code>MAX_QUESTIONS = 12</code> (answering more in one sitting produces careless data).</p>
+<p>Validation returns <strong>everything</strong> wrong rather than the first problem found:</p>
+<pre><code class="language-ts">export type SurveyIssue =
+  | &#39;no_title&#39; | &#39;no_questions&#39; | &#39;question_missing_prompt&#39;
+  | &#39;choice_needs_options&#39; | &#39;reward_too_low&#39; | &#39;no_target&#39; | &#39;closes_in_past&#39;;
+</code></pre>
+<p>Cost, with the same platform share as commission:</p>
+<pre><code class="language-ts">export function estimateSurveyCost(rewardPesewas: number, responsesTarget: number): SurveyCost {
+  const rewardsPesewas = Math.max(0, Math.round(rewardPesewas * responsesTarget));
+  const platformFeePesewas = Math.round(rewardsPesewas * PLATFORM_FEE_RATE);
+  return { rewardsPesewas, platformFeePesewas, totalPesewas: rewardsPesewas + platformFeePesewas };
+}
+</code></pre>
+<p>A business&#39;s concurrent live surveys MUST NOT exceed its plan&#39;s <code>concurrentSurveys</code>.</p>
+<hr>
+<h2 id="13-endpoint-index">13. Endpoint index</h2>
+<p>Endpoints marked <strong>new</strong> do not exist in v1 of this contract and cover everything built since.</p>
+<h3 id="capture-and-identity">Capture and identity</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/devices</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/register</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/login</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/refresh</code></td>
+<td>refresh token</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/auth/google</code></td>
+<td>none — <strong>new</strong>, currently non-functional in the client</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/incidents</code></td>
+<td>device or user</td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/uploads/{uploadId}/chunks/{index}</code></td>
+<td>same as init</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/uploads/{uploadId}/complete</code></td>
+<td>same as init</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/uploads/{uploadId}</code></td>
+<td>same as init</td>
+</tr>
+</tbody></table></div>
+<h3 id="reading">Reading</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/incidents</code></td>
+<td>device or user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/incidents/map</code></td>
+<td>device or user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/incidents/{id}</code></td>
+<td>device or user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/incidents/by-reference/{reportId}</code></td>
+<td>none — <strong>new</strong>, public verification page</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/incidents</code></td>
+<td>user</td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/incidents/{id}</code></td>
+<td>user, author only</td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/incidents/{id}</code></td>
+<td>user, author only</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/incidents/{id}/comments</code></td>
+<td>device or user — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/incidents/{id}/comments</code></td>
+<td>user — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/incidents/{id}/reactions</code></td>
+<td>user — <strong>new</strong></td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/incidents/{id}/reactions</code></td>
+<td>user — <strong>new</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="editorial-all-new">Editorial — <strong>all new</strong></h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Capability</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/editorial/queue</code></td>
+<td>editor</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/editorial/{incidentId}</code></td>
+<td>editor</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/editorial/{incidentId}/transition</code></td>
+<td>editor — enforces §4.3</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/editorial/{incidentId}/corroboration</code></td>
+<td>editor</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/editorial/decided</code></td>
+<td>editor</td>
+</tr>
+</tbody></table></div>
+<h3 id="institution">Institution</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Capability</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/org/dashboard</code></td>
+<td><code>view_reports</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/org/inbox</code></td>
+<td><code>view_reports</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/incidents/{id}/license</code></td>
+<td><code>view_reports</code> — enforces §4.5</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/incidents/{id}/publish</code></td>
+<td><code>manage_org</code> — enforces §4.5</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/incidents/{id}/response</code></td>
+<td><code>triage_reports</code> — <strong>new</strong>, §11</td>
+</tr>
+<tr>
+<td>GET/POST/DELETE</td>
+<td><code>/org/queries[/{id}]</code></td>
+<td><code>manage_queries</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/exports</code></td>
+<td><code>export_data</code></td>
+</tr>
+<tr>
+<td>GET/POST/PATCH/DELETE</td>
+<td><code>/org/members[/{id}]</code></td>
+<td><code>manage_members</code></td>
+</tr>
+<tr>
+<td>GET/POST/PATCH/DELETE</td>
+<td><code>/org/branches[/{id}]</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>GET/POST/PATCH/DELETE</td>
+<td><code>/org/employees[/{id}]</code></td>
+<td><code>manage_members</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/org/membership-requests</code></td>
+<td><code>manage_members</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/membership-requests/{id}/decide</code></td>
+<td><code>manage_members</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/assignments</code></td>
+<td><code>dispatch_units</code> — <strong>new</strong>, §7</td>
+</tr>
+<tr>
+<td>GET/POST</td>
+<td><code>/org/internal-submissions</code></td>
+<td><code>view_reports</code> — <strong>new</strong>, §8.6</td>
+</tr>
+<tr>
+<td>GET/POST/DELETE</td>
+<td><code>/org/invites[/{id}]</code></td>
+<td><code>manage_members</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>GET/POST/DELETE</td>
+<td><code>/org/affiliations[/{id}]</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>GET/POST</td>
+<td><code>/org/surveys</code></td>
+<td><code>manage_queries</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/org/onboarding</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>PUT</td>
+<td><code>/org/onboarding/steps/{stepId}</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/onboarding/steps/{stepId}/submit</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/org/onboarding/documents</code></td>
+<td><code>manage_org</code> — <strong>new</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="platform-operator-all-new">Platform operator — <strong>all new</strong></h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/platform/routing</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/platform/routing/{incidentId}/recipients</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/platform/applications</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/platform/applications/{id}/steps/{stepId}/decide</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/platform/applications/{id}/screening</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/platform/applications/{id}/approve</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/platform/businesses</code></td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/platform/payouts</code></td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/platform/payouts/batches</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="reporter-earnings">Reporter earnings</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/me/earnings</code></td>
+<td>user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/me/commissions</code></td>
+<td>user</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/surveys</code></td>
+<td>user</td>
+</tr>
+<tr>
+<td>POST</td>
+<td><code>/surveys/{id}/responses</code></td>
+<td>user</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="14-invariants-the-must-never-list">14. Invariants — the must-never list</h2>
+<p>Every one of these is a rule the clients already follow and the server MUST enforce independently. They are collected here because they are the failures that would matter, and because an implementation that gets everything else right and one of these wrong is worse than useless.</p>
+<ol>
+<li><strong>Never let assurance imply verification.</strong> A Class A file is not a verified event. The two fields are separate, stored separately, and no code path may set one from the other.</li>
+<li><strong>Never use the word &quot;verified&quot; against a state whose <code>mayUseWordVerified</code> is false.</strong> Return <code>permittedRepresentation</code> and have clients render it verbatim.</li>
+<li><strong>Never allow a transition outside the table in §4.3</strong>, and never allow anything out of <code>rejected</code>.</li>
+<li><strong>Never publish a report whose handling includes <code>redact_before_publication</code></strong> until redaction is done and recorded — regardless of verification state.</li>
+<li><strong>Never publish a Class C report that is not independently corroborated</strong>, however far editorial has got.</li>
+<li><strong>Never return <code>PreciseLocation</code> on a public endpoint.</strong> Author-only, always.</li>
+<li><strong>Never return suppressed fields.</strong> <code>showLocation: false</code> means coordinates and label are null in the response body, not merely hidden by the client.</li>
+<li><strong>Never trust a client-supplied assurance class, handling requirement, commission amount, or capture timestamp.</strong> Compute all of them server-side.</li>
+<li><strong>Never store money as a float.</strong> Integer pesewas everywhere, rounded once, reconciled by subtraction.</li>
+<li><strong>Never recompute a settled commission.</strong> The amount is fixed at licensing.</li>
+<li><strong>Never let an admin modify or remove an owner</strong>, and never allow the last owner to be removed.</li>
+<li><strong>Never let an organisation approve its own onboarding.</strong> Approval is always an act by a platform administrator, and only after screening is run and clear.</li>
+<li><strong>Never treat <code>severity: &#39;emergency&#39;</code> as a dispatch to an emergency service.</strong> Dawuro is not one. Ghana&#39;s emergency number is 112.</li>
+<li><strong>Never make an internal submission anonymous.</strong> Attribution is the point.</li>
+<li><strong>Never return a retryable error code for a permanent failure</strong>, or the reverse. The mobile outbox switches on it.</li>
+<li><strong>Never route a <code>public</code> submission to institutions</strong>, and never pay commission on one.</li>
+<li><strong>Never infer an employee&#39;s location from their branch address.</strong></li>
+<li><strong>Never let the SLA clock restart.</strong> Once acknowledged, the answer is fixed.</li>
+<li><strong>Never delete from the response log.</strong> Append-only.</li>
+<li><strong>Never accept an organisation context from anything but a verified membership</strong> on the authenticated user.</li>
+</ol>
+<hr>
+<h2 id="15-test-vectors">15. Test vectors</h2>
+<p>Verify your implementation against these before wiring anything to a client.</p>
+<h3 id="report-id">Report ID</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Seed</th>
+<th>Expected</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>inc_01JBX7Q2K9</code></td>
+<td><code>DW-WQD-JW4</code></td>
+</tr>
+<tr>
+<td><code>inc_01JBX7R4M2</code></td>
+<td><code>DW-YNG-6JR</code></td>
+</tr>
+<tr>
+<td><code>inc_01JBX7S6P7</code></td>
+<td><code>DW-VPR-WCH</code></td>
+</tr>
+<tr>
+<td><code>inc_01JBX7T8Q1</code></td>
+<td><code>DW-DC9-VKM</code></td>
+</tr>
+</tbody></table></div>
+<p>Lookup MUST be case-insensitive: <code>dw-wqd-jw4</code> resolves the same report.</p>
+<h3 id="assurance-classification">Assurance classification</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th align="center">capturedInApp</th>
+<th align="center">institutional</th>
+<th align="center">all 5 checks</th>
+<th align="center">→ class</th>
+</tr>
+</thead>
+<tbody><tr>
+<td align="center">false</td>
+<td align="center">true</td>
+<td align="center">true</td>
+<td align="center"><strong>C</strong> — an import can never be rescued</td>
+</tr>
+<tr>
+<td align="center">false</td>
+<td align="center">false</td>
+<td align="center">false</td>
+<td align="center"><strong>C</strong></td>
+</tr>
+<tr>
+<td align="center">true</td>
+<td align="center">true</td>
+<td align="center">false</td>
+<td align="center"><strong>D</strong></td>
+</tr>
+<tr>
+<td align="center">true</td>
+<td align="center">false</td>
+<td align="center">true</td>
+<td align="center"><strong>A</strong></td>
+</tr>
+<tr>
+<td align="center">true</td>
+<td align="center">false</td>
+<td align="center">false</td>
+<td align="center"><strong>B</strong></td>
+</tr>
+</tbody></table></div>
+<h3 id="commission">Commission</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Input</th>
+<th align="right">gross</th>
+<th align="right">fee</th>
+<th align="right">reporter</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>flood</code>, marketplace, photo, high</td>
+<td align="right">2,000</td>
+<td align="right">600</td>
+<td align="right">1,400</td>
+</tr>
+<tr>
+<td><code>flood</code>, marketplace, video, high</td>
+<td align="right">3,000</td>
+<td align="right">900</td>
+<td align="right">2,100</td>
+</tr>
+<tr>
+<td><code>flood</code>, marketplace, audio, high</td>
+<td align="right">2,500</td>
+<td align="right">750</td>
+<td align="right">1,750</td>
+</tr>
+<tr>
+<td><code>flood</code>, directed, video, high</td>
+<td align="right">3,750</td>
+<td align="right">1,125</td>
+<td align="right">2,625</td>
+</tr>
+<tr>
+<td><code>flood</code>, marketplace, video, <strong>low</strong></td>
+<td align="right">2,100</td>
+<td align="right">630</td>
+<td align="right">1,470</td>
+</tr>
+<tr>
+<td><code>galamsey</code>, directed, video, high</td>
+<td align="right">5,625</td>
+<td align="right">1,688</td>
+<td align="right">3,937</td>
+</tr>
+<tr>
+<td><code>flood</code>, <strong>both</strong>, video, high</td>
+<td align="right">3,000</td>
+<td align="right">900</td>
+<td align="right">2,100</td>
+</tr>
+<tr>
+<td>anything, <strong>public</strong>, any, any</td>
+<td align="right">0</td>
+<td align="right">0</td>
+<td align="right">0</td>
+</tr>
+<tr>
+<td><code>flood</code>, marketplace, video, high, <strong>2 licensees</strong></td>
+<td align="right">4,500</td>
+<td align="right">1,350</td>
+<td align="right">3,150</td>
+</tr>
+</tbody></table></div>
+<p>The three figures MUST always satisfy <code>gross − fee = reporter</code> exactly.</p>
+<h3 id="billing">Billing</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Assertion</th>
+<th>Value</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>annualCost(basic, 0)</code></td>
+<td>540,000</td>
+</tr>
+<tr>
+<td><code>annualCost(standard, 0)</code></td>
+<td>2,160,000</td>
+</tr>
+<tr>
+<td><code>annualCost(enterprise, 0)</code></td>
+<td>2,400,000</td>
+</tr>
+<tr>
+<td><code>annualCost(enterprise, 10_000)</code></td>
+<td>2,400,000 — unlimited</td>
+</tr>
+<tr>
+<td><code>breakEvenDownloads(basic, enterprise)</code></td>
+<td>930</td>
+</tr>
+<tr>
+<td><code>breakEvenDownloads(standard, enterprise)</code></td>
+<td>200</td>
+</tr>
+<tr>
+<td><code>breakEvenDownloads(enterprise, enterprise)</code></td>
+<td><code>null</code></td>
+</tr>
+</tbody></table></div>
+<p>Standard breaks even sooner than basic. That is correct, not a bug: standard&#39;s annual fee already sits near enterprise&#39;s.</p>
+<h3 id="sla">SLA</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>severity</th>
+<th>submitted</th>
+<th>acknowledged</th>
+<th>now</th>
+<th>→ status</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>emergency</code></td>
+<td>T+0</td>
+<td>—</td>
+<td>T+0.5h</td>
+<td><code>due</code> — half the window still left</td>
+</tr>
+<tr>
+<td><code>emergency</code></td>
+<td>T+0</td>
+<td>—</td>
+<td>T+0.8h</td>
+<td><code>at_risk</code> — ≤25% of a 1h window left</td>
+</tr>
+<tr>
+<td><code>emergency</code></td>
+<td>T+0</td>
+<td>—</td>
+<td>T+2h</td>
+<td><code>breached</code></td>
+</tr>
+<tr>
+<td><code>emergency</code></td>
+<td>T+0</td>
+<td>T+3h</td>
+<td>T+99h</td>
+<td><code>breached</code> — the clock stopped at acknowledgement</td>
+</tr>
+<tr>
+<td><code>observation</code></td>
+<td>T+0</td>
+<td>T+70h</td>
+<td>T+99h</td>
+<td><code>met</code></td>
+</tr>
+<tr>
+<td><code>concern</code></td>
+<td>T+0</td>
+<td>—</td>
+<td>T+1h</td>
+<td><code>due</code></td>
+</tr>
+</tbody></table></div>
+<h3 id="handling-requirements">Handling requirements</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Consent</th>
+<th>→ handling</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>containsMinors</code></td>
+<td><code>redact_before_publication</code>, <code>editorial_review_required</code></td>
+</tr>
+<tr>
+<td><code>distressing</code></td>
+<td><code>viewer_warning</code>, <code>editorial_review_required</code></td>
+</tr>
+<tr>
+<td><code>showsPrivateProperty</code> only</td>
+<td><code>restrict_location</code>, <code>redact_before_publication</code></td>
+</tr>
+<tr>
+<td><code>showsPrivateProperty</code> + <code>publicPlace</code></td>
+<td><code>restrict_location</code></td>
+</tr>
+<tr>
+<td><code>showsPrivateProperty</code> + <code>subjectsConsented</code></td>
+<td><code>restrict_location</code></td>
+</tr>
+<tr>
+<td>all false</td>
+<td><code>[]</code></td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="16-open-decisions">16. Open decisions</h2>
+<p>These need a decision from the product side before or during implementation. They are listed here rather than guessed at.</p>
+<ol>
+<li><strong>Device clock tolerance.</strong> What gap between <code>capturedAtIso</code> and server-received time sets <code>timeCheckPassed</code> false? Suggested 5 minutes plus observed upload delay.</li>
+<li><strong>GPS accuracy limits per category.</strong> <code>GPS_ACCURACY_REJECTED</code> implies a threshold. Does a <code>fire</code> demand a tighter fix than a <code>sanitation</code> report?</li>
+<li><strong>Media retention.</strong> How long is media held? The mobile client keeps a metadata row after deleting its local copy, so a reporter&#39;s history will eventually point at collected media. What should it show then?</li>
+<li><strong>Payout provider.</strong> MTN MoMo, Telecel Cash, AirtelTigo — which, and through which aggregator? What is <code>payoutThresholdPesewas</code> and how often do batches run?</li>
+<li><strong>Key management.</strong> Where does the server-side integrity signing key live, how is it rotated, and how are historical signatures verified after a rotation?</li>
+<li><strong>Audit ledger.</strong> The proposal calls for a tamper-evident record of every editorial decision. Append-only table, hash chain, or an external service?</li>
+<li><strong>Right of reply and takedown.</strong> Ghana&#39;s Data Protection Act (Act 843) applies. What is the process when someone filmed requests removal, and what happens to a report already licensed and published by a third party?</li>
+<li><strong>Reporter deanonymisation risk.</strong> A timestamp plus coordinates plus a distinctive scene can identify an &quot;anonymous&quot; reporter. Is there a policy on suppressing detail for high-risk categories such as <code>galamsey</code> and <code>corruption</code>?</li>
+<li><strong>Rate limits.</strong> The figures in §2.8 are starting points, not measurements.</li>
+<li><strong><code>reportId</code> collisions.</strong> Confirm the persistence-with-uniqueness approach in §3.7.</li>
+</ol>
+<hr>
+<h2 id="appendix-reference-implementation">Appendix — reference implementation</h2>
+<p>Every algorithm in this document is implemented and unit-tested in TypeScript in <code>packages/core</code> of the console repository, with no React, DOM or Node dependencies. If a rule here is ambiguous, that code is the tiebreaker — and if the two disagree, <strong>this document is what the backend builds against</strong> and both should be corrected together.</p>
+<p>Consult it for: <code>assignment.ts</code> (§7 scoring in full), <code>editorial.ts</code> (§4.4 corroboration), <code>clusters.ts</code> (map clustering for <code>GET /incidents/map</code>), <code>surveyLogic.ts</code> (§12 validation).</p>
+
+  </main>
+</div>
+</body>
+</html>

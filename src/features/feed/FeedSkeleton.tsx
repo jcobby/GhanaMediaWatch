@@ -3,46 +3,53 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Skeleton } from '@/components/ui';
 
 /**
- * Loading placeholder for the feed.
+ * The feed while it loads.
  *
- * Shaped like a real cell — media block, chips, caption lines, action rail —
- * rather than one flat rectangle. An earlier version filled the screen with a
- * single skeleton in `canvas-raise`, which sits within a few percent luminance
- * of `canvas`; the result was indistinguishable from a blank screen, so a stuck
- * request looked like a broken app.
+ * Shaped like the rows that replace it — thumbnail left, three lines of
+ * headline, a short meta line — so nothing jumps when data arrives. A skeleton
+ * that does not match its content is worse than none, because the shift on
+ * arrival reads as the screen reloading.
+ *
+ * Six rows rather than two: the list layout fits about seven on a phone, and a
+ * skeleton that stops after two implies the feed is nearly empty.
  */
 export function FeedSkeleton() {
   const insets = useSafeAreaInsets();
 
   return (
-    <View className="flex-1 bg-canvas-raise">
-      {/* Top chips */}
-      <View className="absolute left-4 flex-row gap-2" style={{ top: insets.top + 10 }}>
-        <Skeleton className="h-7 w-24 rounded-pill" />
-        <Skeleton className="h-7 w-16 rounded-pill" />
+    <View className="flex-1 bg-canvas-soft" style={{ paddingTop: insets.top }}>
+      {/* Bar */}
+      <View className="flex-row items-center gap-2 px-4 pb-2.5 pt-1">
+        <Skeleton className="h-5 w-28 rounded-xs" />
+        <View className="flex-1" />
+        <Skeleton className="h-9 w-9 rounded-pill" />
+        <Skeleton className="h-9 w-9 rounded-pill" />
       </View>
 
-      {/* Action rail */}
-      <View className="absolute right-4 gap-5" style={{ bottom: insets.bottom + 190 }}>
-        {[0, 1, 2, 3].map((i) => (
-          <View key={i} className="items-center gap-1.5">
-            <Skeleton className="h-11 w-11 rounded-pill" />
-            <Skeleton className="h-2.5 w-7 rounded-pill" />
+      {/* Category tabs */}
+      <View className="flex-row gap-5 border-b border-hairline/[0.08] px-4 pb-3 pt-3">
+        <Skeleton className="h-3 w-14 rounded-xs" />
+        <Skeleton className="h-3 w-16 rounded-xs" />
+        <Skeleton className="h-3 w-12 rounded-xs" />
+        <Skeleton className="h-3 w-20 rounded-xs" />
+      </View>
+
+      {[0, 1, 2, 3, 4, 5].map((i) => (
+        <View key={i} className="flex-row gap-3 border-b border-hairline/[0.06] px-4 py-3.5">
+          <View style={{ width: 112, height: 86 }}>
+            <Skeleton className="h-full w-full rounded-sm" />
           </View>
-        ))}
-      </View>
-
-      {/* Caption block */}
-      <View className="absolute left-4 right-20 gap-3" style={{ bottom: insets.bottom + 80 }}>
-        <View className="flex-row items-center gap-2.5">
-          <Skeleton className="h-8 w-8 rounded-pill" />
-          <Skeleton className="h-3.5 w-28 rounded-pill" />
+          <View className="flex-1 justify-between py-0.5">
+            <View className="gap-1.5">
+              <Skeleton className="h-3.5 w-full rounded-xs" />
+              <Skeleton className="h-3.5 w-[85%] rounded-xs" />
+              {/* The third line is short, as a wrapped headline usually is. */}
+              <Skeleton className="h-3.5 w-[45%] rounded-xs" />
+            </View>
+            <Skeleton className="mt-1.5 h-2.5 w-32 rounded-xs" />
+          </View>
         </View>
-        <Skeleton className="h-4 w-full rounded-pill" />
-        <Skeleton className="h-4 w-4/5 rounded-pill" />
-        <Skeleton className="h-3 w-1/2 rounded-pill" />
-        <Skeleton className="h-10 w-32 rounded-pill" />
-      </View>
+      ))}
     </View>
   );
 }

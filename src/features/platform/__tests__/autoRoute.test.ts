@@ -7,7 +7,7 @@ function biz(overrides: Partial<BusinessAccount> = {}): BusinessAccount {
     name: 'Test Org',
     sector: 'government',
     verified: true,
-    tier: 'professional',
+    tier: 'standard',
     subscriptionStatus: 'active',
     renewsAtIso: '2026-12-01T00:00:00.000Z',
     seatsUsed: 1,

@@ -8,8 +8,9 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, Glass, Pressable, SwitchRow, Text } from '@/components/ui';
 import { MY_REPORTS } from '@/api/mockData';
 import { useAuthStore } from '@/stores/authStore';
+import { useThemeStore } from '@/stores/themeStore';
 import { useRouter } from 'expo-router';
-import { accentGradient, categoryColor, colors } from '@/lib/theme';
+import { accentGradient, categoryColor, useColors } from '@/lib/theme';
 import { formatCount, formatRelativeTime } from '@/lib/format';
 import type { AuthoredIncident, VettingState } from '@/types/api';
 
@@ -23,6 +24,7 @@ const STATE_TONE: Record<VettingState, 'success' | 'warning' | 'danger' | 'info'
 type Tab = 'reports' | 'settings';
 
 function ReportCard({ report }: { report: AuthoredIncident }) {
+  const c = useColors();
   const { t } = useTranslation();
 
   return (
@@ -51,7 +53,7 @@ function ReportCard({ report }: { report: AuthoredIncident }) {
             </Text>
             {report.isAnonymous ? (
               <View className="flex-row items-center gap-1">
-                <Ionicons name="eye-off-outline" size={11} color={colors.textFaint} />
+                <Ionicons name="eye-off-outline" size={11} color={c.textFaint} />
                 <Text variant="caption" tone="faint">
                   {t('common.anonymous')}
                 </Text>
@@ -101,6 +103,9 @@ function ReportCard({ report }: { report: AuthoredIncident }) {
  * the author sees all of theirs while the public feed shows only `published`.
  */
 export function ProfileScreen() {
+  const c = useColors();
+  const themeChoice = useThemeStore((st) => st.choice);
+  const setThemeChoice = useThemeStore((st) => st.setChoice);
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -157,7 +162,7 @@ export function ProfileScreen() {
             label={t('platform.console')}
             size="sm"
             onPress={() => router.push('/platform/(tabs)')}
-            leading={<Ionicons name="git-branch-outline" size={15} color={colors.textOnDark} />}
+            leading={<Ionicons name="git-branch-outline" size={15} color={c.textOnDark} />}
           />
         ) : null}
         {profile?.accountType === 'reporter' || !profile ? (
@@ -166,7 +171,7 @@ export function ProfileScreen() {
             size="sm"
             variant="glass"
             onPress={() => router.push('/surveys')}
-            leading={<Ionicons name="clipboard-outline" size={15} color={colors.textPrimary} />}
+            leading={<Ionicons name="clipboard-outline" size={15} color={c.textPrimary} />}
           />
         ) : null}
         {profile?.accountType === 'reporter' || !profile ? (
@@ -175,7 +180,7 @@ export function ProfileScreen() {
             size="sm"
             variant="glass"
             onPress={() => router.push('/earnings')}
-            leading={<Ionicons name="cash-outline" size={15} color={colors.textPrimary} />}
+            leading={<Ionicons name="cash-outline" size={15} color={c.textPrimary} />}
           />
         ) : null}
         {profile?.accountType === 'business' ? (
@@ -183,7 +188,7 @@ export function ProfileScreen() {
             label={t('business.brand')}
             size="sm"
             onPress={() => router.push('/business/(tabs)')}
-            leading={<Ionicons name="briefcase-outline" size={15} color={colors.textOnDark} />}
+            leading={<Ionicons name="briefcase-outline" size={15} color={c.textOnDark} />}
           />
         ) : null}
         {!profile ? (
@@ -273,6 +278,51 @@ export function ProfileScreen() {
         </View>
       ) : (
         <View className="gap-3 px-4">
+          {/* Appearance first: it is the setting people come looking for, and
+              the one that changes the most on screen when they find it. */}
+          <Glass elevation="low" className="gap-2.5 rounded-lg p-4">
+            <Text variant="body-sm" className="font-sans-semibold">
+              {t('settings.appearance')}
+            </Text>
+            <View className="flex-row gap-2">
+              {(['dark', 'light', 'system'] as const).map((option) => {
+                const on = themeChoice === option;
+                return (
+                  <Pressable
+                    key={option}
+                    onPress={() => setThemeChoice(option)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={t(`settings.theme.${option}`)}
+                    className={
+                      on
+                        ? 'flex-1 items-center rounded-sm border border-accent bg-accent-wash py-2.5'
+                        : 'border-hairline/12 flex-1 items-center rounded-sm border py-2.5'
+                    }
+                  >
+                    <Ionicons
+                      name={
+                        option === 'dark' ? 'moon' : option === 'light' ? 'sunny' : 'phone-portrait'
+                      }
+                      size={16}
+                      color={on ? c.accent : c.textMuted}
+                    />
+                    <Text
+                      variant="caption"
+                      tone={on ? 'primary' : 'muted'}
+                      className="mt-1 font-sans-medium"
+                    >
+                      {t(`settings.theme.${option}`)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+            <Text variant="caption" tone="faint">
+              {t('settings.appearanceHelp')}
+            </Text>
+          </Glass>
+
           <Glass elevation="low" className="rounded-lg px-4">
             <SwitchRow
               label={t('settings.wifiOnly')}
@@ -342,13 +392,14 @@ function SettingRow({
   danger?: boolean;
   onPress?: () => void;
 }) {
+  const c = useColors();
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel={label}
       className="flex-row items-center gap-3 border-b border-hairline/[0.08] px-4 py-3.5"
     >
-      <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.textMuted} />
+      <Ionicons name={icon} size={18} color={danger ? c.danger : c.textMuted} />
       <Text variant="body" tone={danger ? 'danger' : 'primary'} className="flex-1">
         {label}
       </Text>
@@ -357,7 +408,7 @@ function SettingRow({
           {value}
         </Text>
       ) : null}
-      <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+      <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
     </Pressable>
   );
 }

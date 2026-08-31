@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Chip, Glass, Pressable, Text } from '@/components/ui';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatDistance, formatRelativeTime } from '@/lib/format';
 import type { IncidentCategory } from '@/types/api';
 
@@ -32,6 +32,7 @@ const DARK_MAP_STYLE = [
  * on a map is a location disclosure, so they are filtered out before render.
  */
 export function MapScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -155,7 +156,7 @@ export function MapScreen() {
                     <Text variant="caption" tone="accent" className="font-sans-semibold">
                       {t('map.openIncident')}
                     </Text>
-                    <Ionicons name="chevron-forward" size={12} color={colors.accent} />
+                    <Ionicons name="chevron-forward" size={12} color={c.accent} />
                   </View>
                 </View>
                 <Pressable
@@ -163,7 +164,7 @@ export function MapScreen() {
                   accessibilityLabel={t('common.close')}
                   className="h-8 w-8 items-center justify-center rounded-pill bg-glass/[0.14]"
                 >
-                  <Ionicons name="close" size={16} color={colors.textMuted} />
+                  <Ionicons name="close" size={16} color={c.textMuted} />
                 </Pressable>
               </View>
             </Glass>

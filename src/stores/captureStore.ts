@@ -2,11 +2,12 @@ import { create } from 'zustand';
 import type { IncidentCategory } from '@/types/api';
 import type { LockedFix } from '@/features/capture/gpsGate';
 import type { SubmissionDestination } from '@/types/dawuro';
+import { EMPTY_CONSENT, type ConsentFlags, type Severity } from '@/types/context';
 
 export interface PendingCapture {
   /** Cache-directory URI straight from the camera, before it is persisted. */
   uri: string;
-  kind: 'photo' | 'video';
+  kind: 'photo' | 'video' | 'audio';
   mimeType: string;
   width: number | null;
   height: number | null;
@@ -21,6 +22,12 @@ interface CaptureState {
   category: IncidentCategory;
   description: string;
   isAnonymous: boolean;
+  /** The reporter's own account of how urgent it is. */
+  severity: Severity;
+  /** A nearby name people actually use, when coordinates are not enough. */
+  landmark: string;
+  /** What the footage contains, which decides how it must be handled. */
+  consent: ConsentFlags;
   showLocation: boolean;
   showDate: boolean;
   showTime: boolean;
@@ -33,6 +40,9 @@ interface CaptureState {
   setCategory: (category: IncidentCategory) => void;
   setDescription: (description: string) => void;
   setAnonymous: (value: boolean) => void;
+  setSeverity: (value: Severity) => void;
+  setLandmark: (value: string) => void;
+  setConsent: (key: keyof ConsentFlags, value: boolean) => void;
   setShowLocation: (value: boolean) => void;
   setShowDate: (value: boolean) => void;
   setShowTime: (value: boolean) => void;
@@ -46,6 +56,9 @@ const DEFAULTS = {
   category: 'other' as IncidentCategory,
   description: '',
   isAnonymous: false,
+  severity: 'concern' as Severity,
+  landmark: '',
+  consent: EMPTY_CONSENT,
   showLocation: true,
   showDate: true,
   showTime: true,
@@ -74,6 +87,10 @@ export const useCaptureStore = create<CaptureState>((set) => ({
   setCategory: (category) => set({ category }),
   setDescription: (description) => set({ description }),
   setAnonymous: (isAnonymous) => set({ isAnonymous }),
+  setSeverity: (severity) => set({ severity }),
+  setLandmark: (landmark) => set({ landmark }),
+  setConsent: (key, value) =>
+    set((state) => ({ consent: { ...state.consent, [key]: value } })),
   setShowLocation: (showLocation) =>
     set((state) => ({
       showLocation,

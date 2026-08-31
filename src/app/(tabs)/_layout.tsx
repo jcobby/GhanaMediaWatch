@@ -2,7 +2,7 @@ import { Tabs } from 'expo-router';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { accentGradient, colors } from '@/lib/theme';
+import { accentGradient, useColors } from '@/lib/theme';
 import { useTabScreenOptions } from '@/components/RoleTabBar';
 import { useOutboxStore } from '@/stores/outboxStore';
 
@@ -17,6 +17,7 @@ import { useOutboxStore } from '@/stores/outboxStore';
  * with the two things that actually drive the product.
  */
 export default function TabsLayout() {
+  const c = useColors();
   const { t } = useTranslation();
   const options = useTabScreenOptions();
   const pendingCount = useOutboxStore((s) => s.pendingCount);
@@ -25,8 +26,8 @@ export default function TabsLayout() {
     <Tabs
       screenOptions={{
         ...options,
-        tabBarActiveTintColor: colors.accent,
-        tabBarInactiveTintColor: colors.textFaint,
+        tabBarActiveTintColor: c.accent,
+        tabBarInactiveTintColor: c.textFaint,
       }}
     >
       <Tabs.Screen
@@ -68,7 +69,7 @@ export default function TabsLayout() {
                 justifyContent: 'center',
               }}
             >
-              <Ionicons name="videocam" size={22} color={colors.textOnDark} />
+              <Ionicons name="videocam" size={22} color={c.textOnDark} />
             </LinearGradient>
           ),
         }}
@@ -80,7 +81,7 @@ export default function TabsLayout() {
           // The badge is the only way a reporter learns something failed to
           // send while they were offline.
           tabBarBadge: pendingCount > 0 ? pendingCount : undefined,
-          tabBarBadgeStyle: { backgroundColor: colors.accent, fontSize: 10 },
+          tabBarBadgeStyle: { backgroundColor: c.accent, fontSize: 10 },
           tabBarIcon: ({ color, focused }) => (
             <Ionicons
               name={focused ? 'paper-plane' : 'paper-plane-outline'}

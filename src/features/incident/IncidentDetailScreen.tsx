@@ -1,25 +1,36 @@
-import { useCallback } from 'react';
-import { Alert, Dimensions, Linking, Platform, ScrollView, Share, View } from 'react-native';
+import { useCallback, useRef, useState } from 'react';
+import { Alert, Dimensions, Linking, ScrollView, View } from 'react-native';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, ErrorState, Glass, Pressable, Skeleton, Text } from '@/components/ui';
-import { useIncident } from '@/hooks/useIncidents';
-import { categoryColor, colors } from '@/lib/theme';
+import {
+  Badge,
+  Button,
+  ErrorState,
+  Glass,
+  Pressable,
+  Sheet,
+  Skeleton,
+  Text,
+} from '@/components/ui';
+import { useIncident, useToggleReaction } from '@/hooks/useIncidents';
+import { categoryColor, useColors } from '@/lib/theme';
 import { haversineMetres, regionContaining } from '@/lib/geo';
 import { useViewerLocation } from '@/hooks/useViewerLocation';
-import {
-  formatCoordinate,
-  formatCount,
-  formatDistance,
-  formatFullTimestamp,
-  formatRelativeTime,
-} from '@/lib/format';
+import { formatCount, formatDistance } from '@/lib/format';
 import { toast } from '@/stores/toastStore';
+import { openDirections } from '@/lib/navigation';
+import { shareIncident } from '@/lib/share';
+import { CaptureStamp } from '@/components/CaptureStamp';
+import { CommentList } from '@/features/comments/CommentList';
+import { CommentComposer } from '@/features/comments/CommentComposer';
+import { useComments, useCommentsStore } from '@/stores/commentsStore';
+import { useAuthStore } from '@/stores/authStore';
+import type { IncidentComment } from '@/types/comments';
 
 interface IncidentDetailScreenProps {
   incidentId: string;
@@ -35,40 +46,63 @@ interface IncidentDetailScreenProps {
  * to check and no placeholder to render — absence is the whole signal.
  */
 export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = Dimensions.get('window');
   const viewer = useViewerLocation();
-
-  const { data: incident, isPending, isError, refetch } = useIncident(incidentId);
-  const hue = incident ? categoryColor[incident.category] : colors.textFaint;
-  const { latitude, longitude, label } = incident?.location ?? {
-    latitude: null,
-    longitude: null,
-    label: null,
-  };
-  const hasCoords = latitude !== null && longitude !== null;
-  const fullTimestamp = incident
-    ? formatFullTimestamp(incident.capturedAtIso, incident.capturedAtPrecision)
-    : null;
+  const comments = useComments(incidentId);
+  const addComment = useCommentsStore((s) => s.add);
+  const profile = useAuthStore((s) => s.profile);
 
   /*
-   * Sharing sends the incident's public link, never the media file: the file
-   * may be restricted, and a report's shareability is a property of the report,
-   * not of whoever happens to be looking at it.
+   * Arriving from the feed's comment icon means the reader has already decided
+   * to read the discussion, so jump them to it rather than making them scroll
+   * the whole report first.
    */
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+  const commentsY = useRef(0);
+  const jumped = useRef(false);
+
+  const [mapOpen, setMapOpen] = useState(false);
+
+  const { data: incident, isPending, isError, refetch } = useIncident(incidentId);
+  const toggleReaction = useToggleReaction();
+  const hue = incident ? categoryColor[incident.category] : c.textFaint;
+  const { latitude, longitude } = incident?.location ?? { latitude: null, longitude: null };
+  const hasCoords = latitude !== null && longitude !== null;
+
   const handleShare = useCallback(async () => {
     if (!incident) return;
-    try {
-      await Share.share({
-        message: `${incident.description}\n\nhttps://dawuro.gh/i/${incident.id}`,
-        ...(Platform.OS === 'ios' ? { url: `https://dawuro.gh/i/${incident.id}` } : {}),
+    await shareIncident({
+      reportId: incident.reportId,
+      description: incident.description,
+      referenceLine: t('feed.shareVerify', { id: incident.reportId }),
+    });
+  }, [incident, t]);
+
+  const contributions = comments.filter((c) => c.isContribution && c.media !== null).length;
+
+  /*
+   * A comment attachment opens outside the report, and is never inlined.
+   *
+   * Comment media carries no vetting state, so playing it inside the report
+   * would lend unreviewed footage the report's standing. It is also never put
+   * through the share sheet: that would send a raw media URL to other people,
+   * which is the one thing sharing must not do — see `shareIncident`.
+   */
+  const handleOpenCommentMedia = useCallback(
+    (comment: IncidentComment) => {
+      if (!comment.media) return;
+      const url = comment.media.playbackUrl ?? comment.media.posterUrl;
+      void Linking.openURL(url).catch(() => {
+        toast.error(t('incident.attachmentUnavailable'), t('incident.attachmentUnavailableBody'));
       });
-    } catch {
-      // The user dismissing the share sheet is not an error worth surfacing.
-    }
-  }, [incident]);
+    },
+    [t],
+  );
 
   const handleReportAbuse = useCallback(() => {
     if (!incident) return;
@@ -83,19 +117,17 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
   }, [incident, t]);
 
   const handleNavigate = useCallback(async () => {
-    if (!hasCoords) return;
-    const native =
-      Platform.OS === 'ios'
-        ? `maps://?daddr=${latitude},${longitude}`
-        : `google.navigation:q=${latitude},${longitude}`;
-    const web = `https://www.google.com/maps/dir/?api=1&destination=${latitude},${longitude}`;
-    try {
-      const canOpen = await Linking.canOpenURL(native);
-      await Linking.openURL(canOpen ? native : web);
-    } catch {
-      await Linking.openURL(web).catch(() => undefined);
+    if (latitude === null || longitude === null) return;
+
+    const outcome = await openDirections({
+      latitude,
+      longitude,
+      label: incident?.location.label,
+    });
+    if (outcome === 'failed') {
+      toast.error(t('detail.directionsFailedTitle'), t('detail.directionsFailedBody'));
     }
-  }, [hasCoords, latitude, longitude]);
+  }, [latitude, longitude, incident, t]);
 
   if (isPending) {
     return (
@@ -124,6 +156,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
   return (
     <View className="flex-1 bg-canvas">
       <ScrollView
+        ref={scrollRef}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       >
@@ -142,6 +175,18 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
             pointerEvents="none"
           />
 
+          {/* Provenance, stamped on the frame rather than captioned beside it —
+              this footage is meant to travel, and the claim has to travel with
+              it. */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']}
+            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 130 }}
+            pointerEvents="none"
+          />
+          <View className="absolute bottom-3 left-4 right-4">
+            <CaptureStamp incident={incident} />
+          </View>
+
           <View
             className="absolute left-4 right-4 flex-row items-center justify-between"
             style={{ top: insets.top + 8 }}
@@ -156,7 +201,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
                 elevation="mid"
                 className="h-10 w-10 items-center justify-center rounded-pill"
               >
-                <Ionicons name="chevron-back" size={20} color={colors.textOnDark} />
+                <Ionicons name="chevron-back" size={20} color={c.textOnDark} />
               </Glass>
             </Pressable>
 
@@ -166,7 +211,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
                 elevation="low"
                 className="flex-row items-center gap-1.5 rounded-pill px-3 py-1.5"
               >
-                <Ionicons name="play" size={11} color={colors.textOnDark} />
+                <Ionicons name="play" size={11} color={c.textOnDark} />
                 <Text variant="caption" onMedia className="font-sans-semibold">
                   {incident.media.durationMs
                     ? `${Math.round(incident.media.durationMs / 1000)}s`
@@ -183,7 +228,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
                 elevation="high"
                 className="h-16 w-16 items-center justify-center rounded-pill"
               >
-                <Ionicons name="play" size={26} color={colors.textOnDark} />
+                <Ionicons name="play" size={26} color={c.textOnDark} />
               </Glass>
             </View>
           ) : null}
@@ -217,9 +262,15 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
           <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
             <View className="h-9 w-9 items-center justify-center rounded-pill bg-accent-wash">
               <Ionicons
-                name={incident.publisher.kind === 'anonymous' ? 'eye-off-outline' : 'person'}
+                name={
+                  incident.publisher.kind === 'anonymous'
+                    ? 'eye-off-outline'
+                    : incident.publisher.kind === 'organisation'
+                      ? 'business'
+                      : 'person'
+                }
                 size={16}
-                color={colors.accent}
+                color={c.accent}
               />
             </View>
             <View className="flex-1">
@@ -233,164 +284,174 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
                 {formatCount(incident.counts.comments)} {t('feed.comments').toLowerCase()}
               </Text>
             </View>
-          </Glass>
-
-          {/* Metadata — each row appears only if the value survived the flags */}
-          <Glass elevation="low" className="gap-0 rounded-lg">
-            {fullTimestamp ? (
-              <MetaRow icon="calendar-outline" label={t('detail.captured')} value={fullTimestamp} />
-            ) : null}
-            {incident.capturedAtIso && incident.capturedAtPrecision === 'exact' ? (
-              <MetaRow
-                icon="time-outline"
-                label={t('detail.elapsed')}
-                value={t('detail.ago', { time: formatRelativeTime(incident.capturedAtIso) })}
-              />
-            ) : null}
-            {label ? (
-              <MetaRow icon="location-outline" label={t('detail.place')} value={label} />
-            ) : null}
-            {incident.distanceM !== undefined ? (
-              <MetaRow
-                icon="walk-outline"
-                label={t('detail.distance')}
-                value={formatDistance(incident.distanceM)}
-              />
-            ) : null}
+            {/* The route lives behind this button rather than inline. A map is
+                the tallest thing on the screen and almost nobody needs it, but
+                everybody scrolls past it to reach the discussion. */}
             {hasCoords ? (
-              <MetaRow
-                icon="navigate-circle-outline"
-                label={t('detail.coordinates')}
-                value={`${formatCoordinate(latitude)}, ${formatCoordinate(longitude)}`}
-                last
-              />
+              <Pressable
+                onPress={() => setMapOpen(true)}
+                accessibilityLabel={t('detail.getDirections')}
+                className="h-10 flex-row items-center gap-1.5 rounded-pill bg-accent px-3"
+              >
+                <Ionicons name="navigate" size={14} color={c.textOnDark} />
+                <Text variant="caption" className="font-sans-semibold text-white">
+                  {t('detail.navigate')}
+                </Text>
+              </Pressable>
             ) : null}
           </Glass>
 
           {/* Location suppressed — say so plainly rather than leaving a gap */}
           {!hasCoords ? (
             <Glass elevation="low" className="flex-row items-start gap-3 rounded-lg p-3.5">
-              <Ionicons name="eye-off-outline" size={17} color={colors.textMuted} />
+              <Ionicons name="eye-off-outline" size={17} color={c.textMuted} />
               <Text variant="body-sm" tone="muted" className="flex-1">
                 {t('detail.locationHidden')}
               </Text>
             </Glass>
           ) : null}
 
-          {/* Route map — where you are, where the incident is */}
-          {hasCoords ? (
-            <View className="gap-3">
-              <View className="overflow-hidden rounded-lg">
-                <MapView
-                  provider={PROVIDER_DEFAULT}
-                  style={{ height: 230 }}
-                  initialRegion={regionContaining(viewer.location, {
-                    latitude,
-                    longitude,
-                  })}
-                  showsUserLocation={viewer.isReal}
-                  showsMyLocationButton={false}
-                >
-                  {/*
-                   * A straight line, not a driving route. Real turn-by-turn
-                   * geometry needs a directions provider and is a paid API call
-                   * per request, so it belongs on the server — see
-                   * API_CONTRACT.md. Until then the app is honest about what
-                   * this line is, and hands off to the OS maps app for the
-                   * actual route.
-                   */}
-                  <Polyline
-                    coordinates={[viewer.location, { latitude, longitude }]}
-                    strokeColor={colors.accent}
-                    strokeWidth={3}
-                    lineDashPattern={[8, 6]}
-                  />
-                  <Marker coordinate={viewer.location} tracksViewChanges={false}>
-                    <View className="h-5 w-5 items-center justify-center rounded-pill border-2 border-white bg-accent-alt" />
-                  </Marker>
-                  <Marker coordinate={{ latitude, longitude }} tracksViewChanges={false}>
-                    <View
-                      style={{ backgroundColor: hue }}
-                      className="h-7 w-7 items-center justify-center rounded-pill border-2 border-white"
-                    >
-                      <Ionicons name="alert" size={13} color={colors.textOnDark} />
-                    </View>
-                  </Marker>
-                </MapView>
-              </View>
-
-              <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
-                <View className="h-8 w-8 items-center justify-center rounded-pill bg-accent-wash">
-                  <Ionicons name="git-compare-outline" size={16} color={colors.accent} />
-                </View>
-                <View className="flex-1">
-                  <Text variant="body-sm" className="font-sans-semibold">
-                    {formatDistance(haversineMetres(viewer.location, { latitude, longitude }))}{' '}
-                    {t('detail.straightLine').toLowerCase()}
-                  </Text>
-                  <Text variant="caption" tone="muted">
-                    {viewer.isReal ? t('detail.fromYou') : t('detail.approxOrigin')}
-                  </Text>
-                </View>
-              </Glass>
-
-              <Button
-                label={t('detail.getDirections')}
-                fullWidth
-                onPress={handleNavigate}
-                leading={<Ionicons name="navigate" size={16} color={colors.textOnDark} />}
-              />
-            </View>
-          ) : null}
-
           <View className="flex-row gap-3">
+            <Button
+              label={t('feed.react')}
+              variant="glass"
+              className="flex-1"
+              onPress={() => toggleReaction(incident)}
+              accessibilityState={{ selected: incident.viewerHasReacted }}
+              leading={
+                <Ionicons
+                  name={incident.viewerHasReacted ? 'heart' : 'heart-outline'}
+                  size={15}
+                  color={incident.viewerHasReacted ? c.live : c.textPrimary}
+                />
+              }
+            />
             <Button
               label={t('feed.share')}
               variant="glass"
               className="flex-1"
               onPress={() => void handleShare()}
-              leading={<Ionicons name="share-outline" size={15} color={colors.textPrimary} />}
+              leading={<Ionicons name="share-outline" size={15} color={c.textPrimary} />}
             />
             <Button
               label={t('feed.reportAbuse')}
               variant="glass"
               className="flex-1"
               onPress={handleReportAbuse}
-              leading={<Ionicons name="flag-outline" size={15} color={colors.textPrimary} />}
+              leading={<Ionicons name="flag-outline" size={15} color={c.textPrimary} />}
             />
+          </View>
+
+          {/* Discussion */}
+          <View
+            className="gap-3 border-t border-hairline/[0.07] pt-5"
+            onLayout={(e) => {
+              commentsY.current = e.nativeEvent.layout.y;
+              if (focus === 'comments' && !jumped.current) {
+                jumped.current = true;
+                // Without the frame delay the ScrollView has not yet sized its
+                // content and the scroll is clamped to the current height.
+                requestAnimationFrame(() =>
+                  scrollRef.current?.scrollTo({ y: commentsY.current, animated: false }),
+                );
+              }
+            }}
+          >
+            <View className="flex-row items-baseline justify-between">
+              <Text variant="title-sm">{t('comments.title')}</Text>
+              {contributions > 0 ? (
+                <Text variant="caption" tone="accent" className="font-sans-semibold">
+                  {t('comments.contributionsHelp', { count: contributions })}
+                </Text>
+              ) : null}
+            </View>
+
+            <CommentComposer
+              onSubmit={(draft) => {
+                addComment(incidentId, draft, profile?.displayName ?? 'You');
+                toast.success(t('comments.posted'), t('comments.postedBody'));
+              }}
+            />
+
+            <CommentList comments={comments} onOpenMedia={handleOpenCommentMedia} />
           </View>
         </View>
       </ScrollView>
-    </View>
-  );
-}
 
-function MetaRow({
-  icon,
-  label,
-  value,
-  last,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value: string;
-  last?: boolean;
-}) {
-  return (
-    <View
-      className={
-        last
-          ? 'flex-row items-center gap-3 px-4 py-3'
-          : 'flex-row items-center gap-3 border-b border-hairline/[0.07] px-4 py-3'
-      }
-    >
-      <Ionicons name={icon} size={16} color={colors.textMuted} />
-      <Text variant="body-sm" tone="muted" className="flex-1">
-        {label}
-      </Text>
-      <Text variant="body-sm" className="font-sans-medium">
-        {value}
-      </Text>
+      {/* Route, on demand. Guarded on the coordinates rather than on `mapOpen`
+          alone so the map body can narrow them — the sheet is only reachable
+          when they exist, but the compiler cannot know that. */}
+      {latitude !== null && longitude !== null ? (
+        <Sheet
+          visible={mapOpen}
+          onClose={() => setMapOpen(false)}
+          title={t('detail.navigate')}
+          subtitle={incident.location.label ?? undefined}
+        >
+          <View className="gap-3">
+            <View className="overflow-hidden rounded-lg">
+              <MapView
+                provider={PROVIDER_DEFAULT}
+                style={{ height: 230 }}
+                initialRegion={regionContaining(viewer.location, {
+                  latitude,
+                  longitude,
+                })}
+                showsUserLocation={viewer.isReal}
+                showsMyLocationButton={false}
+              >
+                {/*
+                 * A straight line, not a driving route. Real turn-by-turn
+                 * geometry needs a directions provider and is a paid API call
+                 * per request, so it belongs on the server — see
+                 * API_CONTRACT.md. Until then the app is honest about what
+                 * this line is, and hands off to the OS maps app for the
+                 * actual route.
+                 */}
+                <Polyline
+                  coordinates={[viewer.location, { latitude, longitude }]}
+                  strokeColor={c.accent}
+                  strokeWidth={3}
+                  lineDashPattern={[8, 6]}
+                />
+                <Marker coordinate={viewer.location} tracksViewChanges={false}>
+                  <View className="h-5 w-5 items-center justify-center rounded-pill border-2 border-white bg-accent-alt" />
+                </Marker>
+                <Marker coordinate={{ latitude, longitude }} tracksViewChanges={false}>
+                  <View
+                    style={{ backgroundColor: hue }}
+                    className="h-7 w-7 items-center justify-center rounded-pill border-2 border-white"
+                  >
+                    <Ionicons name="alert" size={13} color={c.textOnDark} />
+                  </View>
+                </Marker>
+              </MapView>
+            </View>
+
+            <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
+              <View className="h-8 w-8 items-center justify-center rounded-pill bg-accent-wash">
+                <Ionicons name="git-compare-outline" size={16} color={c.accent} />
+              </View>
+              <View className="flex-1">
+                <Text variant="body-sm" className="font-sans-semibold">
+                  {formatDistance(haversineMetres(viewer.location, { latitude, longitude }))}{' '}
+                  {t('detail.straightLine').toLowerCase()}
+                </Text>
+                <Text variant="caption" tone="muted">
+                  {viewer.isReal ? t('detail.fromYou') : t('detail.approxOrigin')}
+                </Text>
+              </View>
+            </Glass>
+
+            <Button
+              label={t('detail.getDirections')}
+              fullWidth
+              onPress={() => void handleNavigate()}
+              leading={<Ionicons name="navigate" size={16} color={c.textOnDark} />}
+            />
+          </View>
+        </Sheet>
+      ) : null}
     </View>
   );
 }

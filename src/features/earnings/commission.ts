@@ -1,4 +1,4 @@
-import type { IncidentCategory } from '@/types/api';
+import type { IncidentCategory, MediaKind } from '@/types/api';
 import type { SubmissionDestination } from '@/types/dawuro';
 
 /**
@@ -38,6 +38,17 @@ const BASE_PESEWAS: Record<IncidentCategory, number> = {
 /** Video takes more effort and carries more evidential weight than a still. */
 const VIDEO_MULTIPLIER = 1.5;
 
+/**
+ * Audio sits between a photograph and a video.
+ *
+ * Speaking an account takes more of a reporter than pointing a lens, so it
+ * pays above a still. It shows less than footage does, so it pays below one.
+ * Pricing it like a photo would tell people the safest way to report — from
+ * somewhere they are not at risk — is the least valuable, which is the
+ * opposite of what this platform should encourage.
+ */
+const AUDIO_MULTIPLIER = 1.25;
+
 /** A report sent to named businesses only is worth more for being exclusive. */
 const DIRECTED_MULTIPLIER = 1.25;
 
@@ -53,7 +64,7 @@ export const PLATFORM_FEE_RATE = 0.3;
 export interface CommissionInput {
   category: IncidentCategory;
   destination: SubmissionDestination;
-  mediaKind: 'photo' | 'video';
+  mediaKind: MediaKind;
   locationConfidence: 'high' | 'low';
   /** Number of businesses licensing it. Each additional one adds half a share. */
   licensedBy?: number;
@@ -83,6 +94,7 @@ export function estimateCommission(input: CommissionInput): CommissionBreakdown 
 
   let gross = BASE_PESEWAS[input.category];
   if (input.mediaKind === 'video') gross *= VIDEO_MULTIPLIER;
+  if (input.mediaKind === 'audio') gross *= AUDIO_MULTIPLIER;
   if (input.destination === 'directed') gross *= DIRECTED_MULTIPLIER;
   if (input.locationConfidence === 'low') gross *= LOW_CONFIDENCE_MULTIPLIER;
 

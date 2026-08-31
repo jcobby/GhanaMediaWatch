@@ -15,10 +15,11 @@ import { INCIDENT_CATEGORIES, type IncidentCategory } from '@/types/api';
 import {
   SUBSCRIPTION_PLANS,
   formatCedis,
+  isUnlimited,
   type BusinessSector,
   type SubscriptionTier,
 } from '@/types/dawuro';
-import { accentGradient, categoryColor, colors } from '@/lib/theme';
+import { accentGradient, categoryColor, useColors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 
@@ -65,6 +66,7 @@ type Step = 'details' | 'interests' | 'plan';
  * distress, and self-service access to that would be indefensible.
  */
 export function BusinessSignUpScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -73,7 +75,7 @@ export function BusinessSignUpScreen() {
   const [step, setStep] = useState<Step>('details');
   const [sector, setSector] = useState<BusinessSector>('government');
   const [interests, setInterests] = useState<IncidentCategory[]>([]);
-  const [tier, setTier] = useState<SubscriptionTier>('professional');
+  const [tier, setTier] = useState<SubscriptionTier>('standard');
   const [submitting, setSubmitting] = useState(false);
 
   const { control, handleSubmit, formState, getValues } = useForm<BusinessValues>({
@@ -132,7 +134,7 @@ export function BusinessSignUpScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="caption" tone="accent" className="font-sans-semibold uppercase">
@@ -289,7 +291,7 @@ export function BusinessSignUpScreen() {
             {/* This is the routing input, so its consequence is stated here
                 rather than discovered later through an empty inbox. */}
             <Glass elevation="low" className="flex-row items-start gap-2.5 rounded-lg p-3.5">
-              <Ionicons name="git-branch-outline" size={16} color={colors.accent} />
+              <Ionicons name="git-branch-outline" size={16} color={c.accent} />
               <Text variant="caption" tone="muted" className="flex-1">
                 {t('business.routingNote')}
               </Text>
@@ -338,12 +340,16 @@ export function BusinessSignUpScreen() {
                         <View className="gap-0.5">
                           <Text variant="title-sm">{t(`business.tier.${key}`)}</Text>
                           <Text variant="caption" tone="muted">
-                            {t('business.includedReports', { count: plan.includedReports })}
+                            {isUnlimited(plan)
+                              ? t('business.unlimitedDownloads')
+                              : t('business.perDownload', {
+                                  amount: formatCedis(plan.perDownloadPesewas ?? 0),
+                                })}
                           </Text>
                         </View>
                         <View className="items-end">
                           <Text variant="title-md" className="font-display">
-                            {formatCedis(plan.monthlyPesewas, { compact: true })}
+                            {formatCedis(plan.feePesewas, { compact: true })}
                           </Text>
                           <Text variant="caption" tone="muted">
                             {t('business.perMonth')}
@@ -354,7 +360,7 @@ export function BusinessSignUpScreen() {
                         <Badge label={t('business.seats', { count: plan.seats })} />
                         <Badge
                           label={t('business.overage', {
-                            amount: formatCedis(plan.overagePesewas),
+                            amount: formatCedis(plan.feePesewas, { compact: true }),
                           })}
                         />
                         {plan.concurrentSurveys > 0 ? (
@@ -378,7 +384,7 @@ export function BusinessSignUpScreen() {
               end={{ x: 1, y: 1 }}
               style={{ borderRadius: 16, padding: 16, flexDirection: 'row', gap: 12 }}
             >
-              <Ionicons name="shield-checkmark-outline" size={20} color={colors.textOnDark} />
+              <Ionicons name="shield-checkmark-outline" size={20} color={c.textOnDark} />
               <View className="flex-1 gap-0.5">
                 <Text variant="body-sm" className="font-sans-semibold text-white">
                   {t('business.verificationTitle')}

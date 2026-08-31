@@ -1,6 +1,6 @@
 import { Switch as RNSwitch, View } from 'react-native';
 import { cn } from '@/lib/cn';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { hapticSelect } from '@/lib/haptics';
 import { Text } from './Text';
 
@@ -27,6 +27,7 @@ export function SwitchRow({
   disabled,
   className,
 }: SwitchRowProps) {
+  const c = useColors();
   return (
     <View className={cn('flex-row items-center gap-4 py-3', disabled && 'opacity-40', className)}>
       <View className="flex-1 gap-0.5">
@@ -48,9 +49,9 @@ export function SwitchRow({
         }}
         accessibilityLabel={label}
         accessibilityHint={description}
-        trackColor={{ false: colors.canvasRaise, true: colors.accent }}
-        thumbColor={colors.textPrimary}
-        ios_backgroundColor={colors.canvasRaise}
+        trackColor={{ false: c.canvasRaise, true: c.accent }}
+        thumbColor={c.textPrimary}
+        ios_backgroundColor={c.canvasRaise}
       />
     </View>
   );

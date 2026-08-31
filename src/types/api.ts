@@ -31,7 +31,14 @@ export type IncidentCategory = (typeof INCIDENT_CATEGORIES)[number];
 
 export type VettingState = 'pending_review' | 'published' | 'rejected' | 'restricted';
 
-export type MediaKind = 'photo' | 'video';
+/**
+ * What was captured.
+ *
+ * Audio is a first-class report type, not a lesser one: describing an incident
+ * from somewhere safe carries none of the risk of filming it, and it is the
+ * only mode that works in the dark or in a crowd.
+ */
+export type MediaKind = 'photo' | 'video' | 'audio';
 
 /** `low` means the reporter used the reduced-accuracy escape hatch at capture. */
 export type LocationConfidence = 'high' | 'low';
@@ -85,9 +92,29 @@ export interface PreciseLocation extends PublicLocation {
 
 // ─── publisher ─────────────────────────────────────────────────────────────
 
+/**
+ * Who a report is credited to on the public feed.
+ *
+ * `organisation` is the third case and the one the product turns on: an
+ * institution licenses a report and may then release it publicly under its own
+ * name. That is the difference between a feed of strangers' clips and a feed a
+ * newsroom stands behind — and it is why a report can be traced back to a
+ * business at all.
+ *
+ * The reporter is still the author; the organisation is the publisher. Those
+ * are different roles and the model keeps them apart.
+ */
 export type Publisher =
   | { kind: 'anonymous' }
-  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null };
+  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null }
+  | {
+      kind: 'organisation';
+      id: string;
+      displayName: string;
+      /** Set once a platform administrator has verified the institution. */
+      verified: boolean;
+      logoUrl: string | null;
+    };
 
 // ─── display flags ─────────────────────────────────────────────────────────
 
@@ -116,6 +143,14 @@ export interface IncidentCounts {
 /** What the feed, map and public detail endpoints return. */
 export interface Incident {
   id: string;
+  /**
+   * The short reference stamped on the footage and quoted afterwards.
+   *
+   * Distinct from `id`: `id` is for machines, `reportId` is what someone reads
+   * down a phone line and what a stranger types into the public verification
+   * page to check the claim.
+   */
+  reportId: string;
   category: IncidentCategory;
   description: string;
   vettingState: VettingState;

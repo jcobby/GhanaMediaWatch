@@ -72,6 +72,9 @@ export interface CaptureMetadata {
   showLocation: boolean;
   showDate: boolean;
   showTime: boolean;
+  severity: string;
+  landmark: string | null;
+  consentJson: string;
   latitude: number | null;
   longitude: number | null;
   accuracyM: number;
@@ -170,6 +173,9 @@ export const incidentsRepository = {
       showLocation: row.showLocation,
       showDate: row.showDate,
       showTime: row.showTime,
+      severity: row.severity,
+      landmark: row.landmark,
+      consentJson: row.consentJson,
       latitude: row.latitude === null ? null : Number(row.latitude),
       longitude: row.longitude === null ? null : Number(row.longitude),
       accuracyM: row.accuracyM ?? 0,

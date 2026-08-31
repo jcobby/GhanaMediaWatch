@@ -11,9 +11,9 @@ import { BUSINESSES } from '@/api/dawuroData';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
 import { autoRoute } from '@/features/platform/autoRoute';
 import { estimateCommission } from '@/features/earnings/commission';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatDistance, formatExactCapture, formatRelativeTime } from '@/lib/format';
-import { SUBSCRIPTION_PLANS, formatCedis } from '@/types/dawuro';
+import { SUBSCRIPTION_PLANS, downloadCharge, formatCedis, isUnlimited } from '@/types/dawuro';
 import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore } from '@/stores/businessStore';
 import { toast } from '@/stores/toastStore';
@@ -33,6 +33,7 @@ type InboxFilter = 'offered' | 'licensed' | 'all';
  * can add or remove recipients afterwards, but nothing waits on them.
  */
 export function BusinessInboxScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -92,8 +93,11 @@ export function BusinessInboxScreen() {
     return offered;
   }, [filter, offered, licensed]);
 
-  const remaining = Math.max(0, plan.includedReports - business.reportsUsedThisPeriod);
-  const overIncluded = remaining === 0;
+  const perDownload = downloadCharge(plan);
+  const uncapped = isUnlimited(plan);
+  // Every download is billable on a metered plan; only the annual tier
+  // absorbs them, so that is the only distinction left to make.
+  const overIncluded = !uncapped;
 
   const licenseCost = useCallback(
     (incident: Incident) =>
@@ -113,11 +117,11 @@ export function BusinessInboxScreen() {
       toast.success(
         t('business.licensedTitle'),
         overIncluded
-          ? t('business.licensedOverage', { amount: formatCedis(plan.overagePesewas) })
-          : t('business.licensedIncluded', { count: remaining - 1 }),
+          ? t('business.licensedUnlimited')
+          : t('business.licensedCharged', { amount: formatCedis(perDownload) }),
       );
     },
-    [overIncluded, plan.overagePesewas, remaining, t],
+    [overIncluded, perDownload, t],
   );
 
   return (
@@ -129,7 +133,7 @@ export function BusinessInboxScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="caption" tone="accent" className="font-sans-semibold uppercase">
@@ -154,19 +158,19 @@ export function BusinessInboxScreen() {
             <Ionicons
               name="documents-outline"
               size={16}
-              color={overIncluded ? colors.warning : colors.success}
+              color={overIncluded ? c.warning : c.success}
             />
           </View>
           <View className="flex-1">
             <Text variant="body-sm" className="font-sans-semibold">
               {overIncluded
                 ? t('business.allowanceUsed')
-                : t('business.allowanceRemaining', { count: remaining })}
+                : t('business.perDownload', { amount: formatCedis(perDownload) })}
             </Text>
             <Text variant="caption" tone="muted">
               {overIncluded
-                ? t('business.overageRate', { amount: formatCedis(plan.overagePesewas) })
-                : t('business.ofIncluded', { count: plan.includedReports })}
+                ? t('business.unlimitedDownloads')
+                : t('business.perDownload', { amount: formatCedis(perDownload) })}
             </Text>
           </View>
           <Badge label={t(`business.tier.${business.tier}`)} tone="accent" />
@@ -178,7 +182,7 @@ export function BusinessInboxScreen() {
         >
           <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
             <View className="h-9 w-9 items-center justify-center rounded-pill bg-accent-wash">
-              <Ionicons name="clipboard-outline" size={16} color={colors.accent} />
+              <Ionicons name="clipboard-outline" size={16} color={c.accent} />
             </View>
             <View className="flex-1">
               <Text variant="body-sm" className="font-sans-semibold">
@@ -188,7 +192,7 @@ export function BusinessInboxScreen() {
                 {t('surveys.builderTeaser')}
               </Text>
             </View>
-            <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+            <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
           </Glass>
         </Pressable>
 
@@ -351,7 +355,7 @@ export function BusinessInboxScreen() {
                 label={t('business.download')}
                 fullWidth
                 size="lg"
-                leading={<Ionicons name="download-outline" size={16} color={colors.textOnDark} />}
+                leading={<Ionicons name="download-outline" size={16} color={c.textOnDark} />}
                 onPress={() => {
                   // Simulated until the media service issues signed URLs.
                   toast.success(t('business.downloadStarted'), t('business.downloadBody'));
@@ -369,7 +373,7 @@ export function BusinessInboxScreen() {
                 />
                 <Text variant="caption" tone="muted" className="text-center">
                   {overIncluded
-                    ? t('business.willBeCharged', { amount: formatCedis(plan.overagePesewas) })
+                    ? t('business.perDownload', { amount: formatCedis(perDownload) })
                     : t('business.countsToward')}
                 </Text>
               </View>

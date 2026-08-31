@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Version 2.0 · 27 August 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)">
+<title>Dawuro Platform — Frontend Architecture</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body,h1,h2,h3,h4,h5,p,figure,blockquote,dl,dd{margin:0}
+  img{max-width:100%;display:block}
+  table{border-collapse:collapse}
+
+  :root{
+    --ground:#EEF1F0; --panel:#F7F9F8; --panel-2:#E3E8E7;
+    --rule:#C7D0CE; --rule-soft:#DAE1DF;
+    --ink:#101819; --ink-2:#3C4A4B; --ink-3:#647575;
+    --accent:#0F6E6A; --accent-ink:#0B534F; --accent-wash:#DCEAE8;
+    --warn:#A25C00; --warn-wash:#F6EADA;
+    --danger:#B4232C; --danger-wash:#F7E2E3;
+    --mono:"SFMono-Regular",Consolas,"Liberation Mono",Menlo,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+  }
+
+  body{
+    background:var(--ground); color:var(--ink);
+    font-family:var(--sans); font-size:16px; line-height:1.62;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .wrap{
+    display:grid; grid-template-columns:210px minmax(0,1fr);
+    gap:44px; max-width:1180px; margin:0 auto; padding:56px 32px 96px;
+  }
+
+  /* ── contents rail ─────────────────────────────────────────────── */
+  .rail{position:sticky; top:32px; align-self:start; max-height:calc(100vh - 64px); overflow-y:auto}
+  .rail-title{
+    font-size:10px; font-weight:700; letter-spacing:.16em; text-transform:uppercase;
+    color:var(--ink-3); margin-bottom:12px;
+  }
+  .rail ol{list-style:none; margin:0; padding:0; counter-reset:sec}
+  .rail li{margin-bottom:2px}
+  .rail a{
+    display:block; padding:5px 9px; border-radius:5px;
+    color:var(--ink-2); text-decoration:none; font-size:12.5px; line-height:1.35;
+  }
+  .rail a:hover{background:var(--accent-wash); color:var(--accent-ink)}
+
+  /* ── document ──────────────────────────────────────────────────── */
+  .doc{min-width:0}
+  .doc > h1{
+    font-size:40px; line-height:1.14; letter-spacing:-.022em; font-weight:700;
+    text-wrap:balance; margin-bottom:6px;
+  }
+  .doc h2{
+    font-size:25px; line-height:1.22; letter-spacing:-.014em; font-weight:650;
+    margin:52px 0 14px; padding-top:22px; border-top:1px solid var(--rule);
+    text-wrap:balance;
+  }
+  .doc h3{font-size:17.5px; font-weight:650; margin:30px 0 9px; letter-spacing:-.006em}
+  .doc h4{font-size:15px; font-weight:650; margin:22px 0 7px; color:var(--ink-2)}
+
+  .doc p{margin:0 0 13px; max-width:74ch}
+  .doc ul,.doc ol{margin:0 0 15px; padding-left:22px; max-width:74ch}
+  .doc li{margin-bottom:5px}
+  .doc li > ul,.doc li > ol{margin-top:5px; margin-bottom:2px}
+
+  .doc a{color:var(--accent-ink); text-decoration-thickness:1px; text-underline-offset:2px}
+  .doc strong{font-weight:650; color:var(--ink)}
+
+  /* Inline code: distinct from prose without shouting. */
+  .doc code{
+    font-family:var(--mono); font-size:.855em;
+    background:var(--panel-2); color:var(--accent-ink);
+    padding:.1em .35em; border-radius:3px; white-space:nowrap;
+  }
+  .doc pre{
+    background:var(--panel); border:1px solid var(--rule-soft); border-left:3px solid var(--accent);
+    border-radius:6px; padding:15px 17px; margin:0 0 17px;
+    overflow-x:auto; font-size:13px; line-height:1.58;
+  }
+  .doc pre code{background:none; color:var(--ink); padding:0; white-space:pre; font-size:inherit}
+
+  /* Tables carry most of the reference material, so they get the most care. */
+  .doc table{
+    width:100%; margin:0 0 19px; font-size:13.5px;
+    background:var(--panel); border:1px solid var(--rule-soft); border-radius:6px;
+    overflow:hidden; font-variant-numeric:tabular-nums;
+  }
+  .doc thead th{
+    background:var(--panel-2); text-align:left; font-weight:650; font-size:11.5px;
+    letter-spacing:.05em; text-transform:uppercase; color:var(--ink-2);
+    padding:9px 12px; border-bottom:1px solid var(--rule);
+  }
+  .doc td{padding:8px 12px; border-bottom:1px solid var(--rule-soft); vertical-align:top}
+  .doc tbody tr:last-child td{border-bottom:none}
+  .doc td code{white-space:nowrap; font-size:.9em}
+  .tw{overflow-x:auto; margin-bottom:19px}
+  .tw table{margin-bottom:0}
+
+  .doc blockquote{
+    border-left:3px solid var(--warn); background:var(--warn-wash);
+    padding:11px 15px; margin:0 0 17px; border-radius:0 5px 5px 0;
+  }
+  .doc blockquote p:last-child{margin-bottom:0}
+
+  .doc hr{border:0; height:0; margin:0}     /* section rules come from h2 */
+
+  .meta{
+    color:var(--ink-3); font-size:13.5px; margin-bottom:30px;
+    padding-bottom:18px; border-bottom:1px solid var(--rule);
+  }
+
+  /* ── print ─────────────────────────────────────────────────────── */
+  @page{ margin:15mm 14mm; }
+  @media print{
+    body{background:#fff; font-size:10pt; line-height:1.5}
+    .wrap{display:block; max-width:none; padding:0}
+    .rail{display:none}
+    .doc > h1{font-size:24pt}
+    .doc h2{
+      font-size:14pt; margin:20pt 0 7pt; padding-top:9pt;
+      break-after:avoid; break-inside:avoid;
+    }
+    .doc h3{font-size:11.5pt; margin:13pt 0 5pt; break-after:avoid}
+    .doc h4{font-size:10pt; break-after:avoid}
+    .doc p,.doc li{max-width:none}
+    .doc pre{
+      font-size:8pt; break-inside:avoid; padding:8pt 10pt;
+      background:#F7F9F8; border-color:#C7D0CE;
+    }
+    .doc table{font-size:8.5pt; break-inside:avoid}
+    .doc thead th{padding:5pt 7pt; font-size:7.5pt}
+    .doc td{padding:4pt 7pt}
+    .tw{overflow:visible}
+    .doc a{color:inherit; text-decoration:none}
+    .doc blockquote{break-inside:avoid}
+  }
+
+  @media (max-width:900px){
+    .wrap{grid-template-columns:minmax(0,1fr); gap:0; padding:32px 20px 64px}
+    .rail{display:none}
+    .doc > h1{font-size:30px}
+    .doc h2{font-size:21px}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <nav class="rail" aria-label="Contents">
+    <div class="rail-title">Contents</div>
+    <ol>
+<li><a href="#0-what-this-document-is">0. What this document is</a></li>
+<li><a href="#1-the-shape-of-the-system">1. The shape of the system</a></li>
+<li><a href="#2-stack">2. Stack</a></li>
+<li><a href="#3-repository-layout">3. Repository layout</a></li>
+<li><a href="#4-the-shared-core">4. The shared core</a></li>
+<li><a href="#the-full-contents-are-documented-in-backend_specmd-312-rather-than-repeated-here">The full contents are documented in BACKEND_SPEC.md §3–§12 rather than repeated here.</a></li>
+<li><a href="#5-mobile-architecture">5. Mobile architecture</a></li>
+<li><a href="#6-console-architecture">6. Console architecture</a></li>
+<li><a href="#7-design-system-quotlight-glassquot">7. Design system — &amp;quot;Light Glass&amp;quot;</a></li>
+<li><a href="#8-privacy-enforcement">8. Privacy enforcement</a></li>
+<li><a href="#9-quality-bar">9. Quality bar</a></li>
+<li><a href="#ci-gate-both-repos-typecheck-lint-at-zero-warnings-tests">CI gate, both repos: typecheck, lint at zero warnings, tests.</a></li>
+<li><a href="#10-running-it">10. Running it</a></li>
+<li><a href="#11-known-constraints">11. Known constraints</a></li>
+<li><a href="#12-what-is-built-and-what-is-not">12. What is built, and what is not</a></li>
+<li><a href="#13-what-the-backend-engineer-should-take-from-this">13. What the backend engineer should take from this</a></li>
+    </ol>
+  </nav>
+  <main class="doc">
+<h1 id="dawuro-platform-frontend-architecture">Dawuro Platform — Frontend Architecture</h1>
+<p><strong>Version 2.0 · 27 August 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)</strong></p>
+<hr>
+<h2 id="0-what-this-document-is">0. What this document is</h2>
+<p>Dawuro has <strong>two frontends and one shared rules package</strong>. v1 of this document described only the mobile app, because the web console did not exist when it was written. This version covers both, plus how they are kept in agreement.</p>
+<p><strong>Audience:</strong> anyone who needs to understand the clients without working on them — most immediately the backend engineer, as the companion to <a href="BACKEND_SPEC.md"><code>BACKEND_SPEC.md</code></a>.</p>
+<p><strong>Status is stated plainly throughout.</strong> v1 carried a phase table saying only Phase 1 was built; that has not been true for some time. Everything described here is built and running against fixtures unless a section says otherwise, and §12 is the honest inventory of what is not.</p>
+<h3 id="what-changed-since-v1">What changed since v1</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th>v1 said</th>
+<th>Actually</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Products</td>
+<td>One (mobile)</td>
+<td><strong>Two</strong> — mobile app and web console</td>
+</tr>
+<tr>
+<td>Expo SDK</td>
+<td>57</td>
+<td><strong>54</strong></td>
+</tr>
+<tr>
+<td>React Native</td>
+<td>0.86.2</td>
+<td><strong>0.81.5</strong></td>
+</tr>
+<tr>
+<td>React</td>
+<td>19.2.3</td>
+<td><strong>19.1.0</strong></td>
+</tr>
+<tr>
+<td>Expo Router</td>
+<td>57.0.14</td>
+<td><strong>6.0.24</strong></td>
+</tr>
+<tr>
+<td>Camera</td>
+<td><code>react-native-vision-camera</code></td>
+<td><strong><code>expo-camera</code></strong> — vision-camera was never installed</td>
+</tr>
+<tr>
+<td>Expo Go</td>
+<td>&quot;will not work from Phase 4&quot;</td>
+<td><strong>Works.</strong> <code>npm start</code> runs <code>expo start --go</code></td>
+</tr>
+<tr>
+<td>Palette</td>
+<td>Warm paper <code>#FAF6F0</code></td>
+<td><strong>Light Glass</strong>, cool neutrals on <code>#F4F5FA</code>, accent <code>#5B3DF5</code></td>
+</tr>
+<tr>
+<td>Build state</td>
+<td>Phase 1 only</td>
+<td>All phases built; 214 mobile tests, 339 core tests</td>
+</tr>
+</tbody></table></div>
+<hr>
+<h2 id="1-the-shape-of-the-system">1. The shape of the system</h2>
+<pre><code>┌─────────────────────────┐        ┌──────────────────────────────┐
+│  Mobile — Expo / RN     │        │  Console — Next.js 15        │
+│  GhanaMediaWatch        │        │  GhanaMediaWatchConsole      │
+│                         │        │                              │
+│  reporter (primary)     │        │  business                    │
+│  business (light)       │        │  platform_owner              │
+│  platform (light)       │        │  editor                      │
+└───────────┬─────────────┘        └───────────────┬──────────────┘
+            │                                      │
+            │        ┌──────────────────────┐      │
+            └───────▶│  @dawuro/core        │◀─────┘
+                     │  pure business rules │
+                     │  no React, DOM, RN   │
+                     └──────────┬───────────┘
+                                │
+                     ┌──────────▼───────────┐
+                     │  backend (to build)  │
+                     │  BACKEND_SPEC.md     │
+                     └──────────────────────┘
+</code></pre>
+<h3 id="who-uses-which">Who uses which</h3>
+<p><strong>The reporter is mobile-only, permanently.</strong> Camera, GPS gating and offline capture <em>are</em> the product, and none of them survive a browser. A reporter who signs into the console lands on <code>/no-console</code>, which explains why rather than showing an empty dashboard.</p>
+<p><strong>The editor is console-only.</strong> Editorial judgement means reading corroboration side by side; a phone is the wrong instrument.</p>
+<p><strong>Business and platform_owner have surfaces on both</strong>, and this is the one piece of genuine duplication in the system — see §3.3.</p>
+<h3 id="the-division-of-labour-with-the-backend">The division of labour with the backend</h3>
+<p>The split matters because several things a server might expect to own are already solved on the device.</p>
+<p><strong>The clients own:</strong> media capture, the GPS gate, local persistence of media and metadata, the outbox queue and its state machine, retry scheduling and backoff, background upload continuation, connectivity detection, Wi-Fi-only deferral, chunk resumption bookkeeping, and all rendering of verification state, assurance class and privacy flags.</p>
+<p><strong>The server owns:</strong> durable storage, the assurance classification itself, editorial decisions, the public feed, clustering, routing, authorisation, money, and abuse handling.</p>
+<p><strong>Both own:</strong> display-flag enforcement (§8) and the business rules in <code>@dawuro/core</code>. That is deliberate duplication, not redundancy — and in both cases <strong>the server&#39;s answer is authoritative</strong>. The client copy exists to make the interface honest and instant, never to secure anything.</p>
+<hr>
+<h2 id="2-stack">2. Stack</h2>
+<h3 id="mobile-ghanamediawatch">Mobile — <code>GhanaMediaWatch</code></h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Version</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Framework</td>
+<td>Expo (managed)</td>
+<td>SDK <strong>54</strong></td>
+<td>Declarative native config; Expo Go still works for demos</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>React Native</td>
+<td><strong>0.81.5</strong> / React 19.1.0</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Routing</td>
+<td>Expo Router, typed routes</td>
+<td><strong>6.0.24</strong></td>
+<td>File-based; typed routes catch broken links at compile time</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>NativeWind v4 + Tailwind v3</td>
+<td>4.2.6</td>
+<td>One styling language app-wide. NativeWind v5 is still preview</td>
+</tr>
+<tr>
+<td>Client state</td>
+<td>Zustand</td>
+<td>5.0.15</td>
+<td>Capture session and filters are small, imperative, and read from <strong>non-React code</strong> (the sync engine)</td>
+</tr>
+<tr>
+<td>Server state</td>
+<td>TanStack Query</td>
+<td>5.101.4</td>
+<td>Caching, pagination and offline persistence are the whole problem</td>
+</tr>
+<tr>
+<td>Local DB</td>
+<td>expo-sqlite + Drizzle</td>
+<td>16.0.10 / 0.45.2</td>
+<td>The outbox is a real relational queue with a state machine</td>
+</tr>
+<tr>
+<td>Camera</td>
+<td><strong>expo-camera</strong></td>
+<td>17.0.10</td>
+<td>Bundled in Expo Go, which vision-camera is not — and that constraint decides the demo story</td>
+</tr>
+<tr>
+<td>Video</td>
+<td>expo-video</td>
+<td>3.0.16</td>
+<td>Replaces the deprecated <code>expo-av</code> player</td>
+</tr>
+<tr>
+<td>Audio</td>
+<td>expo-audio</td>
+<td>1.1.1</td>
+<td>Voice reports (§5.5)</td>
+</tr>
+<tr>
+<td>Maps</td>
+<td>react-native-maps</td>
+<td>1.20.1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Lists</td>
+<td>@shopify/flash-list</td>
+<td>2.0.2</td>
+<td>The feed must hold 60 fps on mid-range Android</td>
+</tr>
+<tr>
+<td>Forms</td>
+<td>react-hook-form + zod</td>
+<td>7.85 / 4.4.3</td>
+<td>One schema drives validation and the submit payload&#39;s types</td>
+</tr>
+<tr>
+<td>i18n</td>
+<td>i18next</td>
+<td>26.3.6</td>
+<td>English only today, structured for a second locale from day one</td>
+</tr>
+</tbody></table></div>
+<h3 id="console-ghanamediawatchconsole">Console — <code>GhanaMediaWatchConsole</code></h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Concern</th>
+<th>Choice</th>
+<th>Version</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Framework</td>
+<td>Next.js App Router</td>
+<td><strong>15.1.2</strong></td>
+<td>Server Components keep fixture data off the wire; route groups give each role its own shell</td>
+</tr>
+<tr>
+<td>Runtime</td>
+<td>React</td>
+<td>19.0.0</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Styling</td>
+<td>Tailwind v3</td>
+<td>3.4.17</td>
+<td>Same token names as mobile (§7)</td>
+</tr>
+<tr>
+<td>Server state</td>
+<td>TanStack Query</td>
+<td>5.62.7</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Tables</td>
+<td>TanStack Table</td>
+<td>8.20.6</td>
+<td>The routing desk and payout ledger are real data grids</td>
+</tr>
+<tr>
+<td>Client state</td>
+<td>Zustand</td>
+<td>5.0.2</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Validation</td>
+<td>zod</td>
+<td>3.24.1</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Auth</td>
+<td><strong>jose</strong></td>
+<td>5.9.6</td>
+<td>Signs and verifies JWTs on the <strong>edge runtime</strong>, which <code>jsonwebtoken</code> cannot</td>
+</tr>
+<tr>
+<td>Icons</td>
+<td>lucide-react</td>
+<td>0.468.0</td>
+<td>—</td>
+</tr>
+<tr>
+<td>Monorepo</td>
+<td><strong>npm workspaces</strong></td>
+<td>—</td>
+<td>Not pnpm, not yarn</td>
+</tr>
+</tbody></table></div>
+<p><strong>TypeScript is strict in both</strong>, with <code>noUncheckedIndexedAccess</code> and <code>noUnusedLocals</code>. <code>any</code> is an ESLint <strong>error</strong>, not a warning.</p>
+<hr>
+<h2 id="3-repository-layout">3. Repository layout</h2>
+<h3 id="31-two-repositories">3.1 Two repositories</h3>
+<pre><code>GhanaMediaWatch/                    the Expo app
+  src/
+    app/                 expo-router routes only — thin, they compose feature components
+    features/            auth business capture comments earnings feed incident
+                         map org outbox platform profile settings surveys
+    components/ui/       design-system primitives
+    api/                 ApiClient interface, MockApiClient, HttpApiClient, fixtures
+    db/                  drizzle schema, migrations, repositories
+    services/            location, permissions, device identity, sync, media
+    stores/  hooks/  types/  lib/  i18n/
+  scripts/               documentation pipeline (§10.3)
+  BACKEND_SPEC.md  FRONTEND.md  API_CONTRACT.md (superseded)
+
+GhanaMediaWatchConsole/             npm workspaces monorepo
+  packages/core/         @dawuro/core — pure rules, no React/RN/DOM/Next
+  apps/console/          the Next.js app
+</code></pre>
+<p>Two rules hold the mobile tree together, unchanged since v1 and still worth stating:</p>
+<ol>
+<li><strong>Route files contain no business logic.</strong> They import a feature component and render it.</li>
+<li><strong>Cross-feature imports go through <code>components/ui</code>, <code>services</code>, or <code>types</code> only.</strong> <code>features/feed</code> never imports from <code>features/capture</code>.</li>
+</ol>
+<h3 id="32-the-drift-problem-read-this">3.2 The drift problem — read this</h3>
+<p><code>@dawuro/core</code> lives in the console repo. The mobile app is a <strong>separate repository</strong> and cannot resolve an npm workspace across a filesystem boundary, so it carries <strong>hand-synced copies</strong> of the shared code:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>File</th>
+<th>Mobile copy</th>
+<th>Console original</th>
+<th>Currently</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>format.ts</code></td>
+<td><code>src/lib/</code></td>
+<td><code>packages/core/src/lib/</code></td>
+<td>Identical but for import paths</td>
+</tr>
+<tr>
+<td><code>placeholder.ts</code></td>
+<td><code>src/lib/</code></td>
+<td><code>packages/core/src/lib/</code></td>
+<td>Identical but for import paths</td>
+</tr>
+<tr>
+<td><code>context.ts</code></td>
+<td><code>src/types/</code></td>
+<td><code>packages/core/src/types/</code></td>
+<td>Identical but for a comment</td>
+</tr>
+<tr>
+<td><code>dawuro.ts</code></td>
+<td><code>src/types/</code></td>
+<td><code>packages/core/src/types/</code></td>
+<td><strong>67 lines apart</strong> — the console knows an <code>editor</code> role the phone does not</td>
+</tr>
+<tr>
+<td>Design tokens</td>
+<td><code>global.css</code></td>
+<td><code>apps/console/src/app/globals.css</code></td>
+<td>All 25 identical</td>
+</tr>
+<tr>
+<td><code>SUBSCRIPTION_PLANS</code></td>
+<td><code>src/types/dawuro.ts</code></td>
+<td><code>packages/core/src/types/dawuro.ts</code></td>
+<td>Prices agree today</td>
+</tr>
+</tbody></table></div>
+<p><strong>The prices agree today. That is the whole risk.</strong> Nothing enforces it, and the first time a tier changes in one repo and not the other, the phone will quote a reporter one figure and the console will invoice another. Two fixes, either acceptable:</p>
+<ul>
+<li>publish <code>@dawuro/core</code> to a private registry and depend on a version, or</li>
+<li>merge both apps into the existing workspaces monorepo.</li>
+</ul>
+<p>Doing this <strong>before the backend lands is cheap; after is not.</strong></p>
+<h3 id="33-the-business-and-platform-duplication">3.3 The business and platform duplication</h3>
+<p>The mobile app has <code>business/</code> and <code>platform/</code> route trees built before the console existed, and the console now has fuller versions of the same surfaces. Both are live.</p>
+<p>This is not accidental scope creep worth deleting on sight — a field officer approving a membership request from a phone is a real use — but it is <strong>two implementations of one set of rules</strong>, and it should be a deliberate decision rather than an accumulation. The recommendation is to keep mobile business/platform deliberately thin (inbox, approve, assign) and let the console own everything analytical.</p>
+<hr>
+<h2 id="4-the-shared-core">4. The shared core</h2>
+<p><code>packages/core</code> holds every rule that must produce the same answer in both clients and on the server: routing, assignment, commission, billing, permissions, the assurance and verification model, the editorial gate, onboarding, survey validation, clustering and the response/SLA log.</p>
+<p><strong>It imports nothing from React, React Native, Next, the DOM, or Node.</strong> Anything touching a camera, filesystem, network or screen does not belong in it. That constraint is what makes the package testable in isolation and reusable on a server.</p>
+<p>~3,600 lines, <strong>339 tests across 15 suites</strong>, all passing. One of those suites, <code>specVectors.test.ts</code>, asserts the exact numbers printed in <code>BACKEND_SPEC.md</code> §15 — so the spec fails CI if the logic moves underneath it.</p>
+<h2 id="the-full-contents-are-documented-in-backend_specmd-312-rather-than-repeated-here">The full contents are documented in <code>BACKEND_SPEC.md</code> §3–§12 rather than repeated here.</h2>
+<h2 id="5-mobile-architecture">5. Mobile architecture</h2>
+<h3 id="51-the-api-layer">5.1 The API layer</h3>
+<p>Every screen is built against a single swappable interface, <code>ApiClient</code>, with two implementations chosen by one environment variable:</p>
+<pre><code>EXPO_PUBLIC_API_MODE=mock   →  MockApiClient   seeded fixtures, artificial latency,
+                                               injectable failure rate, no backend needed
+EXPO_PUBLIC_API_MODE=http   →  HttpApiClient   real calls to EXPO_PUBLIC_API_URL
+</code></pre>
+<p>This is why frontend work never blocked on the backend, and why the contract was exercised end to end before a server existed.</p>
+<p><strong>Consequence for the backend:</strong> the client never constructs a request inline in a component. If your implementation must differ from the spec, the change lands in exactly one file.</p>
+<h3 id="52-the-gps-gate">5.2 The GPS gate</h3>
+<p>The defining feature. <strong>The camera preview does not mount until a location fix meets the accuracy threshold.</strong> A hard gate, not a warning.</p>
+<pre><code>  entering capture
+        │
+        ▼
+  watchPositionAsync(BestForNavigation)
+        │
+        ├─ permission denied ──────► explainer + deep link to system settings
+        ├─ location services off ──► prompt to enable
+        │
+        ▼
+  acquiring ── accuracy readout, pulse indicator, live lat/long at 6 dp
+        │
+        ├─ accuracy ≤ 20 m ────────► CAMERA MOUNTS (haptic confirmation)
+        │
+        └─ stalled &gt; 30 s ─────────► &quot;move to an open area&quot; coaching
+                                     └─ optional escape hatch:
+                                        proceed with locationConfidence: &quot;low&quot;
+</code></pre>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Constant</th>
+<th>Value</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>GPS_ACCURACY_THRESHOLD_M</code></td>
+<td>20</td>
+<td>About the best a consumer phone achieves outdoors in a few seconds. Tighter feels broken in urban canyons; looser is useless for sending someone to the scene</td>
+</tr>
+<tr>
+<td><code>GPS_STALL_TIMEOUT_MS</code></td>
+<td>30 000</td>
+<td>When coaching and the escape hatch appear</td>
+</tr>
+<tr>
+<td><code>GPS_ABSOLUTE_MAX_ACCURACY_M</code></td>
+<td>150</td>
+<td>Beyond this, not offered even via the escape hatch</td>
+</tr>
+<tr>
+<td><code>MAX_VIDEO_DURATION_S</code></td>
+<td>60</td>
+<td>Enforced client-side with a ring countdown</td>
+</tr>
+</tbody></table></div>
+<p><strong>The fix is locked at the shutter</strong> and never re-read afterwards. A reporter who walks away before submitting must not have their report stamped with wherever they ended up.</p>
+<p><strong>Tamper signals captured alongside it:</strong> <code>accuracyM</code>, <code>altitude</code>, <code>heading</code>, <code>speed</code>, <code>capturedAtIso</code> (device clock), <code>capturedAtUtcOffsetMinutes</code>, <code>deviceUptimeMs</code>, and <code>isMocked</code> on Android. The reduced-accuracy escape hatch <strong>flags</strong> the report — it never silently downgrades it, and the flag is visible in the interface as well as in the payload.</p>
+<p>All of these feed the server&#39;s <code>CaptureFacts</code> (<code>BACKEND_SPEC.md</code> §4.1). <strong>The device does not classify itself.</strong></p>
+<h3 id="53-offline-first-sync">5.3 Offline-first sync</h3>
+<p><strong>The network is treated as absent by default. Capture always succeeds locally.</strong></p>
+<p>On capture the client writes media to <code>documentDirectory/incidents/</code> — never the cache directory, which the OS can evict — and inserts a row in the local <code>incidents</code> table. Only when both succeed does the interface report success.</p>
+<pre><code>  draft ──► queued ──► uploading ──► uploaded
+                          │
+                          └──► failed ──► (retry) ──► queued
+
+  any state ──► cancelled   (terminal, user-initiated)
+</code></pre>
+<p>Persisted per row: <code>attemptCount</code>, <code>lastError</code>, <code>lastErrorCode</code>, <code>nextRetryAt</code>, <code>serverId</code>, <code>bytesUploaded</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Attempt</th>
+<th>Delay</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>1</td>
+<td>2 s</td>
+</tr>
+<tr>
+<td>2</td>
+<td>8 s</td>
+</tr>
+<tr>
+<td>3</td>
+<td>30 s</td>
+</tr>
+<tr>
+<td>4</td>
+<td>2 min</td>
+</tr>
+<tr>
+<td>5</td>
+<td>10 min</td>
+</tr>
+<tr>
+<td>6+</td>
+<td>1 h (cap, repeats)</td>
+</tr>
+</tbody></table></div>
+<p>Plus <strong>±25 % jitter</strong>, so a thousand phones do not retry in unison when a cell tower returns. <code>Retry-After</code> on a <code>429</code> overrides the schedule entirely.</p>
+<p><strong>Drain rules.</strong> Subscribes to NetInfo and drains when <code>isInternetReachable === true</code> — <strong>not merely <code>isConnected</code></strong>, which is true on a captive-portal Wi-Fi that goes nowhere. Oldest first, one at a time. A background task via <code>expo-task-manager</code> continues uploads when backgrounded; <strong>iOS background execution is opportunistic and not guaranteed</strong>, so the app also resumes draining on foreground. A Wi-Fi-only toggle defers <em>video</em> to Wi-Fi while photos still go over mobile data, and the outbox shows what is waiting and why.</p>
+<p><strong>Deletion.</strong> The local media file is removed <strong>only after the server confirms completion</strong>. The metadata row is kept, with <code>serverId</code>, so the user retains a personal history.</p>
+<blockquote>
+<p>This is why media retention is an open question in the spec (§16). If the server expires footage the client has already deleted locally, the user&#39;s history points at nothing.</p>
+</blockquote>
+<h3 id="54-capture-modes">5.4 Capture modes</h3>
+<p>Four on the shutter: <strong>photo</strong>, <strong>video</strong>, <strong>audio</strong>, <strong>live</strong>.</p>
+<p>Audio is a first-class report type and takes the same GPS lock as everything else — describing an incident from somewhere safe carries none of the risk of filming it, and it is the only mode that works in the dark or in a crowd. It is priced above a photo and below a video.</p>
+<p><strong>Live is present but not implemented.</strong> Selecting it opens a sheet that explains what it will do and offers to switch to video, rather than arming a shutter that does nothing. It is on the switch so the layout is settled before the feature arrives.</p>
+<h3 id="55-the-capture-stamp">5.5 The capture stamp</h3>
+<p>Provenance is burned onto the frame rather than captioned beside it, because this footage is meant to travel and the claim has to travel with it: the report reference, the capture time at the precision the reporter allowed, and the location where permitted.</p>
+<p>The same component renders on the feed card, the detail view and the console&#39;s media frame, so a still shared into WhatsApp carries the same reference someone can type into the public verification page.</p>
+<h3 id="56-sharing">5.6 Sharing</h3>
+<p><strong>One rule, and it lives in <code>src/lib/share.ts</code> precisely so it cannot be quietly broken at a call site: share the report, never the media file.</strong></p>
+<p>A playback URL points at footage that may be licensed, restricted or pending review, and once it is pasted into a group chat none of those controls apply. The report page carries the context and can be taken down; a raw file cannot. The link is built from <code>reportId</code> — the reference stamped on the footage — so someone sent a clip and someone sent a link can tell they are looking at the same report.</p>
+<hr>
+<h2 id="6-console-architecture">6. Console architecture</h2>
+<h3 id="61-route-groups">6.1 Route groups</h3>
+<p>Two — three, counting editorial — each with its own layout and sidebar. Route groups are a filesystem convention and <strong>do not appear in the URL</strong>: <code>(business)/inbox</code> serves <code>/inbox</code>.</p>
+<pre><code>app/
+  (business)/    inbox  map  published  surveys  team  account  onboarding
+  (platform)/    platform  ├ routing  ├ approvals  ├ businesses  └ payouts
+  (editorial)/   editorial └ decided
+  login  register  join  invite/[token]  verify  verify/[reportId]  no-console
+</code></pre>
+<p><code>src/middleware.ts</code> gates by URL prefix, so <strong>the route groups and the middleware prefix lists must be kept in step by hand.</strong> Adding a page under <code>(business)/</code> without adding its prefix to <code>BUSINESS_PREFIXES</code> leaves it reachable by any signed-in account.</p>
+<h3 id="62-auth">6.2 Auth</h3>
+<p>A signed JWT in an <strong>httpOnly cookie</strong>, so browser JavaScript can never read it.</p>
+<p>Token primitives live in <code>src/lib/token.ts</code> with <strong>no Node dependency</strong>, because middleware runs on the edge runtime and must verify sessions with exactly the same code the server uses. <code>src/lib/session.ts</code> is the <code>server-only</code> half that reads cookies via <code>next/headers</code>. Splitting them is what lets middleware and Server Components reach identical conclusions about who someone is.</p>
+<p><code>jose</code> rather than <code>jsonwebtoken</code> for the same reason: it runs on the edge.</p>
+<p>When the backend lands, <strong>its access token is stored inside the session server-side</strong> and attached by route handlers under <code>src/app/api/</code>. The browser must never see it.</p>
+<h3 id="63-two-rules-that-fail-at-runtime-not-at-build">6.3 Two rules that fail at runtime, not at build</h3>
+<p><strong>Never pass a component function across the RSC boundary.</strong> Server layouts pass icon <em>names</em>; <code>src/components/shell/icons.ts</code> resolves them client-side. Passing the component itself fails with an opaque digest in production, not a type error in your editor.</p>
+<p><strong>Never silently fall back to fixtures when the API is unreachable.</strong> An outage must look like an outage. A console that quietly serves stale seed data during an incident is worse than one that says it is down.</p>
+<h3 id="64-server-components-by-default">6.4 Server Components by default</h3>
+<p>Pages are thin server routes that load data and render a client <code>*Workspace</code> component. <code>(platform)/payouts/page.tsx</code> is sixteen lines: import the fixtures, render <code>&lt;PayoutsWorkspace&gt;</code>. This keeps fixture volume off the wire and puts interactivity in exactly the components that need it.</p>
+<hr>
+<h2 id="7-design-system-quotlight-glassquot">7. Design system — &quot;Light Glass&quot;</h2>
+<p><strong>All 25 design tokens are byte-identical across both repositories today.</strong> They are hand-synced (§3.2), which is the risk, but the system itself is genuinely one system.</p>
+<p>Tokens live as CSS custom properties — <code>global.css</code> on mobile, <code>apps/console/src/app/globals.css</code> on the console — surfaced as Tailwind utilities with <code>&lt;alpha-value&gt;</code> support. Components never hardcode a hex; the single mirror is <code>src/lib/theme.ts</code>, for the few React Native APIs that take colours as props rather than styles.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Token</th>
+<th>Value</th>
+<th></th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>--color-canvas</code></td>
+<td><code>244 245 250</code></td>
+<td><code>#F4F5FA</code> — the ground</td>
+</tr>
+<tr>
+<td><code>--color-canvas-soft</code></td>
+<td><code>255 255 255</code></td>
+<td>Cards and raised surfaces</td>
+</tr>
+<tr>
+<td><code>--color-canvas-raise</code></td>
+<td><code>233 236 244</code></td>
+<td>Wells and insets</td>
+</tr>
+<tr>
+<td><code>--color-text-primary</code></td>
+<td><code>11 12 20</code></td>
+<td><code>#0B0C14</code></td>
+</tr>
+<tr>
+<td><code>--color-accent</code></td>
+<td><code>91 61 245</code></td>
+<td><code>#5B3DF5</code></td>
+</tr>
+<tr>
+<td><code>--color-accent-alt</code></td>
+<td><code>37 99 235</code></td>
+<td><code>#2563EB</code></td>
+</tr>
+</tbody></table></div>
+<p>Channels are stored as space-separated RGB so Tailwind can compose alpha (<code>bg-accent/25</code>) without a second token per opacity.</p>
+<p><strong>Light by default, and light is not a default — it is a decision.</strong> Intraocular light scatter roughly doubles between age 20 and 70, so white-on-black haloes badly for an older reader. Dark mode exists, softened at both ends, and media surfaces stay dark in either scheme because a light frame wrecks the footage.</p>
+<p><strong>Category colour is always a secondary cue.</strong> Twenty-three hues cannot be reliably distinguished, particularly by an older eye, so every chip carries a text label and every map pin a distinct icon. Hue signals the <em>family</em> of incident; the label says which one.</p>
+<p>Colour choices are asserted in <code>src/lib/__tests__/palette.test.ts</code>, so a later &quot;soften that grey&quot; fails CI rather than landing quietly.</p>
+<hr>
+<h2 id="8-privacy-enforcement">8. Privacy enforcement</h2>
+<p>Three booleans per report: <code>showLocation</code>, <code>showDate</code>, <code>showTime</code>.</p>
+<p><strong>Each client enforces these independently of the server</strong>, with tests asserting a hidden value never reaches rendered output. The server enforcement in <code>BACKEND_SPEC.md</code> §3.5 is the other half.</p>
+<p>Both layers are required, and the reason is worth stating plainly: <strong>client-side hiding alone</strong> means true coordinates travel to every phone that scrolls past the report and sit in an inspectable cache. <strong>Server-side alone</strong> means one client bug leaks them.</p>
+<p>The review screen shows a <strong>live public preview</strong> — exactly what a stranger will see — so the reporter is never guessing.</p>
+<p><strong>Anonymous mode</strong> is a prominent toggle with an honest explainer. The copy states that anonymous means the public and other users see no profile, <strong>but a device identifier is still attached</strong> for abuse prevention. The client deliberately does not overstate the guarantee, and <code>deviceId</code> is never rendered in public UI on any screen.</p>
+<h3 id="device-identity">Device identity</h3>
+<p>A <strong>UUID v4</strong> generated on first launch and persisted in <code>expo-secure-store</code> is the primary identifier, sent as <code>X-Device-Id</code>. <code>Application.getAndroidId()</code> / <code>getIosIdForVendorAsync()</code> supplement it as a weak correlation signal only — <strong>both platform IDs reset on uninstall or factory reset and are not stable identifiers.</strong></p>
+<hr>
+<h2 id="9-quality-bar">9. Quality bar</h2>
+<ul>
+<li><strong>Accessibility</strong> — <code>accessibilityLabel</code> and <code>accessibilityRole</code> on every interactive element; toggles carry <code>accessibilityState</code> so a filled heart is announced, not merely coloured; the capture flow announces accuracy and gate state to screen readers; reduced motion respected; system font scaling to 2× without breaking layout.</li>
+<li><strong>i18n</strong> — every user-facing string goes through i18next. An automated sweep checks that every <code>t(&#39;…&#39;)</code> key resolves, so a missing translation fails rather than rendering a raw key.</li>
+<li><strong>Every list has three designed states</strong> — skeleton, empty, error. A bare spinner is never an acceptable empty state.</li>
+<li><strong>Error handling</strong> — a root error boundary plus per-screen boundaries, typed errors from the API layer, and toasts that say what happened and what to do next. <strong>A raw stack trace is never shown to a user.</strong></li>
+<li><strong>No dead controls.</strong> A button that does nothing is treated as a defect; a feature that does not exist yet explains itself (§5.4) rather than failing silently.</li>
+</ul>
+<h3 id="testing">Testing</h3>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th align="right">Suites</th>
+<th align="right">Tests</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Mobile</td>
+<td align="right">14</td>
+<td align="right">214</td>
+</tr>
+<tr>
+<td><code>@dawuro/core</code></td>
+<td align="right">15</td>
+<td align="right">339</td>
+</tr>
+</tbody></table></div>
+<p>Priority targets are the pure logic — the sync state machine, the GPS gate, backoff, commission, routing, assignment, the editorial gate, permissions and the palette. Business rules are tested directly against fixtures rather than through a rendered screen, which is why they can be trusted to match the server.</p>
+<h2 id="ci-gate-both-repos-typecheck-lint-at-zero-warnings-tests">CI gate, both repos: <strong>typecheck, lint at zero warnings, tests.</strong></h2>
+<h2 id="10-running-it">10. Running it</h2>
+<h3 id="101-mobile">10.1 Mobile</h3>
+<p><strong>Expo Go works.</strong> This changed since v1, and it changes the demo story — the app can be put on any phone by scanning a QR code, with no build and no cable.</p>
+<pre><code class="language-bash">npm install
+npm start                  # expo start --go, then scan the QR
+npm run start:clear        # same, clearing the Metro cache
+npm run start:tunnel       # when the phone is not on the same network
+</code></pre>
+<p>The constraint that buys this is <strong>every native module must be one Expo Go already bundles</strong> (§11.1). A development build is still available via <code>npm run start:dev-client</code> and is required if that constraint is ever broken.</p>
+<pre><code class="language-bash">npx expo prebuild --platform android
+npm run android            # first build 10–20 min; later builds incremental
+</code></pre>
+<p>iOS requires a Mac. Android minSdk 26; iOS deployment target per Expo SDK 54.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Script</th>
+<th>Does</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>npm run typecheck</code></td>
+<td><code>tsc --noEmit</code></td>
+</tr>
+<tr>
+<td><code>npm run lint</code></td>
+<td>ESLint, <strong>zero warnings tolerated</strong></td>
+</tr>
+<tr>
+<td><code>npm test</code></td>
+<td>Jest</td>
+</tr>
+<tr>
+<td><code>npm run docs:spec</code></td>
+<td>Regenerates the specification HTML and PDF (§10.3)</td>
+</tr>
+</tbody></table></div>
+<h3 id="102-console">10.2 Console</h3>
+<pre><code class="language-bash">npm install                # from the repo root — npm workspaces
+npm run dev                # console on :3000
+npm run verify             # typecheck + lint + test, all workspaces
+npm test                   # @dawuro/core only
+</code></pre>
+<p><code>apps/console/.env.local</code> needs <code>SESSION_SECRET</code> (32+ characters). See <code>.env.example</code>.</p>
+<blockquote>
+<p><strong>Do not run <code>next build</code> while a dev server is live on the same directory.</strong> The two compete over <code>.next</code> and leave a corrupted module graph whose symptom is every route returning 500 while typecheck and lint both pass. Recovery is <code>rm -rf .next</code> and a restart.</p>
+</blockquote>
+<h3 id="103-documentation-pipeline">10.3 Documentation pipeline</h3>
+<p>Both PDFs are generated from markdown, so the prose has one source and never drifts from its rendering:</p>
+<pre><code>BACKEND_SPEC.md   ──┐
+                    ├──► scripts/render-spec.js ──► HTML ──► scripts/print-pdf.js ──► PDF
+FRONTEND.md       ──┘
+</code></pre>
+<p><code>print-pdf.js</code> drives whichever Chrome or Edge is already installed rather than pulling in Puppeteer, which would download a second Chromium into a repository with no other use for one. Set <code>CHROME_PATH</code> to override.</p>
+<hr>
+<h2 id="11-known-constraints">11. Known constraints</h2>
+<ol>
+<li><strong>Expo Go bundles a fixed set of native modules.</strong> Anything outside that set means the app will not load in Go at all — not a degraded experience, a blank failure. This is why capture uses <code>expo-camera</code> rather than <code>react-native-vision-camera</code>, and it is a real constraint on every future native dependency. Check the SDK 54 bundled list before adding one.</li>
+<li><strong><code>react-dom</code> is pinned to 19.1.0 via <code>overrides</code>.</strong> <code>expo-router</code> → <code>@expo/ui</code> → <code>vaul</code> floats it past Expo&#39;s pinned <code>react</code> and breaks npm peer resolution.</li>
+<li><strong>React Native cannot synthesise font weights from one custom family on Android.</strong> Each Inter weight is registered as its own family: <code>font-sans</code>, <code>font-sans-medium</code>, <code>font-sans-semibold</code>, <code>font-sans-bold</code>, <code>font-display</code>.</li>
+<li><strong>Emulators report a perfect, mocked GPS fix</strong> — precisely the branch the gate exists to detect. The capture flow needs a physical device to test meaningfully.</li>
+<li><strong>Apple Maps has no routing coverage in Ghana.</strong> Directions open Google Maps unconditionally — the app, then the web fallback. <code>LSApplicationQueriesSchemes</code> in <code>app.json</code> carries <code>comgooglemaps</code> so the app-scheme check works on iOS. Handing a Ghanaian user Apple Maps produces &quot;Directions Not Available&quot;.</li>
+<li><strong>Expo tunnel mode depends on <code>exp.direct</code> resolving and <code>connect.ngrok-agent.com</code> being reachable.</strong> Some networks block both, and the failure looks like a hung startup rather than a network error. LAN mode is the fallback.</li>
+<li><strong>Route groups and middleware prefixes are coupled by hand</strong> (§6.1).</li>
+<li><strong><code>packages/core</code> cannot be resolved from the mobile repo</strong> (§3.2). This is the one to fix.</li>
+</ol>
+<hr>
+<h2 id="12-what-is-built-and-what-is-not">12. What is built, and what is not</h2>
+<h3 id="built-and-running-against-fixtures">Built and running against fixtures</h3>
+<p><strong>Mobile</strong> — capture with the GPS gate and four modes, the offline outbox and sync engine, resumable chunked upload, the feed with comments and reactions, map and clustering, incident detail with in-app directions, earnings and the commission ledger, surveys, auth and onboarding, and light business and platform tiers.</p>
+<p><strong>Console</strong> — business inbox, routing desk, editorial workbench and decided log, institutional onboarding with per-step review, platform approvals, payouts, organisations, published archive, team management, invites and affiliations, the public verification page, and both role shells.</p>
+<p><strong>Core</strong> — every rule in <code>BACKEND_SPEC.md</code> §3–§12, with 339 tests.</p>
+<h3 id="not-built">Not built</h3>
+<p><strong>The backend.</strong> Nothing. That is <code>BACKEND_SPEC.md</code>.</p>
+<p><strong>Specifically, the trust model has a hole until it exists.</strong> <code>assurance</code> and <code>verification</code> render correctly and the state machine is enforced client-side, but the <em>facts</em> underneath — server-side integrity signing, server-time comparison, device attestation, malware and duplicate screening, original preservation — are all server work (<code>BACKEND_SPEC.md</code> §5.4). Until then, an assurance class is a display value with nothing behind it. <strong>This is the single most important thing to build, because it is what the product claims to be.</strong></p>
+<p><strong>Live streaming</strong> is on the capture switch and explains itself (§5.4).</p>
+<p><strong>Google sign-in</strong> renders a button that is deliberately inert pending an OAuth client.</p>
+<p><strong>Payouts</strong> have a ledger and batches but no mobile-money integration.</p>
+<h3 id="known-rough-edges">Known rough edges</h3>
+<ul>
+<li>The mobile app is still named <strong>GhanaMediaWatch</strong> in <code>app.json</code> — name, slug and scheme — with the stock Expo icon and no splash. The console has the dawuro gong favicon; the phone does not.</li>
+<li>Mobile and console <strong>duplicate the business and platform tiers</strong> (§3.3).</li>
+<li>The seeded fixtures are a scatter of unrelated reports rather than one coherent story that can be walked end to end.</li>
+</ul>
+<hr>
+<h2 id="13-what-the-backend-engineer-should-take-from-this">13. What the backend engineer should take from this</h2>
+<ul>
+<li>The clients are <strong>offline-first and retry forever.</strong> Assume duplicates; implement idempotency (<code>BACKEND_SPEC.md</code> §2.6).</li>
+<li>The clients <strong>already back off</strong> on <code>429</code> and <code>5xx</code>. Return the right status and they behave. Return <code>500</code> for a validation error and every affected phone retries hourly, indefinitely — the retryable/permanent split in §2.5 is not cosmetic.</li>
+<li>The mobile client <strong>deletes local media on upload completion.</strong> Your retention policy is not an internal detail; it changes what a user can see in their own history.</li>
+<li>The clients <strong>enforce display flags too</strong>, but that is defence in depth, <strong>not permission to send suppressed values.</strong></li>
+<li>The clients <strong>compute commission, routing and permissions locally</strong> so the interface can be instant and honest. <strong>Your answer is authoritative in every case.</strong> Where the two disagree, the client is wrong and should be corrected — but a client that has to ask the server what a download costs before it can label a button is a client that shows a spinner where a price belongs.</li>
+<li><strong>The device never classifies its own assurance.</strong> It sends facts; you decide (§4.1, §5.4).</li>
+<li>Everything is built against <strong>one swappable interface</strong> on mobile and thin route handlers on the console. Contract changes are cheap now and expensive once integration starts. <strong>Raise them early.</strong></li>
+</ul>
+
+  </main>
+</div>
+</body>
+</html>

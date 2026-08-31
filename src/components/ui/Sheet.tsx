@@ -3,7 +3,7 @@ import { Modal, Pressable as RNPressable, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { cn } from '@/lib/cn';
-import { colors } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
 import { Pressable } from './Pressable';
 import { Text } from './Text';
 
@@ -26,6 +26,7 @@ export interface SheetProps {
  * reanimated/gesture-handler coupling buy nothing here.
  */
 export function Sheet({ visible, onClose, title, subtitle, children, className }: SheetProps) {
+  const c = useColors();
   const insets = useSafeAreaInsets();
 
   return (
@@ -67,7 +68,7 @@ export function Sheet({ visible, onClose, title, subtitle, children, className }
               accessibilityLabel="Close"
               className="h-8 w-8 items-center justify-center rounded-pill bg-canvas-raise"
             >
-              <Ionicons name="close" size={18} color={colors.textSecondary} />
+              <Ionicons name="close" size={18} color={c.textSecondary} />
             </Pressable>
           </View>
         ) : null}

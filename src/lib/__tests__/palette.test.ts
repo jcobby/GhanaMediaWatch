@@ -12,7 +12,8 @@ import { accentGradient, categoryColor, colors } from '../theme';
  *  - Text over *media* is a different problem: the background is arbitrary
  *    footage, so legibility comes from the gradient scrim plus the text shadow
  *    on Text's `onMedia` prop, not from a colour pair. Nothing here can assert
- *    that; it is enforced by the scrim always being present in FeedItem.
+ *    that; it is enforced by the gradient always being present under the
+ *    capture stamp on the incident detail screen.
  *  - Category hues only need to be distinguishable and visible, not readable
  *    as body text — they are dots beside a label.
  */

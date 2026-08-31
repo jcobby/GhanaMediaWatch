@@ -1,29 +1,39 @@
 {
   "expo": {
-    "name": "GhanaMediaWatch",
-    "slug": "ghanamediawatch",
-    "scheme": "ghanamediawatch",
+    "name": "Dawuro",
+    "slug": "dawuro",
+    "scheme": "dawuro",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "backgroundColor": "#F4F5FA",
     "splash": {
-      "backgroundColor": "#F4F5FA",
-      "resizeMode": "contain"
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0E101A"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": false,
       "bundleIdentifier": "gh.mediawatch.app",
       "infoPlist": {
-        "UIBackgroundModes": ["fetch", "processing", "remote-notification"],
+        "UIBackgroundModes": [
+          "fetch",
+          "processing",
+          "remote-notification"
+        ],
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "GhanaMediaWatch uses the camera to capture photo and video evidence of incidents.",
-        "NSMicrophoneUsageDescription": "GhanaMediaWatch records audio with incident videos so the footage carries its original context.",
-        "NSLocationWhenInUseUsageDescription": "GhanaMediaWatch needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
-        "NSPhotoLibraryAddUsageDescription": "GhanaMediaWatch can save a copy of the footage you capture to your photo library."
+        "NSCameraUsageDescription": "Dawuro uses the camera to capture photo and video evidence of incidents.",
+        "NSMicrophoneUsageDescription": "Dawuro records audio with incident videos so the footage carries its original context.",
+        "NSLocationWhenInUseUsageDescription": "Dawuro needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
+        "NSPhotoLibraryAddUsageDescription": "Dawuro can save a copy of the footage you capture to your photo library.",
+        "LSApplicationQueriesSchemes": [
+          "comgooglemaps"
+        ]
       }
     },
     "android": {
@@ -62,8 +72,8 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "GhanaMediaWatch needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
-          "locationWhenInUsePermission": "GhanaMediaWatch needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
+          "locationAlwaysAndWhenInUsePermission": "Dawuro needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
+          "locationWhenInUsePermission": "Dawuro needs your precise location to stamp incident reports with accurate GPS coordinates. The camera only unlocks once an accurate fix is acquired.",
           "isAndroidBackgroundLocationEnabled": false,
           "isAndroidForegroundServiceEnabled": false
         }
@@ -91,20 +101,28 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#F4F5FA",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 180,
-          "resizeMode": "contain"
+          "imageWidth": 300,
+          "resizeMode": "contain",
+          "backgroundColor": "#0E101A"
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "GhanaMediaWatch uses the camera to capture photo and video evidence of incidents.",
-          "microphonePermission": "GhanaMediaWatch records audio with incident videos so the footage carries its original context.",
+          "cameraPermission": "Dawuro uses the camera to capture photo and video evidence of incidents.",
+          "microphonePermission": "Dawuro records audio with incident videos so the footage carries its original context.",
           "recordAudioAndroid": true
         }
-      ]
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Dawuro needs access to your photos so you can attach footage of the same incident to a comment.",
+          "cameraPermission": "Dawuro needs the camera so you can record footage to attach to a comment."
+        }
+      ],
+      "expo-audio"
     ],
     "experiments": {
       "typedRoutes": true,

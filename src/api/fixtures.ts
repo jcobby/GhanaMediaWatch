@@ -1,4 +1,17 @@
-import type { Incident, IncidentCategory, TimePrecision } from '@/types/api';
+import type { Incident, IncidentCategory, Publisher, TimePrecision } from '@/types/api';
+import { BUSINESSES } from '@/api/dawuroData';
+import { placeholderImage } from '@/lib/placeholder';
+import { formatReportId } from '@/types/context';
+
+/**
+ * Institutions that publish, rather than only receive.
+ *
+ * Declared here rather than beside `publisherFor` below: the function is
+ * hoisted, this list is not, and the fixture array runs between them.
+ */
+const PUBLISHING_ORGS = BUSINESSES.filter(
+  (b) => b.sector === 'media' || b.sector === 'government',
+);
 
 /**
  * Seeded sample incidents for the mock API client.
@@ -22,8 +35,8 @@ import type { Incident, IncidentCategory, TimePrecision } from '@/types/api';
  * `lock` pins the result so each incident keeps the same image across restarts
  * — a demo that reshuffles its own photography cannot be talked over.
  */
-const img = (keywords: string, lock: number, w = 1080, h = 1920): string =>
-  `https://loremflickr.com/${w}/${h}/${keywords}?lock=${lock}`;
+const img = (category: IncidentCategory, lock: number, w = 1080, h = 1920): string =>
+  placeholderImage(`inc-${lock}`, category, { width: w, height: h });
 
 /**
  * Sample clips for the video cells. Short, ranged-request friendly, and served
@@ -180,6 +193,7 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
 
   return {
     id: s.id,
+    reportId: formatReportId(s.id),
     category: s.category,
     description: s.description,
     vettingState: 'published',
@@ -188,8 +202,8 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
       kind: isVideo ? 'video' : 'photo',
       // A video still needs a poster: the player shows it while buffering, and
       // without one the cell flashes black before the first frame arrives.
-      url: isVideo ? VIDEO_CLIPS[i % VIDEO_CLIPS.length]! : img(s.imagery, i + 1),
-      posterUrl: img(s.imagery, i + 1, 540, 960),
+      url: isVideo ? VIDEO_CLIPS[i % VIDEO_CLIPS.length]! : img(s.category, i + 1),
+      posterUrl: img(s.category, i + 1, 540, 960),
       width: 1080,
       height: 1920,
       ...(isVideo ? { durationMs: 10_000 } : {}),
@@ -202,11 +216,46 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
     },
     capturedAtIso,
     capturedAtPrecision,
-    publisher: s.anonymous
-      ? { kind: 'anonymous' }
-      : { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null },
+    publisher: publisherFor(i, s.anonymous),
     counts: { reactions: s.reactions, comments: s.comments },
     viewerHasReacted: i === 1,
     ...(showLocation && s.distanceM !== undefined ? { distanceM: s.distanceM } : {}),
   } satisfies Incident;
 });
+
+/**
+ * Who a seeded report is credited to.
+ *
+ * Roughly a third are released by an institution, because that is the shape of
+ * the real feed: most reports come from the public, and the ones an
+ * organisation has licensed and stood behind are the minority — but they are
+ * the ones that make a business page worth opening.
+ *
+ * The rest split between named reporters and anonymous, which the reporter
+ * chooses at submission.
+ */
+function publisherFor(i: number, anonymous: boolean): Publisher {
+  /*
+   * Cycled on the count of organisation-published reports, not on the report
+   * index.
+   *
+   * Keying both off `i` meant the two modulos interfered: only every third
+   * report went to an organisation, and `i % 4` then picked which — so the
+   * fourth publisher did not appear until the tenth report, and with fewer
+   * seeds than that some organisations never published at all. Their page
+   * opened onto an empty Reports tab.
+   */
+  const org = PUBLISHING_ORGS[Math.floor(i / 3) % PUBLISHING_ORGS.length];
+  if (i % 3 === 0 && org) {
+    return {
+      kind: 'organisation',
+      id: org.id,
+      displayName: org.name,
+      verified: org.verified,
+      logoUrl: org.logoUrl,
+    };
+  }
+  if (anonymous) return { kind: 'anonymous' };
+  return { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null };
+}
+

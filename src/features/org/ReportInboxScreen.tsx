@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, Glass, Pressable, Text } from '@/components/ui';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { toast } from '@/stores/toastStore';
 import { RequireRole } from './RequireRole';
@@ -30,6 +30,7 @@ const STATUS_TONE: Record<TriageStatus, 'neutral' | 'warning' | 'success' | 'dan
  * is what makes people stop using an inbox.
  */
 export function ReportInboxScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -77,7 +78,7 @@ export function ReportInboxScreen() {
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
-            <Ionicons name="chevron-back" size={20} color={colors.textPrimary} />
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
           </Pressable>
           <View className="flex-1">
             <Text variant="title-lg">{t('org.inbox')}</Text>
@@ -144,7 +145,7 @@ export function ReportInboxScreen() {
                       }
                     >
                       {isSelected ? (
-                        <Ionicons name="checkmark" size={12} color={colors.textOnDark} />
+                        <Ionicons name="checkmark" size={12} color={c.textOnDark} />
                       ) : null}
                     </View>
                   </View>

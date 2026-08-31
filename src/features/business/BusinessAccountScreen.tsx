@@ -7,8 +7,8 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Chip, Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { BUSINESSES } from '@/api/dawuroData';
-import { accentGradient, categoryColor, colors } from '@/lib/theme';
-import { SUBSCRIPTION_PLANS, formatCedis } from '@/types/dawuro';
+import { accentGradient, categoryColor, useColors } from '@/lib/theme';
+import { SUBSCRIPTION_PLANS, downloadCharge, formatCedis, isUnlimited } from '@/types/dawuro';
 import { useAuthStore } from '@/stores/authStore';
 import { useBusinessStore, useEffectiveInterests } from '@/stores/businessStore';
 import { toast } from '@/stores/toastStore';
@@ -24,6 +24,7 @@ import { INCIDENT_CATEGORIES, type IncidentCategory } from '@/types/api';
  * this screen, not in support.
  */
 export function BusinessAccountScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -40,8 +41,14 @@ export function BusinessAccountScreen() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState<IncidentCategory[]>(interests);
 
-  const usage = Math.min(1, business.reportsUsedThisPeriod / plan.includedReports);
-  const over = business.reportsUsedThisPeriod > plan.includedReports;
+  const uncapped = isUnlimited(plan);
+  const perDownload = downloadCharge(plan);
+  /*
+   * There is no allowance to be "over" any more — metered plans charge per
+   * download from the first one, and the annual plan charges for none. The bar
+   * now shows spend against this period rather than usage against a quota.
+   */
+  const spentThisPeriod = perDownload * business.reportsUsedThisPeriod;
 
   return (
     <ScrollView
@@ -58,9 +65,7 @@ export function BusinessAccountScreen() {
           <Text variant="display-md" className="flex-1" numberOfLines={2}>
             {business.name}
           </Text>
-          {business.verified ? (
-            <Ionicons name="checkmark-circle" size={22} color={colors.info} />
-          ) : null}
+          {business.verified ? <Ionicons name="checkmark-circle" size={22} color={c.info} /> : null}
         </View>
         <Text variant="body-sm" tone="muted">
           {t(`sector.${business.sector}`)}
@@ -90,18 +95,17 @@ export function BusinessAccountScreen() {
           </View>
         </View>
         <View className="h-1.5 overflow-hidden rounded-pill bg-white/25">
-          <View className="h-full rounded-pill bg-white" style={{ width: `${usage * 100}%` }} />
+          {/* Metered plans have no quota to fill, so the bar is a simple
+              activity indicator rather than a fraction of an allowance. */}
+          <View
+            className="h-full rounded-pill bg-white"
+            style={{ width: `${Math.min(100, business.reportsUsedThisPeriod * 4)}%` }}
+          />
         </View>
         <Text variant="caption" className="text-white/85">
-          {over
-            ? t('businessAccount.overBy', {
-                count: business.reportsUsedThisPeriod - plan.includedReports,
-                amount: formatCedis(plan.overagePesewas),
-              })
-            : t('businessAccount.ofIncluded', {
-                remaining: plan.includedReports - business.reportsUsedThisPeriod,
-                total: plan.includedReports,
-              })}
+          {uncapped
+            ? t('businessAccount.unlimitedNote')
+            : t('businessAccount.spentOnDownloads', { amount: formatCedis(spentThisPeriod) })}
         </Text>
       </LinearGradient>
 
@@ -150,9 +154,22 @@ export function BusinessAccountScreen() {
           {t('businessAccount.plan')}
         </Text>
         <Glass elevation="low" className="gap-0 rounded-lg">
-          <Row label={t('businessAccount.monthly')} value={formatCedis(plan.monthlyPesewas)} />
-          <Row label={t('businessAccount.included')} value={String(plan.includedReports)} />
-          <Row label={t('businessAccount.perExtra')} value={formatCedis(plan.overagePesewas)} />
+          <Row
+            label={
+              plan.billingPeriod === 'annual'
+                ? t('businessAccount.annualFee')
+                : t('businessAccount.monthlyFee')
+            }
+            value={formatCedis(plan.feePesewas)}
+          />
+          <Row
+            label={t('businessAccount.perDownload')}
+            value={uncapped ? t('business.unlimitedDownloads') : formatCedis(perDownload)}
+          />
+          <Row
+            label={t('businessAccount.downloadsTaken')}
+            value={String(business.reportsUsedThisPeriod)}
+          />
           <Row
             label={t('businessAccount.seats')}
             value={`${business.seatsUsed} / ${plan.seats}`}
@@ -191,9 +208,7 @@ export function BusinessAccountScreen() {
               dotColor={categoryColor[c]}
               accessibilityLabel={t(`category.${c}`)}
               onPress={() =>
-                setDraft((prev) =>
-                  prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c],
-                )
+                setDraft((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]))
               }
             />
           ))}
@@ -253,17 +268,18 @@ function SettingRow({
   danger?: boolean;
   onPress?: () => void;
 }) {
+  const c = useColors();
   return (
     <Pressable
       onPress={onPress}
       accessibilityLabel={label}
       className="flex-row items-center gap-3 border-b border-hairline/[0.07] px-4 py-3.5"
     >
-      <Ionicons name={icon} size={18} color={danger ? colors.danger : colors.textMuted} />
+      <Ionicons name={icon} size={18} color={danger ? c.danger : c.textMuted} />
       <Text variant="body" tone={danger ? 'danger' : 'primary'} className="flex-1">
         {label}
       </Text>
-      <Ionicons name="chevron-forward" size={15} color={colors.textFaint} />
+      <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
     </Pressable>
   );
 }

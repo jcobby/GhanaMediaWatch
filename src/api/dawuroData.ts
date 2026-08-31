@@ -5,6 +5,7 @@ import type {
   RoutingItem,
   Survey,
 } from '@/types/dawuro';
+import { placeholderImage } from '@/lib/placeholder';
 
 /**
  * Seed data for the Dawuro platform.
@@ -137,7 +138,7 @@ export const BUSINESSES: BusinessAccount[] = [
     name: 'Accra Metropolitan Assembly',
     sector: 'government',
     verified: true,
-    tier: 'professional',
+    tier: 'standard',
     subscriptionStatus: 'active',
     renewsAtIso: daysAhead(6),
     seatsUsed: 9,
@@ -150,7 +151,7 @@ export const BUSINESSES: BusinessAccount[] = [
     name: 'Electricity Company of Ghana',
     sector: 'utility',
     verified: true,
-    tier: 'professional',
+    tier: 'standard',
     subscriptionStatus: 'active',
     renewsAtIso: daysAhead(23),
     seatsUsed: 6,
@@ -163,7 +164,7 @@ export const BUSINESSES: BusinessAccount[] = [
     name: 'Joy News',
     sector: 'media',
     verified: true,
-    tier: 'professional',
+    tier: 'standard',
     subscriptionStatus: 'active',
     renewsAtIso: daysAhead(11),
     seatsUsed: 12,
@@ -189,7 +190,7 @@ export const BUSINESSES: BusinessAccount[] = [
     name: 'Star Assurance',
     sector: 'insurance',
     verified: false,
-    tier: 'starter',
+    tier: 'basic',
     subscriptionStatus: 'trialing',
     renewsAtIso: daysAhead(4),
     seatsUsed: 2,
@@ -305,7 +306,7 @@ export const ROUTING_QUEUE: RoutingItem[] = [
     submittedAtIso: hoursAgo(1),
     status: 'awaiting_routing',
     locationLabel: 'Spintex Road, Accra',
-    thumbnailUrl: 'https://loremflickr.com/200/200/car,accident?lock=2',
+    thumbnailUrl: placeholderImage('rt-2', 'other', { width: 720, height: 1280 }),
   },
   {
     id: 'rt_2',
@@ -319,7 +320,7 @@ export const ROUTING_QUEUE: RoutingItem[] = [
     submittedAtIso: hoursAgo(2),
     status: 'awaiting_routing',
     locationLabel: null,
-    thumbnailUrl: 'https://loremflickr.com/200/200/river,mining?lock=3',
+    thumbnailUrl: placeholderImage('rt-3', 'other', { width: 720, height: 1280 }),
   },
   {
     id: 'rt_3',
@@ -333,7 +334,7 @@ export const ROUTING_QUEUE: RoutingItem[] = [
     submittedAtIso: hoursAgo(5),
     status: 'awaiting_routing',
     locationLabel: 'Adenta, Accra',
-    thumbnailUrl: 'https://loremflickr.com/200/200/powerline,pole?lock=6',
+    thumbnailUrl: placeholderImage('rt-6', 'other', { width: 720, height: 1280 }),
   },
   {
     id: 'rt_4',
@@ -347,7 +348,7 @@ export const ROUTING_QUEUE: RoutingItem[] = [
     submittedAtIso: hoursAgo(11),
     status: 'routed',
     locationLabel: 'Achimota, Accra',
-    thumbnailUrl: 'https://loremflickr.com/200/200/streetlight,road?lock=4',
+    thumbnailUrl: placeholderImage('rt-4', 'other', { width: 720, height: 1280 }),
   },
 ];
 
@@ -457,7 +458,7 @@ export const BUSINESS_APPLICATIONS: BusinessApplication[] = [
     email: 'newsroom@citifmonline.com',
     phone: '0302909090',
     registrationNumber: 'CS0445566778',
-    requestedTier: 'professional',
+    requestedTier: 'standard',
     interests: ['disorder', 'corruption', 'accident', 'fire'],
     submittedAtIso: hoursAgo(20),
     status: 'pending',
@@ -471,7 +472,7 @@ export const BUSINESS_APPLICATIONS: BusinessApplication[] = [
     email: 'kmensah@gmail.com',
     phone: '0244000111',
     registrationNumber: 'BN12',
-    requestedTier: 'starter',
+    requestedTier: 'basic',
     interests: ['crime', 'disorder', 'health'],
     submittedAtIso: hoursAgo(44),
     status: 'pending',

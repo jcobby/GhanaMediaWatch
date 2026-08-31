@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, EmptyState, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
 import { OUTBOX_ITEMS, type OutboxItem, type OutboxState } from '@/api/mockData';
-import { categoryColor, colors } from '@/lib/theme';
+import { categoryColor, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { toast } from '@/stores/toastStore';
 
@@ -31,6 +31,7 @@ function OutboxRow({
   onRetry: (id: string) => void;
   onCancel: (id: string) => void;
 }) {
+  const c = useColors();
   const { t } = useTranslation();
   const hue = categoryColor[item.category];
 
@@ -101,7 +102,7 @@ function OutboxRow({
               accessibilityLabel={t('common.retry')}
               className="h-9 w-9 items-center justify-center rounded-pill bg-glass/[0.14]"
             >
-              <Ionicons name="refresh" size={17} color={colors.textPrimary} />
+              <Ionicons name="refresh" size={17} color={c.textPrimary} />
             </Pressable>
           ) : null}
           <Pressable
@@ -109,7 +110,7 @@ function OutboxRow({
             accessibilityLabel={t('common.cancel')}
             className="h-9 w-9 items-center justify-center rounded-pill bg-glass/[0.14]"
           >
-            <Ionicons name="close" size={17} color={colors.textMuted} />
+            <Ionicons name="close" size={17} color={c.textMuted} />
           </Pressable>
         </View>
       </View>
@@ -125,6 +126,7 @@ function OutboxRow({
  * and every state it renders are already the ones the engine produces.
  */
 export function OutboxScreen() {
+  const c = useColors();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState(OUTBOX_ITEMS);
@@ -192,7 +194,7 @@ export function OutboxScreen() {
           {/* The sync engine drains oldest-first, one at a time — this note is
               why a user watching the queue sees only one bar moving. */}
           <Glass elevation="low" className="flex-row items-center gap-2.5 rounded-md px-3.5 py-3">
-            <Ionicons name="information-circle-outline" size={17} color={colors.info} />
+            <Ionicons name="information-circle-outline" size={17} color={c.info} />
             <Text variant="caption" tone="muted" className="flex-1">
               {t('outbox.explainer')}
             </Text>
