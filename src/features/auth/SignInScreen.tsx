@@ -10,7 +10,9 @@ import { useTranslation } from 'react-i18next';
 import { Button, Pressable, Text } from '@/components/ui';
 import { accentGradient, colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
+import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 import { toast } from '@/stores/toastStore';
+import { hapticUnlock } from '@/lib/haptics';
 import { AuthField } from './AuthField';
 import { DemoAccountSheet } from './DemoAccountSheet';
 import { isLiveBackend } from '@/api';
@@ -36,15 +38,26 @@ export function SignInScreen() {
   const onSubmit = async (values: SignInValues) => {
     setSubmitting(true);
     try {
-      await signIn(values.email);
+      await signIn(values.email, values.password);
       // The store now knows the account type, so land in its shell rather than
       // bouncing the user through the reporter feed first.
       const { profile } = useAuthStore.getState();
+
+      // Named, because "Signed in" alone does not tell somebody *which*
+      // account they reached — and on a shared phone that is the question.
+      hapticUnlock();
+      toast.success(
+        t('auth.welcomeBackTitle'),
+        t('auth.welcomeBackBody', { name: profile?.displayName ?? values.email }),
+      );
       router.replace(
         profile?.accountType === 'platform_owner'
           ? '/platform/(tabs)'
-          : profile?.accountType === 'business'
-            ? '/business/(tabs)'
+          : // An organisation login lands in the reporter app while the institution
+            // tier is off. Sending it to a hidden shell would be a dead end
+            // with no way back.
+            ORGANISATION_TIER_ENABLED && profile?.accountType === 'organisation'
+            ? '/organisation/(tabs)'
             : '/(tabs)',
       );
     } catch (cause) {
@@ -66,6 +79,7 @@ export function SignInScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }}
         contentContainerClassName="gap-6 px-6"
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="items-center gap-4">
           <LinearGradient
@@ -159,7 +173,7 @@ export function SignInScreen() {
           />
         </View>
 
-        {/* Only while the app runs on fixtures. A shortcut into a business or
+        {/* Only while the app runs on fixtures. A shortcut into an organisation or
             operator account must not exist against a real backend. */}
         {!isLiveBackend ? (
           <Pressable

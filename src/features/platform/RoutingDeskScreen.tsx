@@ -7,8 +7,8 @@ import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, EmptyState, Glass, Pressable, Sheet, Text } from '@/components/ui';
-import { BUSINESSES, ROUTING_QUEUE } from '@/api/dawuroData';
-import { categoryColor, useColors } from '@/lib/theme';
+import { ORGANISATIONS, ROUTING_QUEUE } from '@/api/dawuroData';
+import { categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { estimateCommission } from '@/features/earnings/commission';
 import { formatCedis, type RoutingItem } from '@/types/dawuro';
@@ -17,8 +17,8 @@ import { toast } from '@/stores/toastStore';
 /**
  * The routing desk — oversight, not a gate.
  *
- * Submissions reach businesses automatically, matched on the reporter's chosen
- * category, any organisations they named, and the watch areas businesses have
+ * Submissions reach organisations automatically, matched on the reporter's chosen
+ * category, any organisations they named, and the watch areas organisations have
  * drawn. Nothing waits on a person: requiring a human to touch every report
  * does not survive a few hundred a day.
  *
@@ -158,7 +158,7 @@ export function RoutingDeskScreen() {
                         width: 6,
                         height: 6,
                         borderRadius: 3,
-                        backgroundColor: categoryColor[item.category],
+                        backgroundColor: categoryHue(item.category),
                       }}
                     />
                     <Text variant="caption" tone="muted" className="uppercase">
@@ -180,7 +180,7 @@ export function RoutingDeskScreen() {
                       <Badge label={t('platform.routed')} tone="success" />
                     ) : null}
                     {/* A suppressed location is worth flagging: it narrows which
-                        businesses can act on the report at all. */}
+                        organisations can act on the report at all. */}
                     {!item.locationLabel ? (
                       <Badge label={t('platform.noLocation')} tone="warning" />
                     ) : null}
@@ -201,66 +201,70 @@ export function RoutingDeskScreen() {
       >
         <ScrollView className="max-h-80" showsVerticalScrollIndicator={false}>
           <View className="gap-2">
-            {BUSINESSES.filter((b) => b.subscriptionStatus !== 'cancelled').map((business) => {
-              const isChosen = chosen.includes(business.id);
-              const requested = active?.requestedBusinessIds.includes(business.id) ?? false;
-              const matches = active ? business.interests.includes(active.category) : false;
-              return (
-                <Pressable
-                  key={business.id}
-                  onPress={() =>
-                    setChosen((prev) =>
-                      prev.includes(business.id)
-                        ? prev.filter((id) => id !== business.id)
-                        : [...prev, business.id],
-                    )
-                  }
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: isChosen }}
-                  accessibilityLabel={business.name}
-                  className={
-                    isChosen
-                      ? 'flex-row items-center gap-3 rounded-lg border border-accent bg-accent-wash p-3'
-                      : 'flex-row items-center gap-3 rounded-lg border border-hairline/[0.10] p-3'
-                  }
-                >
-                  <View className="flex-1 gap-0.5">
-                    <View className="flex-row items-center gap-1.5">
-                      <Text variant="body-sm" className="font-sans-semibold">
-                        {business.name}
-                      </Text>
-                      {business.verified ? (
-                        <Ionicons name="checkmark-circle" size={13} color={c.info} />
-                      ) : null}
-                    </View>
-                    <View className="flex-row items-center gap-1.5">
-                      {requested ? (
-                        <Text variant="caption" tone="accent" className="font-sans-semibold">
-                          {t('platform.reporterAsked')}
-                        </Text>
-                      ) : matches ? (
-                        <Text variant="caption" tone="success">
-                          {t('platform.interestMatch')}
-                        </Text>
-                      ) : (
-                        <Text variant="caption" tone="muted">
-                          {t(`sector.${business.sector}`)}
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                  <View
+            {ORGANISATIONS.filter((b) => b.subscriptionStatus !== 'cancelled').map(
+              (organisation) => {
+                const isChosen = chosen.includes(organisation.id);
+                const requested = active?.requestedBusinessIds.includes(organisation.id) ?? false;
+                const matches = active ? organisation.interests.includes(active.category) : false;
+                return (
+                  <Pressable
+                    key={organisation.id}
+                    onPress={() =>
+                      setChosen((prev) =>
+                        prev.includes(organisation.id)
+                          ? prev.filter((id) => id !== organisation.id)
+                          : [...prev, organisation.id],
+                      )
+                    }
+                    accessibilityRole="checkbox"
+                    accessibilityState={{ checked: isChosen }}
+                    accessibilityLabel={organisation.name}
                     className={
                       isChosen
-                        ? 'h-5 w-5 items-center justify-center rounded-pill bg-accent'
-                        : 'h-5 w-5 rounded-pill border border-hairline/25'
+                        ? 'flex-row items-center gap-3 rounded-lg border border-accent bg-accent-wash p-3'
+                        : 'flex-row items-center gap-3 rounded-lg border border-hairline/[0.10] p-3'
                     }
                   >
-                    {isChosen ? <Ionicons name="checkmark" size={12} color={c.textOnDark} /> : null}
-                  </View>
-                </Pressable>
-              );
-            })}
+                    <View className="flex-1 gap-0.5">
+                      <View className="flex-row items-center gap-1.5">
+                        <Text variant="body-sm" className="font-sans-semibold">
+                          {organisation.name}
+                        </Text>
+                        {organisation.verified ? (
+                          <Ionicons name="checkmark-circle" size={13} color={c.info} />
+                        ) : null}
+                      </View>
+                      <View className="flex-row items-center gap-1.5">
+                        {requested ? (
+                          <Text variant="caption" tone="accent" className="font-sans-semibold">
+                            {t('platform.reporterAsked')}
+                          </Text>
+                        ) : matches ? (
+                          <Text variant="caption" tone="success">
+                            {t('platform.interestMatch')}
+                          </Text>
+                        ) : (
+                          <Text variant="caption" tone="muted">
+                            {t(`sector.${organisation.sector}`)}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                    <View
+                      className={
+                        isChosen
+                          ? 'h-5 w-5 items-center justify-center rounded-pill bg-accent'
+                          : 'h-5 w-5 rounded-pill border border-hairline/25'
+                      }
+                    >
+                      {isChosen ? (
+                        <Ionicons name="checkmark" size={12} color={c.textOnDark} />
+                      ) : null}
+                    </View>
+                  </Pressable>
+                );
+              },
+            )}
           </View>
         </ScrollView>
 

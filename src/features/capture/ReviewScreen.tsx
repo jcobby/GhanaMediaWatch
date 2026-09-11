@@ -1,6 +1,12 @@
 import { useCallback, useMemo, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
-import { Image } from 'expo-image';
+import {
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  TextInput,
+  View,
+} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -12,6 +18,8 @@ import { categoryColor, useColors } from '@/lib/theme';
 import { formatExactCapture } from '@/lib/format';
 import { hapticError, hapticUnlock } from '@/lib/haptics';
 import { useCaptureStore } from '@/stores/captureStore';
+import { CapturePreview } from './CapturePreview';
+import { PosterPicker } from './PosterPicker';
 import { ContextFields } from './ContextFields';
 import { submitCapture } from './submitCapture';
 import { DestinationPicker } from './DestinationPicker';
@@ -51,6 +59,8 @@ export function ReviewScreen() {
     setAnonymous,
     setSeverity,
     setLandmark,
+    posterAtMs,
+    setPosterAtMs,
     setConsent,
     setShowLocation,
     setShowDate,
@@ -60,6 +70,8 @@ export function ReviewScreen() {
 
   const [anonymitySheet, setAnonymitySheet] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  /** Whether the description has focus, so the way out of it can be offered. */
+  const [describing, setDescribing] = useState(false);
 
   /*
    * The public preview.
@@ -77,6 +89,18 @@ export function ReviewScreen() {
     };
   }, [pending, showLocation, showDate, showTime, isAnonymous, t]);
 
+  /**
+   * The reason this report cannot be sent yet, or null when it can.
+   *
+   * Only conditions the server will actually refuse — this is not a place to
+   * invent house style. A description is required by the API and was the one
+   * thing a reporter could leave out and still press submit.
+   */
+  const blocker = useMemo(
+    () => (description.trim().length === 0 ? t('review.needDescription') : null),
+    [description, t],
+  );
+
   const handleSubmit = useCallback(async () => {
     if (!pending || submitting) return;
     setSubmitting(true);
@@ -90,7 +114,12 @@ export function ReviewScreen() {
         displayFlags: { showLocation, showDate, showTime },
         severity,
         landmark,
+        posterAtMs,
         consent,
+        // The picker above is the reporter's decision about who sees this and
+        // whether it earns. It used to stop at this screen.
+        destination,
+        directedBusinessIds: businessIds,
       });
       hapticUnlock();
       reset();
@@ -98,9 +127,17 @@ export function ReviewScreen() {
       router.replace('/outbox');
     } catch (cause) {
       hapticError();
+      // The empty-capture case has words of its own: the raw message is a
+      // sentinel, and the reporter needs to be told to film it again rather
+      // than shown "EMPTY_CAPTURE".
+      const empty = cause instanceof Error && cause.message === 'EMPTY_CAPTURE';
       toast.error(
-        t('review.saveFailedTitle'),
-        cause instanceof Error ? cause.message : t('common.unknownErrorHelp'),
+        empty ? t('review.emptyCaptureTitle') : t('review.saveFailedTitle'),
+        empty
+          ? t('review.emptyCaptureBody')
+          : cause instanceof Error
+            ? cause.message
+            : t('common.unknownErrorHelp'),
       );
     } finally {
       setSubmitting(false);
@@ -113,7 +150,13 @@ export function ReviewScreen() {
     isAnonymous,
     severity,
     landmark,
+    posterAtMs,
     consent,
+    // Load-bearing, not housekeeping: omitted, the handler closes over the
+    // destination as it was on first render, so a reporter who changes their
+    // mind submits the old choice and is told the new one was saved.
+    destination,
+    businessIds,
     showLocation,
     showDate,
     showTime,
@@ -134,13 +177,28 @@ export function ReviewScreen() {
     );
   }
 
+  /*
+   * The keyboard covers the bottom of the screen, which is where a form's last
+   * field and its submit button live. Every screen here that takes typed input
+   * needs this; only the sign-in screens had it, so the rest hid the control
+   * you were reaching for the moment you tapped to type.
+   *
+   * `padding` on iOS, matching the sign-in screens. Left unset on Android,
+   * where the window resizing under `adjustResize` already does it — the
+   * exception is a `Modal`, which that does not reach, and which `Sheet`
+   * handles itself.
+   */
   return (
-    <View className="flex-1 bg-canvas">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-canvas"
+    >
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingBottom: insets.bottom + 120 }}
         contentContainerClassName="gap-5 px-4"
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="flex-row items-center gap-3">
           <Pressable
@@ -158,25 +216,40 @@ export function ReviewScreen() {
           <Text variant="label" tone="muted">
             {t('review.previewLabel')}
           </Text>
-          <View className="h-72 overflow-hidden rounded-lg bg-canvas-raise">
-            {/* A voice recording has no frame to show. Rather than an empty
-                box that reads as a failed load, the preview says what it is. */}
-            {pending.kind === 'audio' ? (
-              <View className="absolute inset-0 items-center justify-center gap-2 bg-canvas-raise">
-                <Ionicons name="mic" size={28} color={c.accent} />
-                <Text variant="body-sm" tone="muted">
-                  {t('review.audioPreview')}
-                </Text>
-              </View>
-            ) : (
-              <Image
-                source={{ uri: pending.uri }}
-                style={{ position: 'absolute', inset: 0 }}
-                contentFit="cover"
-                transition={180}
-              />
-            )}
-            <View className="absolute bottom-0 left-0 right-0 gap-1.5 bg-black/55 p-3.5">
+          {/*
+            Tall, and portrait-shaped.
+
+            This was a 288px landscape box with the media cropped to fill it, so
+            a reporter reviewing a portrait phone video saw a letterbox slice
+            through the middle of their own footage and had to send it without
+            ever seeing the top or the bottom. A capture is reviewed once,
+            before it is committed to permanently, and the whole frame is the
+            thing being reviewed.
+          */}
+          <View className="aspect-[3/4] w-full overflow-hidden rounded-lg bg-black">
+            {/*
+              Every kind of capture, each in an element that can render it.
+
+              This was one `expo-image` for all of them, and `expo-image` cannot
+              decode an MP4 — it fails silently, so a video report showed an
+              empty grey box directly under "This is exactly how your report
+              appears to other people". A reporter could not check their own
+              footage, and could not tell a blank preview from a failed
+              recording.
+            */}
+            <CapturePreview uri={pending.uri} kind={pending.kind} />
+            {/*
+              Not clickable, so the video controls underneath still are.
+
+              This strip sits at the bottom of the frame, which is exactly where
+              a player puts its scrubber — and it would otherwise swallow every
+              tap meant for it, leaving a reporter unable to play the clip they
+              are being asked to review.
+            */}
+            <View
+              pointerEvents="none"
+              className="absolute bottom-0 left-0 right-0 gap-1.5 bg-black/55 p-3.5"
+            >
               <View className="flex-row items-center gap-2">
                 <View
                   style={{ backgroundColor: categoryColor[category] }}
@@ -230,6 +303,24 @@ export function ReviewScreen() {
           </View>
         </View>
 
+        {/* ── Thumbnail ───────────────────────────────────────────────────── */}
+        {/*
+          Only for footage, and only the reporter decides.
+
+          A photograph is already its own thumbnail. A clip is not, and the
+          frame the app would otherwise take — one second in — is often the
+          phone still being raised. The person who filmed it is the only one who
+          knows which second shows the thing.
+        */}
+        {pending.kind === 'video' ? (
+          <PosterPicker
+            uri={pending.uri}
+            durationMs={pending.durationMs}
+            value={posterAtMs}
+            onChange={setPosterAtMs}
+          />
+        ) : null}
+
         {/* ── Description ─────────────────────────────────────────────────── */}
         <View className="gap-2">
           <Text variant="label" tone="muted">
@@ -244,6 +335,8 @@ export function ReviewScreen() {
               multiline
               numberOfLines={4}
               maxLength={500}
+              onFocus={() => setDescribing(true)}
+              onBlur={() => setDescribing(false)}
               style={{
                 // TextInput's own text colour and min height have no NativeWind
                 // equivalent that survives multiline on both platforms.
@@ -256,16 +349,40 @@ export function ReviewScreen() {
               accessibilityLabel={t('review.description')}
             />
           </Glass>
-          <Text variant="caption" tone="faint" className="self-end">
-            {description.length}/500
-          </Text>
+          {/*
+            A way out of a multiline field.
+
+            A single-line input can offer "Done" on the return key. This one
+            cannot: return has to insert a newline, so the only escapes are
+            scrolling — `keyboardDismissMode` above — or tapping somewhere
+            harmless. Neither is discoverable while the keyboard is covering the
+            submit button, which reporters hit as being unable to file at all.
+          */}
+          <View className="flex-row items-center justify-between">
+            {describing ? (
+              <Pressable
+                onPress={() => Keyboard.dismiss()}
+                accessibilityLabel={t('common.done')}
+                className="rounded-pill bg-canvas-raise px-3 py-1.5"
+              >
+                <Text variant="caption" tone="accent" className="font-sans-semibold">
+                  {t('common.done')}
+                </Text>
+              </Pressable>
+            ) : (
+              <View />
+            )}
+            <Text variant="caption" tone="faint">
+              {description.length}/500
+            </Text>
+          </View>
         </View>
 
         {/* ── Where it goes ───────────────────────────────────────────────── */}
         <DestinationPicker
           destination={destination}
           onChange={setDestination}
-          selectedBusinessIds={businessIds}
+          selectedOrganisationIds={businessIds}
           onChangeBusinesses={setBusinessIds}
           category={category}
           mediaKind={pending.kind}
@@ -348,11 +465,26 @@ export function ReviewScreen() {
         className="absolute bottom-0 left-0 right-0 border-t border-hairline/[0.08] bg-canvas px-4 pt-3"
         style={{ paddingBottom: insets.bottom + 12 }}
       >
+        {/*
+          Said here, not discovered in the outbox.
+
+          The server requires at least one character of description and rejects
+          the whole submission without it. That rejection used to arrive minutes
+          later as "Request validation failed" on a row in the queue, by which
+          point the reporter had left the scene and had no idea which of their
+          answers was the problem — or that a single word would have fixed it.
+        */}
+        {blocker ? (
+          <Text variant="caption" tone="muted" className="mb-2 text-center">
+            {blocker}
+          </Text>
+        ) : null}
         <Button
           label={t('review.submit')}
           fullWidth
           size="lg"
           loading={submitting}
+          disabled={blocker !== null}
           onPress={() => void handleSubmit()}
         />
       </View>
@@ -376,6 +508,6 @@ export function ReviewScreen() {
           />
         </View>
       </Sheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }

@@ -27,6 +27,17 @@ export const GPS_WATCH_INTERVAL_MS = 1_000;
 /** Maximum video length, enforced client-side with a visual ring countdown. */
 export const MAX_VIDEO_DURATION_S = 60;
 
+/**
+ * The shortest recording that produces a usable file.
+ *
+ * A tap that starts and stops inside the same second gives the encoder no
+ * frames to mux and writes a file of zero bytes — with no error, so the app
+ * only discovers it later and tells the reporter "nothing was recorded" about
+ * footage they watched themselves film. Holding the stop to one whole second
+ * costs a moment and removes the failure.
+ */
+export const MIN_VIDEO_DURATION_S = 1;
+
 /** Decimal places used whenever coordinates are shown to a human. ~0.11 m. */
 export const COORDINATE_PRECISION = 6;
 
@@ -69,3 +80,23 @@ export const FEED_PRELOAD_AHEAD = 1;
  * the difference between hitting "Submit" and hitting "Cancel".
  */
 export const MIN_TAP_TARGET = 48;
+
+/**
+ * Below this, a stored file is not media.
+ *
+ * Measured against the live service: real captures from this app are 1.9–3.7 MB,
+ * while the integration probes sharing the same queue hold 2 048, 4 096 or
+ * 8 192 bytes of random data with no container header at all. 64 KB sits far
+ * above every synthetic payload and far below the smallest plausible capture.
+ *
+ * It matters because a player handed one of those shows 0:00 on a black frame
+ * forever, which a reader cannot tell from a slow connection.
+ *
+ * **Hand-synced with `MIN_PLAUSIBLE_MEDIA_BYTES` in `@dawuro/core`**, which the
+ * console and the news-value score use for the same decision. This app does not
+ * consume that package — the same reason `NewsSection` is declared twice — so
+ * the two must be changed together. They disagreeing would show up as a frame
+ * saying "unplayable" beside a score rating the same file 5 out of 5 for
+ * footage.
+ */
+export const MIN_PLAUSIBLE_MEDIA_BYTES = 64_000;

@@ -48,9 +48,28 @@ const body = marked.parse(md);
 
 // Contents: top-level sections only. A two-level rail on a 1,700-line document
 // becomes a second document.
+/*
+ * Section headings, plus any part divider.
+ *
+ * A single-source document has one h1 — its title — and the rail is a flat list
+ * of h2s. The combined handbook has two more h1s, "Part I" and "Part II", and
+ * without them the rail runs 0–16 straight into C0–C13 as one undifferentiated
+ * column. The C prefix keeps that unambiguous but not legible; the dividers say
+ * where the second document starts.
+ *
+ * The document's own title is skipped: it is already the page heading, and a
+ * contents rail whose first entry is the thing you are looking at is noise.
+ */
+const [firstH1] = [...slugs.entries()].filter(([, v]) => v.depth === 1);
+
 const toc = [...slugs.entries()]
-  .filter(([, v]) => v.depth === 2)
-  .map(([id, v]) => `<li><a href="#${id}">${v.text.replace(/&/g, '&amp;')}</a></li>`)
+  .filter(([id, v]) => v.depth === 2 || (v.depth === 1 && id !== firstH1?.[0]))
+  .map(([id, v]) => {
+    const label = v.text.replace(/&/g, '&amp;');
+    return v.depth === 1
+      ? `<li class="part"><a href="#${id}">${label}</a></li>`
+      : `<li><a href="#${id}">${label}</a></li>`;
+  })
   .join('\n');
 
 const html = `<!doctype html>
@@ -101,6 +120,15 @@ const html = `<!doctype html>
     color:var(--ink-2); text-decoration:none; font-size:12.5px; line-height:1.35;
   }
   .rail a:hover{background:var(--accent-wash); color:var(--accent-ink)}
+
+  /* Part dividers in a combined document. Set as a label rather than as a
+     louder link: they are where you are, not usually where you are going. */
+  .rail li.part{margin:16px 0 4px}
+  .rail li.part:first-child{margin-top:0}
+  .rail li.part a{
+    font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-3);
+  }
 
   /* ── document ──────────────────────────────────────────────────── */
   .doc{min-width:0}

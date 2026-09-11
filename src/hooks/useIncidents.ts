@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import {
+  useMutation,
   useQuery,
   useQueryClient,
   type QueryClient,
@@ -53,6 +54,38 @@ export function useMyIncidents() {
   return useQuery({
     queryKey: queryKeys.myIncidents(),
     queryFn: () => api.getMyIncidents(),
+  });
+}
+
+/**
+ * Withdrawing a report you filed.
+ *
+ * **Author-only, and the server is the only authority on that.** `DELETE
+ * /incidents/{id}` refuses anybody else — an editor cannot remove a report, a
+ * platform owner cannot, and neither can an organisation it was routed to. That
+ * asymmetry is deliberate and worth keeping in view: an institution able to
+ * delete footage about itself is the failure the whole platform exists to
+ * prevent, while a reporter withdrawing their own is simply their decision
+ * about something they filmed.
+ *
+ * It is a *soft* delete on the service. The record survives for lawful process
+ * and for any organisation that already licensed it — this takes a report down,
+ * it does not make the evidence cease to exist, and the confirmation says so
+ * rather than promising an erasure nobody can perform.
+ *
+ * The list is invalidated rather than edited in place: the server decides what
+ * a withdrawn report leaves behind, and guessing at that here would show
+ * somebody a list the service disagrees with.
+ */
+export function useDeleteIncident() {
+  const client = useQueryClient();
+
+  return useMutation({
+    mutationFn: (incidentId: string) => api.deleteIncident(incidentId),
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: queryKeys.myIncidents() });
+      void client.invalidateQueries({ queryKey: queryKeys.feed({}) });
+    },
   });
 }
 

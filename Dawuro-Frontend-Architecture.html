@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Version 2.0 · 27 August 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)">
+<meta name="description" content="Version 2.1 · 2 September 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)">
 <title>Dawuro Platform — Frontend Architecture</title>
 <style>
   *,*::before,*::after{box-sizing:border-box}
@@ -46,6 +46,15 @@
     color:var(--ink-2); text-decoration:none; font-size:12.5px; line-height:1.35;
   }
   .rail a:hover{background:var(--accent-wash); color:var(--accent-ink)}
+
+  /* Part dividers in a combined document. Set as a label rather than as a
+     louder link: they are where you are, not usually where you are going. */
+  .rail li.part{margin:16px 0 4px}
+  .rail li.part:first-child{margin-top:0}
+  .rail li.part a{
+    font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-3);
+  }
 
   /* ── document ──────────────────────────────────────────────────── */
   .doc{min-width:0}
@@ -156,13 +165,11 @@
 <li><a href="#2-stack">2. Stack</a></li>
 <li><a href="#3-repository-layout">3. Repository layout</a></li>
 <li><a href="#4-the-shared-core">4. The shared core</a></li>
-<li><a href="#the-full-contents-are-documented-in-backend_specmd-312-rather-than-repeated-here">The full contents are documented in BACKEND_SPEC.md §3–§12 rather than repeated here.</a></li>
 <li><a href="#5-mobile-architecture">5. Mobile architecture</a></li>
 <li><a href="#6-console-architecture">6. Console architecture</a></li>
 <li><a href="#7-design-system-quotlight-glassquot">7. Design system — &amp;quot;Light Glass&amp;quot;</a></li>
 <li><a href="#8-privacy-enforcement">8. Privacy enforcement</a></li>
 <li><a href="#9-quality-bar">9. Quality bar</a></li>
-<li><a href="#ci-gate-both-repos-typecheck-lint-at-zero-warnings-tests">CI gate, both repos: typecheck, lint at zero warnings, tests.</a></li>
 <li><a href="#10-running-it">10. Running it</a></li>
 <li><a href="#11-known-constraints">11. Known constraints</a></li>
 <li><a href="#12-what-is-built-and-what-is-not">12. What is built, and what is not</a></li>
@@ -171,7 +178,7 @@
   </nav>
   <main class="doc">
 <h1 id="dawuro-platform-frontend-architecture">Dawuro Platform — Frontend Architecture</h1>
-<p><strong>Version 2.0 · 27 August 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)</strong></p>
+<p><strong>Version 2.1 · 2 September 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)</strong></p>
 <hr>
 <h2 id="0-what-this-document-is">0. What this document is</h2>
 <p>Dawuro has <strong>two frontends and one shared rules package</strong>. v1 of this document described only the mobile app, because the web console did not exist when it was written. This version covers both, plus how they are kept in agreement.</p>
@@ -229,7 +236,7 @@
 <tr>
 <td>Build state</td>
 <td>Phase 1 only</td>
-<td>All phases built; 214 mobile tests, 339 core tests</td>
+<td>All phases built; 261 mobile tests, 370 core tests</td>
 </tr>
 </tbody></table></div>
 <hr>
@@ -518,9 +525,23 @@ GhanaMediaWatchConsole/             npm workspaces monorepo
 <h2 id="4-the-shared-core">4. The shared core</h2>
 <p><code>packages/core</code> holds every rule that must produce the same answer in both clients and on the server: routing, assignment, commission, billing, permissions, the assurance and verification model, the editorial gate, onboarding, survey validation, clustering and the response/SLA log.</p>
 <p><strong>It imports nothing from React, React Native, Next, the DOM, or Node.</strong> Anything touching a camera, filesystem, network or screen does not belong in it. That constraint is what makes the package testable in isolation and reusable on a server.</p>
-<p>~3,600 lines, <strong>339 tests across 15 suites</strong>, all passing. One of those suites, <code>specVectors.test.ts</code>, asserts the exact numbers printed in <code>BACKEND_SPEC.md</code> §15 — so the spec fails CI if the logic moves underneath it.</p>
-<h2 id="the-full-contents-are-documented-in-backend_specmd-312-rather-than-repeated-here">The full contents are documented in <code>BACKEND_SPEC.md</code> §3–§12 rather than repeated here.</h2>
+<p>~3,600 lines, <strong>370 tests across 17 suites</strong>, all passing. One of those suites, <code>specVectors.test.ts</code>, asserts the exact numbers printed in <code>BACKEND_SPEC.md</code> §15 — so the spec fails CI if the logic moves underneath it.</p>
+<p>The full contents are documented in <code>BACKEND_SPEC.md</code> §3–§12 rather than repeated here.</p>
+<hr>
 <h2 id="5-mobile-architecture">5. Mobile architecture</h2>
+<h3 id="50-the-home-screen-is-a-newsroom-feed">5.0 The home screen is a newsroom feed</h3>
+<p>Worth stating first, because it is the screen the whole app is judged on and it changed shape after v2.0.</p>
+<p>It is a <strong>news list</strong>, not a social card feed: a thumbnail on the left, headline right, and a meta line of category · time · comment count. Above it sits a fixed black masthead carrying the GNA lockup and a strip of <strong>desks</strong> — Ghana, Africa, World, Business, Politics, Sport. A reader navigates by desk, the way they would pick up a section of a paper.</p>
+<p>Three consequences for the backend:</p>
+<ol>
+<li><strong><code>section</code> is required on every published incident</strong> (<code>BACKEND_SPEC.md</code> §3.8). A report with no desk does not appear in the feed at all — silently, with no error and no empty state. It is the failure mode most likely to be read as data loss.</li>
+<li><strong>A desk is not a category.</strong> <code>category</code> is filed by the reporter and drives routing, commission and the editorial queue; <code>section</code> is chosen by an editor at release and drives nothing but placement. Never derive one from the other.</li>
+<li><code>GET /incidents</code> needs a repeatable <code>section</code> filter. The client currently filters locally over fixtures — a stand-in, not a design.</li>
+</ol>
+<p>There is also a <strong>slides mode</strong> — a full-screen, auto-advancing reader for people who would rather be shown the news than scroll it. It reads the same feed payload; no separate endpoint.</p>
+<h3 id="501-one-fixed-appearance">5.0.1 One fixed appearance</h3>
+<p>The app has <strong>one theme</strong>: a black masthead over a white page, with no way to change it. A dark/light switch was built and removed. It gave one question — what colour is this app — three sources of truth that disagreed: a value stored on the device, the reader&#39;s OS setting, and the app&#39;s own default. The app would come up dark for someone who had never asked for dark, and each fix moved the failure to a different one of the three.</p>
+<p>Nothing here concerns the backend except as a warning about the shape of that bug: it produced no error, and the visible symptom pointed at the palette, which was the one part that was correct.</p>
 <h3 id="51-the-api-layer">5.1 The API layer</h3>
 <p>Every screen is built against a single swappable interface, <code>ApiClient</code>, with two implementations chosen by one environment variable:</p>
 <pre><code>EXPO_PUBLIC_API_MODE=mock   →  MockApiClient   seeded fixtures, artificial latency,
@@ -640,6 +661,15 @@ EXPO_PUBLIC_API_MODE=http   →  HttpApiClient   real calls to EXPO_PUBLIC_API_U
 <p>A playback URL points at footage that may be licensed, restricted or pending review, and once it is pasted into a group chat none of those controls apply. The report page carries the context and can be taken down; a raw file cannot. The link is built from <code>reportId</code> — the reference stamped on the footage — so someone sent a clip and someone sent a link can tell they are looking at the same report.</p>
 <hr>
 <h2 id="6-console-architecture">6. Console architecture</h2>
+<h3 id="60-where-a-report-reaches-the-public">6.0 Where a report reaches the public</h3>
+<p>The console is where a report becomes visible, so this is the part of it the backend most needs to understand.</p>
+<p><strong><code>/published</code></strong> is the business-side release surface. A business licenses a report privately, then decides separately whether the public sees it — releasing is a decision, not a consequence of paying. Releasing does two things at once:</p>
+<ul>
+<li>Credits the report to the organisation. This is the <code>publisher.kind: &#39;organisation&#39;</code> variant (<code>BACKEND_SPEC.md</code> §3.6). The reporter is still the author and still earns the commission; the organisation is only the publisher.</li>
+<li><strong>Sets the desk.</strong> The picker is part of the release rather than a setting elsewhere, because a report released without a desk does not appear on the phone at all.</li>
+</ul>
+<p><strong><code>/editorial</code></strong> is the workbench where verification is decided. Note carefully that today <code>vettingState</code> is <em>derived</em> from <code>VerificationState</code> rather than stored: <code>vettingStateFor()</code> returns <code>published</code> the moment a report reaches <code>verified_high_confidence</code> or <code>verified_in_part</code>. So &quot;is this true?&quot; and &quot;should the public see this?&quot; are currently the same act, and partly-verified material publishes automatically.</p>
+<p><strong>Treat that as a known design issue, not as the intended contract.</strong> If the server is to enforce &quot;nothing appears without approval&quot; — which is the product rule — publication needs to be a stored decision with its own permission, separate from the verification judgement. See §12.</p>
 <h3 id="61-route-groups">6.1 Route groups</h3>
 <p>Two — three, counting editorial — each with its own layout and sidebar. Route groups are a filesystem convention and <strong>do not appear in the URL</strong>: <code>(business)/inbox</code> serves <code>/inbox</code>.</p>
 <pre><code>app/
@@ -735,17 +765,23 @@ EXPO_PUBLIC_API_MODE=http   →  HttpApiClient   real calls to EXPO_PUBLIC_API_U
 </thead>
 <tbody><tr>
 <td>Mobile</td>
-<td align="right">14</td>
-<td align="right">214</td>
+<td align="right">23</td>
+<td align="right">261</td>
 </tr>
 <tr>
 <td><code>@dawuro/core</code></td>
-<td align="right">15</td>
-<td align="right">339</td>
+<td align="right">17</td>
+<td align="right">370</td>
+</tr>
+<tr>
+<td>Console app</td>
+<td align="right">2</td>
+<td align="right">8</td>
 </tr>
 </tbody></table></div>
 <p>Priority targets are the pure logic — the sync state machine, the GPS gate, backoff, commission, routing, assignment, the editorial gate, permissions and the palette. Business rules are tested directly against fixtures rather than through a rendered screen, which is why they can be trusted to match the server.</p>
-<h2 id="ci-gate-both-repos-typecheck-lint-at-zero-warnings-tests">CI gate, both repos: <strong>typecheck, lint at zero warnings, tests.</strong></h2>
+<p>CI gate, both repos: <strong>typecheck, lint at zero warnings, tests.</strong></p>
+<hr>
 <h2 id="10-running-it">10. Running it</h2>
 <h3 id="101-mobile">10.1 Mobile</h3>
 <p><strong>Expo Go works.</strong> This changed since v1, and it changes the demo story — the app can be put on any phone by scanning a QR code, with no build and no cable.</p>
@@ -817,16 +853,22 @@ FRONTEND.md       ──┘
 <h3 id="built-and-running-against-fixtures">Built and running against fixtures</h3>
 <p><strong>Mobile</strong> — capture with the GPS gate and four modes, the offline outbox and sync engine, resumable chunked upload, the feed with comments and reactions, map and clustering, incident detail with in-app directions, earnings and the commission ledger, surveys, auth and onboarding, and light business and platform tiers.</p>
 <p><strong>Console</strong> — business inbox, routing desk, editorial workbench and decided log, institutional onboarding with per-step review, platform approvals, payouts, organisations, published archive, team management, invites and affiliations, the public verification page, and both role shells.</p>
-<p><strong>Core</strong> — every rule in <code>BACKEND_SPEC.md</code> §3–§12, with 339 tests.</p>
+<p><strong>Core</strong> — every rule in <code>BACKEND_SPEC.md</code> §3–§12, with 370 tests.</p>
 <h3 id="not-built">Not built</h3>
 <p><strong>The backend.</strong> Nothing. That is <code>BACKEND_SPEC.md</code>.</p>
 <p><strong>Specifically, the trust model has a hole until it exists.</strong> <code>assurance</code> and <code>verification</code> render correctly and the state machine is enforced client-side, but the <em>facts</em> underneath — server-side integrity signing, server-time comparison, device attestation, malware and duplicate screening, original preservation — are all server work (<code>BACKEND_SPEC.md</code> §5.4). Until then, an assurance class is a display value with nothing behind it. <strong>This is the single most important thing to build, because it is what the product claims to be.</strong></p>
 <p><strong>Live streaming</strong> is on the capture switch and explains itself (§5.4).</p>
 <p><strong>Google sign-in</strong> renders a button that is deliberately inert pending an OAuth client.</p>
 <p><strong>Payouts</strong> have a ledger and batches but no mobile-money integration.</p>
+<h3 id="known-design-issues-the-server-must-not-inherit">Known design issues the server must not inherit</h3>
+<p>These are not missing screens — they are places where the clients encode something the backend should decide differently. Each is verifiable in the code today.</p>
+<p><strong>Publication is a side effect of verification.</strong> <code>vettingStateFor()</code> derives <code>published</code> from <code>VerificationState</code>, so an editor cannot verify a report and hold it back, and <code>verified_in_part</code> — partly verified — goes live automatically. For a national news agency that is the wrong default.</p>
+<p><strong>No capability governs the public feed.</strong> The capability list has <code>view_editorial_queue</code>, <code>decide_verification</code> and <code>assign_editors</code>, and nothing about publishing. &quot;Who may put a citizen&#39;s video in front of the country&quot; is not expressible.</p>
+<p><strong>The platform owner cannot approve anything.</strong> <code>decide_verification</code> is held only by <code>editorial_lead</code> and <code>verification_editor</code>. <code>super_admin</code> does not have it, while its own description claims it holds every permission.</p>
+<p><strong>The reporter&#39;s destination choice is collected and then dropped.</strong> <code>DestinationPicker</code> is a real control on the review screen: the reporter chooses <code>public</code>, <code>marketplace</code>, <code>directed</code> or <code>both</code>, and picks named businesses for a directed submission. <code>submitCapture()</code> is then called without either value. So the single choice that decides whether a report earns a commission and who is allowed to see it never leaves the screen it was made on — and the server, when it exists, will receive nothing to route on.</p>
+<p><strong>Human approval is the throughput ceiling.</strong> If every report needs a person, the editorial queue is the product&#39;s capacity. Priority scoring exists — expedited class, then severity, then age, with age last so a stale observation cannot outrank a fresh emergency — but there is no time target or breach state for editorial the way <code>slaState</code> gives institutions one.</p>
 <h3 id="known-rough-edges">Known rough edges</h3>
 <ul>
-<li>The mobile app is still named <strong>GhanaMediaWatch</strong> in <code>app.json</code> — name, slug and scheme — with the stock Expo icon and no splash. The console has the dawuro gong favicon; the phone does not.</li>
 <li>Mobile and console <strong>duplicate the business and platform tiers</strong> (§3.3).</li>
 <li>The seeded fixtures are a scatter of unrelated reports rather than one coherent story that can be walked end to end.</li>
 </ul>

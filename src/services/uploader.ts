@@ -2,9 +2,15 @@ import { api } from '@/api';
 import { ApiError } from '@/types/api';
 import { incidentsRepository } from '@/db/incidentsRepository';
 import type { OutboxRecord } from '@/features/outbox/outboxMachine';
+import { buildCreateRequest } from './createRequest';
 import { remainingChunks, uploadedBytes } from './chunkPlan';
 import { deleteMedia, fileExists, readChunk } from './media';
 import { applyEvent, configureUploader } from './sync';
+import { toast } from '@/stores/toastStore';
+import { queryClient } from '@/lib/queryClient';
+import { queryKeys } from '@/hooks/useIncidents';
+import { adoptLocalPoster } from '@/lib/videoPoster';
+import i18n from '@/i18n';
 
 /**
  * Uploads one queued report, in the three phases the contract defines.
@@ -25,7 +31,30 @@ async function uploadRecord(record: OutboxRecord): Promise<void> {
   if (!mediaUri || !fileExists(mediaUri)) {
     applyEvent(record, {
       type: 'UPLOAD_FAIL',
-      message: 'The captured file is no longer on this device.',
+      message: i18n.t('outbox.mediaGone'),
+      code: 'VALIDATION_FAILED',
+      retryable: false,
+    });
+    return;
+  }
+
+  /*
+   * A row with no bytes in it.
+   *
+   * The file is present but empty, so the chunk planner produces no chunks,
+   * nothing is sent, and completion fails with the server's own words —
+   * "Upload is missing chunks" — which describes the symptom and names neither
+   * the cause nor anything the reporter could do. It then retried on that
+   * message indefinitely.
+   *
+   * New captures cannot reach this state: `submitCapture` refuses an empty file
+   * outright. This is for the rows already queued before that check existed,
+   * and it ends them rather than leaving them cycling.
+   */
+  if (record.byteSize === 0) {
+    applyEvent(record, {
+      type: 'UPLOAD_FAIL',
+      message: i18n.t('outbox.mediaEmpty'),
       code: 'VALIDATION_FAILED',
       retryable: false,
     });
@@ -37,7 +66,9 @@ async function uploadRecord(record: OutboxRecord): Promise<void> {
   try {
     // ── Phase 1: initialise, or recover an existing session ────────────────
     if (!current.uploadId) {
-      const init = await api.createIncident(buildCreateRequest(current), current.clientId);
+      const meta = incidentsRepository.findCaptureMetadata(current.id);
+      if (!meta) throw new Error(`No capture metadata for ${current.id}`);
+      const init = await api.createIncident(buildCreateRequest(current, meta), current.clientId);
       current = applyEvent(current, {
         type: 'UPLOAD_INIT',
         uploadId: init.uploadId,
@@ -91,6 +122,54 @@ async function uploadRecord(record: OutboxRecord): Promise<void> {
     const completed = await api.completeUpload(current.uploadId!);
     current = applyEvent(current, { type: 'UPLOAD_COMPLETE', serverId: completed.incidentId });
 
+    /*
+     * The moment the reporter has been waiting for, and it used to pass in
+     * silence.
+     *
+     * Uploads finish in the background — minutes later, on a bus, after the
+     * screen has moved on — so unless something says so the reporter's last
+     * information is "Sending". They filmed something at some risk and were
+     * never told it arrived.
+     *
+     * A toast, not a push notification: this fires while the app is open, and
+     * a system notification for something happening on the screen in front of
+     * you is noise. The queued row updates either way.
+     */
+    toast.success(i18n.t('outbox.sentTitle'), i18n.t('outbox.sentBody'));
+
+    /*
+     * The reporter's own list is now out of date.
+     *
+     * Without this the report they just filed does not appear under Profile →
+     * Reports until the app is restarted: the queue row is dropped the moment
+     * it uploads, and the cached page was fetched before the report existed. So
+     * it left one screen and never arrived on the other, and there was nowhere
+     * in the app that could answer "where did it go?".
+     *
+     * Marked stale rather than refetched here — the list refetches when
+     * somebody actually looks at it, which on a phone that finished an upload
+     * in the background may be much later, or never.
+     */
+    void queryClient.invalidateQueries({ queryKey: queryKeys.myIncidents() });
+
+    /*
+     * The reporter's chosen thumbnail, taken before the recording is deleted.
+     *
+     * This is the only moment the two things exist together: the report has a
+     * server id at last, and its footage is still on the phone for another few
+     * lines. Cutting the frame here costs nothing — no signed URL, no buffering
+     * a remote file — where doing it later would mean downloading footage the
+     * device just finished uploading.
+     *
+     * Awaited rather than left running, because the next line removes the file
+     * it reads. It cannot fail the upload: the function swallows its own
+     * errors, and a missing thumbnail is not a failed report.
+     */
+    const chosen = incidentsRepository.findPosterChoice(current.id);
+    if (chosen?.mediaKind === 'video') {
+      await adoptLocalPoster(completed.incidentId, mediaUri, chosen.posterAtMs);
+    }
+
     // Only now is it safe to reclaim the space. The metadata row stays as the
     // reporter's history.
     deleteMedia(mediaUri);
@@ -125,44 +204,6 @@ async function uploadRecord(record: OutboxRecord): Promise<void> {
 function mediaUriFor(id: string): string | null {
   const record = incidentsRepository.findMediaUri(id);
   return record;
-}
-
-function buildCreateRequest(record: OutboxRecord) {
-  const meta = incidentsRepository.findCaptureMetadata(record.id);
-  if (!meta) throw new Error(`No capture metadata for ${record.id}`);
-  return {
-    clientId: record.clientId,
-    category: record.category,
-    description: record.description,
-    isAnonymous: meta.isAnonymous,
-    displayFlags: {
-      showLocation: meta.showLocation,
-      showDate: meta.showDate,
-      showTime: meta.showTime,
-    },
-    location: {
-      latitude: meta.latitude,
-      longitude: meta.longitude,
-      accuracyM: meta.accuracyM,
-      altitude: meta.altitude,
-      heading: meta.heading,
-      speed: meta.speed,
-      confidence: meta.locationConfidence,
-      isMocked: meta.isMocked,
-    },
-    capturedAtIso: meta.capturedAtIso,
-    capturedAtUtcOffsetMinutes: meta.capturedAtUtcOffsetMinutes,
-    deviceUptimeMs: meta.deviceUptimeMs,
-    media: {
-      kind: meta.mediaKind,
-      mimeType: meta.mimeType,
-      byteSize: record.byteSize,
-      ...(meta.durationMs !== null ? { durationMs: meta.durationMs } : {}),
-      ...(meta.width !== null ? { width: meta.width } : {}),
-      ...(meta.height !== null ? { height: meta.height } : {}),
-      sha256: meta.sha256 ?? '',
-    },
-  };
 }
 
 /** Called once at boot to give the sync engine something to run. */

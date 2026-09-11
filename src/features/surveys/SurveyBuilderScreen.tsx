@@ -1,5 +1,5 @@
-import { useMemo, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
@@ -27,7 +27,7 @@ const TARGET_STEPS = [50, 100, 250, 500, 1_000, 2_500] as const;
 let questionCounter = 0;
 
 /**
- * Survey builder for businesses.
+ * Survey builder for organisations.
  *
  * The cost is visible and updates as the survey is edited, because publishing
  * commits the organisation to reward × target up front. A builder that reveals
@@ -53,7 +53,15 @@ export function SurveyBuilderScreen() {
 
   const rewardPesewas = REWARD_STEPS[rewardIndex]!;
   const responsesTarget = TARGET_STEPS[targetIndex]!;
-  const closesAtIso = useMemo(() => new Date(Date.now() + 14 * 86_400_000).toISOString(), []);
+  /*
+   * Two weeks from when the builder opened.
+   *
+   * Lazy `useState`, not `useMemo`: a memo's factory still runs during render,
+   * so reading the clock there is an impure render — and a memo may legally be
+   * recomputed, which would silently move the closing date. This is a value
+   * that must be decided once.
+   */
+  const [closesAtIso] = useState(() => new Date(Date.now() + 14 * 86_400_000).toISOString());
 
   const cost = estimateSurveyCost(rewardPesewas, responsesTarget);
   const issues = validateSurvey({ title, questions, rewardPesewas, responsesTarget, closesAtIso });
@@ -92,13 +100,28 @@ export function SurveyBuilderScreen() {
     }
   };
 
+  /*
+   * The keyboard covers the bottom of the screen, which is where a form's last
+   * field and its submit button live. Every screen here that takes typed input
+   * needs this; only the sign-in screens had it, so the rest hid the control
+   * you were reaching for the moment you tapped to type.
+   *
+   * `padding` on iOS, matching the sign-in screens. Left unset on Android,
+   * where the window resizing under `adjustResize` already does it — the
+   * exception is a `Modal`, which that does not reach, and which `Sheet`
+   * handles itself.
+   */
   return (
-    <View className="flex-1 bg-canvas">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-canvas"
+    >
       <ScrollView
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 130 }}
         contentContainerClassName="gap-5 px-4"
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="flex-row items-center gap-3">
           <Pressable
@@ -110,7 +133,7 @@ export function SurveyBuilderScreen() {
           </Pressable>
           <View className="flex-1">
             <Text variant="caption" tone="accent" className="font-sans-semibold uppercase">
-              {t('business.brand')}
+              {t('organisation.brand')}
             </Text>
             <Text variant="title-lg">{t('surveys.newSurvey')}</Text>
           </View>
@@ -362,7 +385,7 @@ export function SurveyBuilderScreen() {
           ))}
         </View>
       </Sheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

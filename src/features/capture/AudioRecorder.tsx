@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -68,13 +68,6 @@ export function AudioRecorder({
   const seconds = Math.floor((state.durationMillis ?? 0) / 1000);
   const remaining = MAX_SECONDS - seconds;
 
-  // Stopped at the cap rather than truncated on upload, so a reporter is never
-  // told afterwards that the end of their account was thrown away.
-  useEffect(() => {
-    if (state.isRecording && remaining <= 0) void stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state.isRecording, remaining]);
-
   const start = async () => {
     hapticSelect();
     try {
@@ -85,7 +78,7 @@ export function AudioRecorder({
     }
   };
 
-  const stop = async () => {
+  const stop = useCallback(async () => {
     try {
       await recorder.stop();
       hapticUnlock();
@@ -93,7 +86,31 @@ export function AudioRecorder({
     } catch {
       toast.error(t('audio.failedTitle'), t('audio.failedBody'));
     }
-  };
+  }, [recorder, t]);
+
+  /*
+   * Stopped at the cap rather than truncated on upload, so a reporter is never
+   * told afterwards that the end of their account was thrown away.
+   *
+   * Declared after `stop` rather than before it. Reading a `const` from an
+   * effect that is defined above it works only because the effect runs later —
+   * the React Compiler rejects it, and it is genuinely fragile: anything that
+   * ever calls this during render hits a temporal dead zone.
+   */
+  useEffect(() => {
+    /*
+     * `set-state-in-effect` is a false positive here.
+     *
+     * `stop` awaits `recorder.stop()` before it touches state, so nothing is
+     * set synchronously — but the rule traces the call and cannot see the
+     * await. The alternative is to let a recording run past its cap and
+     * truncate it on upload, which is the behaviour this exists to prevent:
+     * a reporter should never be told afterwards that the end of their account
+     * was thrown away.
+     */
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (state.isRecording && remaining <= 0) void stop();
+  }, [state.isRecording, remaining, stop]);
 
   if (granted === false) {
     return (

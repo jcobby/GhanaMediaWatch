@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { GnaLogo } from '@/components/Brand';
@@ -25,7 +25,15 @@ import { useColors } from '@/lib/theme';
 export function BootScreen() {
   const { t } = useTranslation();
   const c = useColors();
-  const fade = useRef(new Animated.Value(0)).current;
+  /*
+   * Created once, without reading a ref during render.
+   *
+   * `useRef(new Animated.Value(0)).current` reads `.current` while rendering,
+   * which the React Compiler rejects — and it also constructs a fresh
+   * `Animated.Value` on every render only to discard it. Lazy `useState` gives
+   * the same "make it once" guarantee and is safe to read.
+   */
+  const [fade] = useState(() => new Animated.Value(0));
 
   useEffect(() => {
     // A short fade rather than an appearing image. Boot is usually fast enough

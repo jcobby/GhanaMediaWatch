@@ -4,11 +4,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Button, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
-import { SURVEYS } from '@/api/dawuroData';
+import { Button, EmptyState, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
+import { useSurveys } from '@/hooks/useSurveys';
+import { api } from '@/api';
+import { describeApiError } from '@/lib/apiErrorCopy';
 import { useColors } from '@/lib/theme';
 import { formatCedis, type SurveyQuestion } from '@/types/dawuro';
-import { hapticSelect, hapticUnlock } from '@/lib/haptics';
+import { hapticError, hapticSelect, hapticUnlock } from '@/lib/haptics';
 import { toast } from '@/stores/toastStore';
 import { completionProgress, isAnswered, isSubmittable, type AnswerValue } from './surveyLogic';
 
@@ -34,15 +36,21 @@ export function SurveyTakeScreen({ surveyId }: SurveyTakeScreenProps) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const survey = SURVEYS.find((s) => s.id === surveyId) ?? SURVEYS[0]!;
+  /*
+   * This survey, or none — never a different one.
+   *
+   * The fallback here was `?? SURVEYS[0]`, so a survey that could not be found
+   * silently opened somebody else's: you would answer four minutes of questions
+   * about a completely different thing, and submit them against it.
+   */
+  const { data: surveys, isPending: surveysPending, isError: surveysFailed } = useSurveys();
+  const survey = (surveys ?? []).find((s) => s.id === surveyId) ?? null;
   const [answers, setAnswers] = useState<Record<string, AnswerValue>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const progress = useMemo(
-    () => completionProgress(survey.questions, answers),
-    [survey.questions, answers],
-  );
-  const canSubmit = isSubmittable(survey.questions, answers);
+  const questions = useMemo(() => survey?.questions ?? [], [survey]);
+  const progress = useMemo(() => completionProgress(questions, answers), [questions, answers]);
+  const canSubmit = survey !== null && isSubmittable(questions, answers);
 
   const setAnswer = (id: string, value: AnswerValue) => {
     hapticSelect();
@@ -52,19 +60,64 @@ export function SurveyTakeScreen({ surveyId }: SurveyTakeScreenProps) {
   const submit = async () => {
     setSubmitting(true);
     try {
-      // Simulated. A real submission posts the response set and credits the
-      // reward to the reporter's pending balance.
-      await new Promise((resolve) => setTimeout(resolve, 900));
+      /*
+       * Sent, not simulated.
+       *
+       * This waited 900ms and then announced a reward. Nothing was recorded and
+       * nothing was credited, so somebody spent four minutes answering
+       * questions and was told they had earned money that does not exist.
+       */
+      if (!survey) return;
+      await api.submitSurveyResponse(survey.id, answers);
       hapticUnlock();
       toast.success(
         t('surveys.submittedTitle', { amount: formatCedis(survey.rewardPesewas) }),
         t('surveys.submittedBody'),
       );
       router.back();
+    } catch (cause) {
+      hapticError();
+      const copy = describeApiError(cause, t, {
+        title: t('surveys.submitFailedTitle'),
+        body: t('surveys.submitFailedBody'),
+      });
+      toast.error(copy.title, copy.body);
     } finally {
       setSubmitting(false);
     }
   };
+
+  /*
+   * Three answers, kept apart.
+   *
+   * Opening a survey that cannot be found used to fall back to the first one in
+   * the list — so somebody answered a different survey without ever being told.
+   * Now it says which of the three situations it is, and none of them renders
+   * as questions.
+   */
+  if (!survey) {
+    return (
+      <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
+        <EmptyState
+          icon={surveysFailed ? 'cloud-offline-outline' : 'clipboard-outline'}
+          title={
+            surveysPending
+              ? t('surveys.loadingTitle')
+              : surveysFailed
+                ? t('surveys.unavailableTitle')
+                : t('surveys.missingTitle')
+          }
+          description={
+            surveysPending
+              ? t('surveys.loadingBody')
+              : surveysFailed
+                ? t('surveys.unavailableBody')
+                : t('surveys.missingBody')
+          }
+        />
+      </View>
+    );
+  }
 
   return (
     <View className="flex-1 bg-canvas">
@@ -108,6 +161,7 @@ export function SurveyTakeScreen({ surveyId }: SurveyTakeScreenProps) {
         contentContainerStyle={{ paddingBottom: insets.bottom + 110 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         {survey.questions.map((question, index) => (
           <QuestionCard

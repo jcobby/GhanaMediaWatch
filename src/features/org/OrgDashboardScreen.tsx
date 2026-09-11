@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Glass, Pressable, Text } from '@/components/ui';
 import { ORG_STATS, ORG_TREND, SAVED_QUERIES } from '@/api/mockData';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, useColors } from '@/lib/theme';
+import { categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { useAuthStore } from '@/stores/authStore';
 import { Sparkline } from '@/components/Sparkline';
@@ -109,7 +109,7 @@ export function OrgDashboardScreen() {
                       width: 7,
                       height: 7,
                       borderRadius: 4,
-                      backgroundColor: categoryColor[stat.category],
+                      backgroundColor: categoryHue(stat.category),
                     }}
                   />
                   <Text variant="body-sm" className="flex-1">
@@ -132,7 +132,7 @@ export function OrgDashboardScreen() {
                     className="h-full rounded-pill"
                     style={{
                       width: `${share * 100}%`,
-                      backgroundColor: categoryColor[stat.category],
+                      backgroundColor: categoryHue(stat.category),
                     }}
                   />
                 </View>
@@ -214,7 +214,7 @@ export function OrgDashboardScreen() {
             >
               <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
                 <View
-                  style={{ backgroundColor: categoryColor[incident.category] }}
+                  style={{ backgroundColor: categoryHue(incident.category) }}
                   className="h-9 w-1 rounded-pill"
                 />
                 <View className="flex-1 gap-0.5">

@@ -1,5 +1,6 @@
-import type { Incident, IncidentCategory, Publisher, TimePrecision } from '@/types/api';
-import { BUSINESSES } from '@/api/dawuroData';
+import type { Incident, IncidentCategory, Publisher, Reporter, TimePrecision } from '@/types/api';
+import type { NewsSection } from '@/types/sections';
+import { ORGANISATIONS } from '@/api/dawuroData';
 import { placeholderImage } from '@/lib/placeholder';
 import { formatReportId } from '@/types/context';
 
@@ -9,7 +10,7 @@ import { formatReportId } from '@/types/context';
  * Declared here rather than beside `publisherFor` below: the function is
  * hoisted, this list is not, and the fixture array runs between them.
  */
-const PUBLISHING_ORGS = BUSINESSES.filter(
+const PUBLISHING_ORGS = ORGANISATIONS.filter(
   (b) => b.sector === 'media' || b.sector === 'government',
 );
 
@@ -51,6 +52,8 @@ const VIDEO_CLIPS = [
 interface Seed {
   id: string;
   category: IncidentCategory;
+  /** The desk it ran on. Omitted means Ghana, which every incident report is. */
+  section?: NewsSection;
   description: string;
   label: string | null;
   latitude: number | null;
@@ -73,8 +76,23 @@ const SEEDS: Seed[] = [
     id: 'inc_01JBX7Q2K9',
     imagery: 'flood,street',
     category: 'flood',
+    /*
+     * Deliberately long.
+     *
+     * Every other seed fits the three lines a caption gets, so the "More"
+     * control on the detail screen never appeared and the expanded state was
+     * unreachable — a branch of the interface that existed but could not be
+     * looked at. One report at the head of the feed now overflows, the way a
+     * real eyewitness account written on a phone does.
+     */
     description:
-      'Culvert completely blocked at the Kaneshie junction. Water is over the kerb and taxis are turning back.',
+      'Culvert completely blocked at the Kaneshie junction. Water is over the kerb and taxis are turning back. ' +
+      'It started rising around four this morning and by six the whole stretch from the traffic light down to the ' +
+      'market entrance was under it. Traders have moved what they can onto the raised platforms but the ones at ' +
+      'the bottom end have lost their stock. Two taxis stalled trying to push through and are still sitting there. ' +
+      'People are walking through water above the knee to get to the other side because there is no other way ' +
+      'round without going all the way back to the overpass. The drain was cleared some months ago but it has ' +
+      'filled again with sand and plastic, and nobody has been down to it since. This is the third time this year.',
     label: 'Kaneshie, Accra',
     latitude: 5.5731,
     longitude: -0.2325,
@@ -162,11 +180,135 @@ const SEEDS: Seed[] = [
     // Date shown, exact time hidden — the other half of the flag matrix.
     showTime: false,
   },
+  {
+    id: 'inc_02AF1K7T',
+    section: 'africa',
+    imagery: 'summit',
+    category: 'other',
+    description:
+      'ECOWAS summit in Abuja closes without agreement on the regional force, with three members abstaining.',
+    label: 'Abuja, Nigeria',
+    latitude: 9.0765,
+    longitude: 7.3986,
+    minutesAgo: 95,
+    anonymous: false,
+    reactions: 640,
+    comments: 58,
+  },
+  {
+    id: 'inc_02AF2M4R',
+    section: 'africa',
+    imagery: 'port',
+    category: 'infrastructure',
+    description:
+      'Lome port expansion reaches its second phase, adding berths that Ghanaian exporters are already booking.',
+    label: 'Lome, Togo',
+    latitude: 6.1256,
+    longitude: 1.2254,
+    minutesAgo: 320,
+    anonymous: false,
+    reactions: 208,
+    comments: 14,
+  },
+  {
+    id: 'inc_02WD1P9Q',
+    section: 'world',
+    imagery: 'climate',
+    category: 'environment',
+    description:
+      'Climate finance talks run past their deadline, with the adaptation fund still short of its target.',
+    label: null,
+    latitude: null,
+    longitude: null,
+    minutesAgo: 180,
+    anonymous: false,
+    reactions: 1120,
+    comments: 203,
+    showLocation: false,
+  },
+  {
+    id: 'inc_02BZ1V6H',
+    section: 'business',
+    imagery: 'market',
+    category: 'other',
+    description:
+      'Cedi holds against the dollar for a third week as the central bank keeps the policy rate unchanged.',
+    label: 'Accra',
+    latitude: 5.6037,
+    longitude: -0.187,
+    minutesAgo: 240,
+    anonymous: false,
+    reactions: 517,
+    comments: 91,
+  },
+  {
+    id: 'inc_02BZ2N8K',
+    section: 'business',
+    imagery: 'cocoa',
+    category: 'other',
+    description:
+      'Cocoa farmgate price review brings a rise, but buyers in Western North say the cash has not reached them.',
+    label: 'Sefwi Wiawso',
+    latitude: 6.2088,
+    longitude: -2.4869,
+    minutesAgo: 400,
+    anonymous: false,
+    reactions: 388,
+    comments: 77,
+  },
+  {
+    id: 'inc_02PL1D3S',
+    section: 'politics',
+    imagery: 'parliament',
+    category: 'corruption',
+    description:
+      'Public Accounts Committee recalls two agencies over unretired imprest running back three financial years.',
+    label: 'Parliament House, Accra',
+    latitude: 5.5573,
+    longitude: -0.1963,
+    minutesAgo: 150,
+    anonymous: false,
+    reactions: 902,
+    comments: 164,
+  },
+  {
+    id: 'inc_02SP1G2W',
+    section: 'sport',
+    imagery: 'stadium',
+    category: 'other',
+    description:
+      'Black Stars name a provisional squad for the qualifier, with two uncapped players from the local league.',
+    label: 'Accra Sports Stadium',
+    latitude: 5.5502,
+    longitude: -0.1922,
+    minutesAgo: 70,
+    anonymous: false,
+    reactions: 2870,
+    comments: 431,
+  },
 ];
 
 const NAMES = ['Ama K.', 'Kwesi B.', 'Nana A.', 'Yaw D.', 'Efua M.'];
 
+/** The agency, as publisher of its own copy. */
+const GNA_DESK = {
+  kind: 'organisation',
+  id: 'org_gna',
+  displayName: 'Ghana News Agency',
+  verified: true,
+  logoUrl: null,
+} as const;
+
 export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
+  /*
+   * Anything not on the Ghana desk is the agency's own copy.
+   *
+   * Derived from the desk rather than flagged per seed because that is what is
+   * actually true of this fixture set: citizens file incidents in Ghana, and
+   * the Africa, World, Organisation, Politics and Sport desks carry wire stories
+   * nobody in this app filmed. A real backend would set it at ingestion.
+   */
+  const newsroom = (s.section ?? 'ghana') !== 'ghana';
   const capturedAt = new Date(Date.now() - s.minutesAgo * 60_000);
   // Every third cell is video, so the feed exercises both players.
   const isVideo = i % 3 === 0;
@@ -195,6 +337,7 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
     id: s.id,
     reportId: formatReportId(s.id),
     category: s.category,
+    section: s.section ?? 'ghana',
     description: s.description,
     vettingState: 'published',
     publishedAt: capturedAt.toISOString(),
@@ -209,14 +352,29 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
       ...(isVideo ? { durationMs: 10_000 } : {}),
     },
     location: {
-      latitude: showLocation ? s.latitude : null,
-      longitude: showLocation ? s.longitude : null,
+      latitude: showLocation && !newsroom ? s.latitude : null,
+      longitude: showLocation && !newsroom ? s.longitude : null,
+      // The dateline stays — "Abuja, Nigeria" is where the story is *about* —
+      // but the coordinates go. A pin on a map is a claim that someone was
+      // standing there, and for agency copy that is not true.
       label: showLocation ? s.label : null,
       confidence: i === 3 ? 'low' : 'high',
     },
-    capturedAtIso,
-    capturedAtPrecision,
-    publisher: publisherFor(i, s.anonymous),
+    origin: newsroom ? 'newsroom' : 'citizen_report',
+
+    /*
+     * Agency copy claims no capture and no citizen behind it.
+     *
+     * `capturedAtIso: null` is not missing data — it is the honest answer.
+     * There was no capture: nobody stood at the ECOWAS summit with this app
+     * open and waited for a GPS fix, and stamping "Captured 11:17 AM" on a wire
+     * story tells the reader something the platform cannot stand behind.
+     */
+    capturedAtIso: newsroom ? null : capturedAtIso,
+    capturedAtPrecision: newsroom ? 'hidden' : capturedAtPrecision,
+    publisher: newsroom ? GNA_DESK : publisherFor(i, s.anonymous),
+    // No citizen filed it, so there is nobody to credit and nobody to pay.
+    reporter: newsroom ? { kind: 'anonymous' } : reporterFor(i, s.anonymous),
     counts: { reactions: s.reactions, comments: s.comments },
     viewerHasReacted: i === 1,
     ...(showLocation && s.distanceM !== undefined ? { distanceM: s.distanceM } : {}),
@@ -229,11 +387,23 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
  * Roughly a third are released by an institution, because that is the shape of
  * the real feed: most reports come from the public, and the ones an
  * organisation has licensed and stood behind are the minority — but they are
- * the ones that make a business page worth opening.
+ * the ones that make an organisation page worth opening.
  *
  * The rest split between named reporters and anonymous, which the reporter
  * chooses at submission.
  */
+/**
+ * Who filed it — independent of who published it.
+ *
+ * Deliberately not derived from `publisherFor`: an organisation-published
+ * report still has a reporter behind it, and that is exactly the case where
+ * the publisher union has thrown the name away.
+ */
+function reporterFor(i: number, anonymous: boolean): Reporter {
+  if (anonymous) return { kind: 'anonymous' };
+  return { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null };
+}
+
 function publisherFor(i: number, anonymous: boolean): Publisher {
   /*
    * Cycled on the count of organisation-published reports, not on the report
@@ -258,4 +428,3 @@ function publisherFor(i: number, anonymous: boolean): Publisher {
   if (anonymous) return { kind: 'anonymous' };
   return { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null };
 }
-

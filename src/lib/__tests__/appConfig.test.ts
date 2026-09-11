@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { darkColors } from '@/lib/theme';
+import { lightColors } from '@/lib/theme';
 
 /**
  * Launch configuration that typecheck cannot see.
@@ -16,14 +16,34 @@ import { darkColors } from '@/lib/theme';
 const ROOT = path.resolve(__dirname, '../../..');
 const app = JSON.parse(fs.readFileSync(path.join(ROOT, 'app.json'), 'utf8')).expo;
 
-test('the interface style does not force light', () => {
-  // `light` makes the OS report a light scheme, which NativeWind honours over
-  // anything the app sets — dark mode simply does nothing.
-  expect(app.userInterfaceStyle).not.toBe('light');
+test('the interface style is pinned light', () => {
+  /*
+   * This assertion used to read `not.toBe('light')`, back when the app had a
+   * dark mode for the OS scheme to interfere with. It does not any more, and
+   * the same mechanism now works for us: pinning the style means a phone in
+   * night mode reports a light scheme to the app, so the OS cannot drag the
+   * shell somewhere the reader never asked for.
+   *
+   * `automatic` here is what let the app come up dark on a dark phone.
+   */
+  expect(app.userInterfaceStyle).toBe('light');
 });
 
-test('the splash is painted the dark ground, not white', () => {
-  expect(app.splash.backgroundColor.toLowerCase()).toBe(darkColors.canvas.toLowerCase());
+test('every native ground is the ground the app launches into', () => {
+  /*
+   * Not "the splash is light" — that pins the test to a decision rather than
+   * to a property. What must hold is that every colour the OS paints before
+   * and around the JS matches the first frame the app paints, or the handover
+   * flashes.
+   *
+   * `expo.backgroundColor` is the easy one to miss. It sits behind the root
+   * view rather than in the splash, so it shows during rotation, in the
+   * over-scroll gutter, and for the moment between splash teardown and first
+   * render — the white flash that keeps being reported as "it went light".
+   */
+  const ground = lightColors.canvas.toLowerCase();
+  expect(app.backgroundColor.toLowerCase()).toBe(ground);
+  expect(app.splash.backgroundColor.toLowerCase()).toBe(ground);
 });
 
 test('the splash plugin agrees with the legacy splash key', () => {
@@ -37,9 +57,9 @@ test('the splash plugin agrees with the legacy splash key', () => {
   expect(plugin[1].image).toBe(app.splash.image);
 });
 
-test('the splash artwork is the reversed lockup', () => {
-  // Generated from gna-digital-platform-reversed.png. The standard lockup is
-  // black type and would vanish against the dark ground.
+test('the splash artwork exists and is a lockup, not a mark', () => {
+  // The standard, black-type lockup: it lands on a light ground. The full
+  // lockup, not the mark — the wordmark is the identity.
   const file = path.join(ROOT, app.splash.image.replace('./', ''));
   expect(fs.existsSync(file)).toBe(true);
   expect(fs.statSync(file).size).toBeGreaterThan(20_000);

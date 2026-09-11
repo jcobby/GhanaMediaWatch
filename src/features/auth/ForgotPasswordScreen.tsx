@@ -46,6 +46,7 @@ export function ForgotPasswordScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}
         contentContainerClassName="gap-6 px-6"
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="flex-row items-center gap-3">
           <Pressable

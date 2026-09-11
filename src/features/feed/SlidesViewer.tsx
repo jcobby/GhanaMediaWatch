@@ -1,14 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Animated, Dimensions, Easing, Modal, Pressable as RNPressable, View } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { Thumbnail } from '@/components/Thumbnail';
+import { GnaHorizontal } from '@/components/Brand';
 import { CaptureStamp } from '@/components/CaptureStamp';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
-import { categoryColor, useColors } from '@/lib/theme';
+import { categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import type { Incident } from '@/types/api';
 
@@ -47,7 +49,15 @@ export function SlidesViewer({
 
   const [index, setIndex] = useState(startAt);
   const [paused, setPaused] = useState(false);
-  const progress = useRef(new Animated.Value(0)).current;
+  /*
+   * Created once, without reading a ref during render.
+   *
+   * `useRef(new Animated.Value(0)).current` reads `.current` while rendering,
+   * which the React Compiler rejects — and it also constructs a fresh
+   * `Animated.Value` on every render only to discard it. Lazy `useState` gives
+   * the same "make it once" guarantee and is safe to read.
+   */
+  const [progress] = useState(() => new Animated.Value(0));
 
   const incident = incidents[index];
 
@@ -92,7 +102,7 @@ export function SlidesViewer({
 
   if (!incident) return null;
 
-  const hue = categoryColor[incident.category];
+  const hue = categoryHue(incident.category);
 
   return (
     <Modal
@@ -103,143 +113,178 @@ export function SlidesViewer({
       onRequestClose={onClose}
     >
       <View className="flex-1 bg-black">
-        <Thumbnail
-          uri={incident.media.posterUrl}
-          category={incident.category}
-          style={{ position: 'absolute', width: '100%', height: '100%' }}
-        />
+        <StatusBar style="light" />
 
-        {/* Legible text over any photograph needs its own ground. */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.75)', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.88)']}
-          locations={[0, 0.42, 1]}
-          style={{ position: 'absolute', inset: 0 }}
-          pointerEvents="none"
-        />
+        {/* ── Header ────────────────────────────────────────────────────── */}
+        {/*
+          A real bar with its own ground, not chrome floating on the picture.
 
-        {/* ── Tap zones ─────────────────────────────────────────────────── */}
-        {/* Behind the chrome, so the close button still wins a tap. */}
-        <View className="absolute inset-0 flex-row">
-          <RNPressable
-            onPress={previous}
-            onLongPress={() => setPaused(true)}
-            onPressOut={() => setPaused(false)}
-            delayLongPress={180}
-            accessibilityLabel={t('slides.previous')}
-            style={{ width: width * 0.32, height: '100%' }}
-          />
-          <RNPressable
-            onPress={next}
-            onLongPress={() => setPaused(true)}
-            onPressOut={() => setPaused(false)}
-            delayLongPress={180}
-            accessibilityLabel={t('slides.next')}
-            style={{ flex: 1, height: '100%' }}
-          />
-        </View>
+          Overlaid, the back arrow sat on whatever happened to be behind it and
+          the slide read as edge-to-edge with controls scattered on top. Given
+          its own black band the viewer gains a top edge: the reader can see
+          where the app ends and the story begins, and the arrow is somewhere
+          rather than nowhere.
 
-        {/* ── Progress ──────────────────────────────────────────────────── */}
-        <View
-          className="absolute left-0 right-0 flex-row gap-1 px-3"
-          style={{ top: insets.top + 8 }}
-          pointerEvents="none"
-        >
-          {incidents.map((item, i) => (
-            <View
-              key={item.id}
-              style={{ height: 3 }}
-              className="flex-1 overflow-hidden rounded-pill bg-white/25"
-            >
-              <Animated.View
-                style={{
-                  height: '100%',
-                  backgroundColor: '#FFFFFF',
-                  width:
-                    i < index
-                      ? '100%'
-                      : i === index
-                        ? progress.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: ['0%', '100%'],
-                          })
-                        : '0%',
-                }}
-              />
-            </View>
-          ))}
-        </View>
-
-        {/* ── Close ─────────────────────────────────────────────────────── */}
-        <RNPressable
-          onPress={onClose}
-          accessibilityLabel={t('common.close')}
-          hitSlop={12}
-          className="absolute h-10 w-10 items-center justify-center rounded-pill bg-black/40"
-          style={{ top: insets.top + 22, right: 12 }}
-        >
-          <Ionicons name="close" size={22} color="#FFFFFF" />
-        </RNPressable>
-
-        {paused ? (
-          <View
-            className="absolute self-center rounded-pill bg-black/55 px-3 py-1"
-            style={{ top: insets.top + 26 }}
-            pointerEvents="none"
-          >
-            <Text variant="caption" onMedia>
-              {t('slides.paused')}
-            </Text>
+          It is the same masthead colour as the feed, so leaving the feed for
+          slides does not feel like leaving the app.
+        */}
+        <View className="bg-masthead" style={{ paddingTop: insets.top }}>
+          <View className="flex-row gap-1 px-3 pt-2" pointerEvents="none">
+            {incidents.map((item, i) => (
+              <View
+                key={item.id}
+                style={{ height: 3 }}
+                className="flex-1 overflow-hidden rounded-pill bg-white/25"
+              >
+                <Animated.View
+                  style={{
+                    height: '100%',
+                    backgroundColor: '#FFFFFF',
+                    width:
+                      i < index
+                        ? '100%'
+                        : i === index
+                          ? progress.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: ['0%', '100%'],
+                            })
+                          : '0%',
+                  }}
+                />
+              </View>
+            ))}
           </View>
-        ) : null}
 
-        {/* ── The report ────────────────────────────────────────────────── */}
-        <View
-          className="absolute left-0 right-0 gap-3 px-5"
-          style={{ bottom: insets.bottom + 24 }}
-          pointerEvents="box-none"
-        >
-          <View className="flex-row items-center gap-2">
-            <View className="rounded-pill px-2.5 py-1" style={{ backgroundColor: `${hue}E6` }}>
-              <Text variant="caption" onMedia className="font-sans-semibold uppercase">
-                {t(`category.${incident.category}`)}
+          <View className="flex-row items-center gap-3 px-2 py-1.5">
+            <RNPressable
+              onPress={onClose}
+              accessibilityLabel={t('common.back')}
+              hitSlop={12}
+              className="h-10 w-10 items-center justify-center rounded-pill"
+            >
+              <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
+            </RNPressable>
+
+            <GnaHorizontal height={22} reversed />
+
+            <View className="flex-1" />
+
+            <RNPressable
+              onPress={onClose}
+              accessibilityLabel={t('feed.exitSlides')}
+              hitSlop={12}
+              className="h-10 w-10 items-center justify-center rounded-pill"
+            >
+              <Ionicons name="close" size={22} color="rgba(255,255,255,0.75)" />
+            </RNPressable>
+          </View>
+        </View>
+
+        {/* ── Stage ─────────────────────────────────────────────────────── */}
+        {/* Everything below the header. `flex-1` rather than absolute fill, so
+            the media begins where the bar ends instead of underneath it. */}
+        <View className="flex-1">
+          <Thumbnail
+            uri={incident.media.posterUrl}
+            cacheKey={incident.id}
+            category={incident.category}
+            // Full-bleed, so the category mark scales with it rather than
+            // sitting lost in the middle of a whole screen.
+            glyphSize={96}
+            style={{ position: 'absolute', width: '100%', height: '100%' }}
+          />
+
+          {/* Legible text over any photograph needs its own ground. */}
+          <LinearGradient
+            colors={['rgba(0,0,0,0.45)', 'rgba(0,0,0,0.05)', 'rgba(0,0,0,0.88)']}
+            locations={[0, 0.38, 1]}
+            style={{ position: 'absolute', inset: 0 }}
+            pointerEvents="none"
+          />
+
+          {/* ── Tap zones ───────────────────────────────────────────────── */}
+          {/* Confined to the stage, so a tap on the header's buttons is never
+              also a tap that advances the slide. */}
+          <View className="absolute inset-0 flex-row">
+            <RNPressable
+              onPress={previous}
+              onLongPress={() => setPaused(true)}
+              onPressOut={() => setPaused(false)}
+              delayLongPress={180}
+              accessibilityLabel={t('slides.previous')}
+              style={{ width: width * 0.32, height: '100%' }}
+            />
+            <RNPressable
+              onPress={next}
+              onLongPress={() => setPaused(true)}
+              onPressOut={() => setPaused(false)}
+              delayLongPress={180}
+              accessibilityLabel={t('slides.next')}
+              style={{ flex: 1, height: '100%' }}
+            />
+          </View>
+
+          {paused ? (
+            <View
+              className="absolute self-center rounded-pill bg-black/55 px-3 py-1"
+              style={{ top: 12 }}
+              pointerEvents="none"
+            >
+              <Text variant="caption" onMedia>
+                {t('slides.paused')}
               </Text>
             </View>
-            <Text variant="caption" onMedia tone="muted">
-              {formatRelativeTime(incident.publishedAt)}
-            </Text>
-          </View>
+          ) : null}
 
-          <Text variant="title-md" onMedia numberOfLines={4} className="font-sans-semibold">
-            {incident.description}
-          </Text>
-
-          {/* Provenance travels with the report here as everywhere else. */}
-          <CaptureStamp incident={incident} compact />
-
-          <RNPressable
-            onPress={() => onOpen(incident)}
-            accessibilityLabel={t('slides.openReport')}
-            className="mt-1 flex-row items-center justify-center gap-2 rounded-lg bg-white/95 py-3"
-          >
-            <Text variant="body-sm" className="font-sans-semibold">
-              {t('slides.openReport')}
-            </Text>
-            <Ionicons name="arrow-forward" size={15} color={c.textPrimary} />
-          </RNPressable>
-        </View>
-
-        {/* Reduced motion removes the clock, so advancing becomes explicit. */}
-        {reducedMotion ? (
+          {/* ── The report ────────────────────────────────────────────────── */}
           <View
-            className="absolute self-center rounded-pill bg-black/55 px-3 py-1"
-            style={{ bottom: insets.bottom + 4 }}
-            pointerEvents="none"
+            className="absolute left-0 right-0 gap-3 px-5"
+            style={{ bottom: insets.bottom + 24 }}
+            pointerEvents="box-none"
           >
-            <Text variant="caption" onMedia tone="muted">
-              {t('slides.tapToAdvance')}
+            <View className="flex-row items-center gap-2">
+              <View className="rounded-pill px-2.5 py-1" style={{ backgroundColor: `${hue}E6` }}>
+                <Text variant="caption" onMedia className="font-sans-semibold uppercase">
+                  {t(`category.${incident.category}`)}
+                </Text>
+              </View>
+              <Text variant="caption" onMedia tone="muted">
+                {formatRelativeTime(incident.publishedAt)}
+              </Text>
+            </View>
+
+            <Text variant="title-md" onMedia numberOfLines={4} className="font-sans-semibold">
+              {incident.description}
             </Text>
+
+            {/* Provenance travels with the report here as everywhere else. */}
+            <CaptureStamp incident={incident} compact />
+
+            <RNPressable
+              onPress={() => onOpen(incident)}
+              accessibilityLabel={t('slides.openReport')}
+              className="mt-1 flex-row items-center justify-center gap-2 rounded-lg bg-white/95 py-3"
+            >
+              <Text variant="body-sm" className="font-sans-semibold">
+                {t('slides.openReport')}
+              </Text>
+              <Ionicons name="arrow-forward" size={15} color={c.textPrimary} />
+            </RNPressable>
           </View>
-        ) : null}
+
+          {/* Reduced motion removes the clock, so advancing becomes explicit. */}
+          {reducedMotion ? (
+            <View
+              className="absolute self-center rounded-pill bg-black/55 px-3 py-1"
+              style={{ bottom: insets.bottom + 4 }}
+              pointerEvents="none"
+            >
+              <Text variant="caption" onMedia tone="muted">
+                {t('slides.tapToAdvance')}
+              </Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </Modal>
   );

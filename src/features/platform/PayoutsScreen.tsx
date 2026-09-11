@@ -1,16 +1,15 @@
-import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, Glass, Pressable, Text } from '@/components/ui';
+import { Badge, Glass, Pressable, Text } from '@/components/ui';
 import { PAYOUT_BATCHES, type PayoutBatch } from '@/api/dawuroData';
 import { useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
+import { DeskOnly } from './DeskOnly';
 import { formatCedis } from '@/types/dawuro';
-import { toast } from '@/stores/toastStore';
 
 const TONE: Record<PayoutBatch['status'], 'neutral' | 'accent' | 'success'> = {
   draft: 'neutral',
@@ -24,9 +23,14 @@ const TONE: Record<PayoutBatch['status'], 'neutral' | 'accent' | 'success'> = {
  * Reporters are paid in runs rather than per report — a mobile-money transfer
  * for every twenty-cedi commission would cost more in fees than it moves.
  *
- * Releasing a batch is the most consequential action an operator takes, so it
- * is a deliberate two-step. An accidental release cannot be undone; the money
- * has left.
+ * Releasing a batch is the most consequential action an operator takes, and it
+ * does not happen here. An accidental release cannot be undone — the money has
+ * left — and it has to reconcile against a ledger nobody can read on a phone.
+ *
+ * This screen used to release, which made the platform tier a second authority
+ * alongside the web console with nothing saying which had actually paid. The
+ * batches and their state are still shown, because knowing a run is waiting is
+ * useful anywhere; the release is at a desk. See `DeskOnly`.
  */
 export function PayoutsScreen() {
   const c = useColors();
@@ -34,20 +38,8 @@ export function PayoutsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const [batches, setBatches] = useState(PAYOUT_BATCHES);
-  const [confirming, setConfirming] = useState<string | null>(null);
-
-  const release = (id: string) => {
-    setBatches((prev) =>
-      prev.map((b) =>
-        b.id === id
-          ? { ...b, status: 'settled' as const, settledAtIso: new Date().toISOString() }
-          : b,
-      ),
-    );
-    setConfirming(null);
-    toast.success(t('platform.batchReleasedTitle'), t('platform.batchReleasedBody'));
-  };
+  // Read-only on the phone: no batch changes state here.
+  const batches = PAYOUT_BATCHES;
 
   return (
     <View className="flex-1 bg-canvas">
@@ -95,37 +87,7 @@ export function PayoutsScreen() {
               </Text>
             </View>
 
-            {batch.status === 'draft' ? (
-              confirming === batch.id ? (
-                <View className="gap-2">
-                  <Text variant="caption" tone="warning">
-                    {t('platform.releaseWarning', {
-                      amount: formatCedis(batch.totalPesewas),
-                      count: batch.reporterCount,
-                    })}
-                  </Text>
-                  <View className="flex-row gap-2">
-                    <Button
-                      label={t('common.cancel')}
-                      variant="glass"
-                      className="flex-1"
-                      onPress={() => setConfirming(null)}
-                    />
-                    <Button
-                      label={t('platform.confirmRelease')}
-                      className="flex-[2]"
-                      onPress={() => release(batch.id)}
-                    />
-                  </View>
-                </View>
-              ) : (
-                <Button
-                  label={t('platform.releaseBatch')}
-                  fullWidth
-                  onPress={() => setConfirming(batch.id)}
-                />
-              )
-            ) : null}
+            {batch.status === 'draft' ? <DeskOnly reason={t('deskOnly.payout')} /> : null}
           </Glass>
         ))}
 

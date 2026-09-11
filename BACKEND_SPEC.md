@@ -1,6 +1,6 @@
 # Dawuro Platform — Backend Specification
 
-**Version 2.0 · 27 August 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)**
+**Version 2.1 · 2 September 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)**
 
 ---
 
@@ -13,6 +13,19 @@ It is written to be handed to an AI coding assistant in full. It is deliberately
 **Normative language.** **MUST** is a requirement — breaking it is a defect. **SHOULD** is a strong recommendation with room for a documented alternative. **MAY** is genuinely optional.
 
 **Read §4 and §14 before writing any code.** §4 is the trust model, which is the product; §14 is the list of things that must never happen. Everything else is mechanics.
+
+### What changed in 2.1
+
+Four additions since 2.0, all driven by mobile work done between 27 August and 2 September. Nothing in 2.0 was removed or contradicted; if you have already started, these are additive.
+
+| Change | Where | Impact |
+| --- | --- | --- |
+| **`section` on every incident** — a news desk, separate from `category` | §3.8, §3.6 | New required non-null field. New feed filter. |
+| **`publisher.kind: 'organisation'`** — a third publisher variant | §3.6 | New union member. Gated on §4.5. |
+| **Public organisation directory** — unauthenticated, reader-facing | §8.8 | Four new endpoints and a new projection type. |
+| **Invariants 21–25** | §14 | Two are data-leak rules. Read them. |
+
+The one to be careful with is **§8.8**. It exposes institutions to the public for the first time, and the private account record it derives from carries subscription and usage data that must not travel with it.
 
 **Language.** All shapes are given as TypeScript because both clients are TypeScript and these exact declarations are compiled against today. Implement the server in whatever you like; the JSON on the wire must match these shapes exactly.
 
@@ -186,6 +199,7 @@ WGS84 decimal degrees. Latitude `-90..90`, longitude `-180..180`, six decimal pl
 - Reconciliation is by subtraction, not by a second rounding: `reporterPesewas = grossPesewas − platformFeePesewas`.
 
 Use a 64-bit integer column. `NUMERIC`/`DECIMAL` is acceptable; `FLOAT`/`REAL`/`DOUBLE` is a defect.
+
 ---
 
 ## 3. Domain model
@@ -348,14 +362,23 @@ export type VettingState = 'pending_review' | 'published' | 'rejected' | 'restri
 
 export type Publisher =
   | { kind: 'anonymous' }
-  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null };
+  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null }
+  | {
+      kind: 'organisation';                // NEW — see the note below
+      id: string;
+      displayName: string;
+      verified: boolean;                   // set by a platform administrator
+      logoUrl: string | null;
+    };
 
 export interface IncidentCounts { reactions: number; comments: number }
 
 export interface Incident {
   id: string;
   reportId: string;                       // see §3.7
+  origin: ItemOrigin;                     // NEW — see §3.9
   category: IncidentCategory;
+  section: NewsSection;                   // NEW — see §3.8
   description: string;
   vettingState: VettingState;
   publishedAt: string;
@@ -385,6 +408,12 @@ export interface AuthoredIncident extends Omit<Incident, 'location'> {
 ```
 
 `assurance` and `verification` are separate fields and MUST remain separate. See §4.
+
+**On `publisher.kind === 'organisation'`.** The reporter is still the author; the organisation is the publisher. Those are different roles and the model keeps them apart — a report credited to Joy News was still filed by a person, and that person is still owed commission for it (§10.2) and still owns the consent flags on it (§3.3).
+
+An organisation may be named here **only** when it has licensed the report and then chosen to release it publicly, so both gates in §4.5 must have passed. Crediting an organisation that merely received a report would tell a reader an institution stands behind a claim it has not looked at.
+
+`verified` on this variant is the institution's onboarding status (§9), not the report's verification state (§4.2). They are unrelated fields with unfortunately similar names: a fully onboarded organisation can publish an unverified report. Do not render one from the other.
 
 ### 3.7 Report ID
 
@@ -419,6 +448,78 @@ export function formatReportId(seed: string): string {
 Format: `DW-XXX-XXX`. Lookups MUST be case-insensitive.
 
 **This is a hash, so collisions are possible.** For production, either persist a generated `reportId` with a uniqueness constraint and re-seed on collision, or switch to a sequence. Do not assume the hash alone is unique across millions of rows.
+
+### 3.8 News sections — **new**
+
+The mobile home screen is a newsroom feed, not a taxonomy browser, so reports are grouped by **desk**.
+
+```ts
+export type NewsSection =
+  | 'ghana' | 'africa' | 'world' | 'business' | 'politics' | 'sport';
+
+/** Order as a newsroom runs them: nearest first. The client renders this order. */
+export const NEWS_SECTIONS: NewsSection[] = [
+  'ghana', 'africa', 'world', 'business', 'politics', 'sport',
+];
+```
+
+**A section is not a category, and the two must not be merged.** They answer different questions and are set by different people at different times:
+
+| | `category` (§3.1) | `section` |
+| --- | --- | --- |
+| Answers | what was filed | where it ran |
+| Set by | the reporter, at capture | an editor, at publication |
+| Drives | routing (§6), commission (§10.2), the editorial queue | feed navigation only |
+| Closed set of | 23 | 6 |
+
+A burst main in Kaneshie is a `flood` on the `ghana` desk. Collapsing them means either the newsroom inherits a taxonomy it does not use, or routing loses the precision it depends on — an institution subscribing to `flood` must not start receiving everything filed under a "Ghana" heading.
+
+**Server obligations:**
+
+- `section` is **required and non-null** on every published incident. The client's type is not optional and a missing value renders an empty desk.
+- Reports awaiting review have no section yet. Assign one at the publish transition (§4.3); until then the field may be absent from author-only responses, never from public ones.
+- Default to `ghana` if an editor publishes without choosing. It is the desk that is right most of the time, and an unset desk is worse than an imprecise one — the report simply disappears from the feed.
+- `GET /incidents` MUST accept a `section` filter (§13). The client currently filters locally against fixtures; that is a stand-in for this parameter, not a design.
+
+Sections are display-only. No money, routing, SLA or permission decision may key off one.
+
+### 3.9 Item origin — **new**
+
+A feed of six desks cannot be filled by citizens alone. Only Ghana can be; Africa, World, Business, Politics and Sport are the agency's own copy. So a feed item is one of two things:
+
+```ts
+export type ItemOrigin = 'citizen_report' | 'newsroom';
+```
+
+**`citizen_report`** is the product. Someone filmed it, the GPS gate passed, §4 applies in full, and the reporter earns if an institution licenses it.
+
+**`newsroom`** is agency copy — wire and desk-written stories. It is **outside** the trust model, not exempted from it: there is no capture to classify, no location to verify and nobody to pay.
+
+This distinction is load-bearing. The clients previously had no way to express it, so the wire stories were dressed as incident reports — a summit in Abuja carried GPS coordinates, a named citizen reporter, and a capture timestamp. Both of the product's promises broke quietly: a reader could no longer take "captured here, then" at face value, and the commission model held a report with a reporter nobody could pay.
+
+**Server obligations for a `newsroom` item:**
+
+| Field | Required value | Why |
+| --- | --- | --- |
+| `capturedAtIso` | `null` | There was no capture. A timestamp is a claim about an act that did not happen. |
+| `capturedAtPrecision` | `'hidden'` | Follows from the above. |
+| `location.latitude` / `.longitude` | `null` | A coordinate asserts somebody was standing there. The dateline in `location.label` is fine — that is what the story is *about*. |
+| `reporter` | `{ kind: 'anonymous' }` | Nobody filmed it. |
+| `publisher` | `kind: 'organisation'` — the agency | It is the agency's copy, published in its own name. |
+| `assurance`, `verification` | Never set from a capture pipeline | There is no capture to classify. Treat §4 as not applying. |
+| Commission | **Never** | §10.2 pays a reporter. There is no reporter. |
+
+Newsroom items do not enter the capture protocol (§5) at all. They arrive through the agency's own editorial tooling:
+
+| Method | Path | Capability |
+| --- | --- | --- |
+| POST | `/newsroom/items` | `publish_newsroom` — **new** |
+| PATCH | `/newsroom/items/{id}` | `publish_newsroom` |
+| DELETE | `/newsroom/items/{id}` | `publish_newsroom` |
+
+`publish_newsroom` is a new capability and deliberately narrow: it publishes agency copy and confers nothing over citizen reports. An account that can write a wire story must not thereby be able to verify, license or take down somebody's footage.
+
+**Open:** wire ingestion itself — a syndication feed, an agency CMS, or hand entry — is not specified here. The contract above is what the clients need whichever it turns out to be.
 
 ---
 
@@ -1088,6 +1189,43 @@ export function inviteProblem(invite: Invite, nowIso: string): InviteProblem | n
 An organisation may be affiliated to another organisation. Affiliation is directional and MUST NOT be allowed to form a cycle — `canAffiliate` rejects an affiliation that would make an organisation its own ancestor.
 
 An individual reporter declares an institution they are affiliated with, or declares themselves **independent**. Both are first-class; independence is not a missing value.
+
+### 8.8 The public directory — **new**
+
+The mobile app has a reader-facing directory: search for an institution, open it, read the reports it has published, and answer the surveys it is running. This is the reader's route into an organisation, and it is **unauthenticated** — anyone with the app can browse it.
+
+Everything in §8.1 is the organisation's *private* account record. Almost none of it may appear here:
+
+| Field | Public? | Why |
+| --- | --- | --- |
+| `id`, `name`, `sector`, `logoUrl` | ✅ | It is a directory |
+| `verified` | ✅ | The reader is deciding whether to trust a source |
+| `tier`, `subscriptionStatus`, `renewsAtIso` | ❌ | What an institution pays is nobody's business |
+| `seatsUsed`, `reportsUsedThisPeriod` | ❌ | Reveals internal size and activity |
+| `interests` | ❌ | Reveals what it is watching for, and to whom |
+
+So the directory has its own projection. Do not reach for `BusinessAccount` and delete fields at the serialiser — one added field later and the leak is silent:
+
+```ts
+export interface PublicOrganisation {
+  id: string;
+  name: string;
+  sector: BusinessSector;
+  verified: boolean;
+  logoUrl: string | null;
+  /** Published reports credited to this organisation. Not its licensed total. */
+  publishedCount: number;
+  /** Live surveys a reader could answer right now. */
+  openSurveyCount: number;
+}
+```
+
+**`publishedCount` is not the licensing count.** An organisation may license a hundred reports and publish two. Exposing the former tells a competitor its download volume, and tells a reader a number that has nothing to do with what they can read.
+
+**Only `status: 'live'` surveys appear**, and a `draft` survey must never be reachable by guessing its id — a draft is an institution's unreleased work. Closed surveys may be listed as closed but MUST NOT accept responses.
+
+An organisation still in onboarding (§9) MUST NOT appear in the directory at all. It has not been screened, and a directory listing is an implicit endorsement by the platform.
+
 ---
 
 ## 9. Institutional onboarding
@@ -1511,6 +1649,19 @@ Endpoints marked **new** do not exist in v1 of this contract and cover everythin
 | POST | `/incidents/{id}/reactions` | user — **new** |
 | DELETE | `/incidents/{id}/reactions` | user — **new** |
 
+`GET /incidents` gains a repeatable **`section`** filter — **new**, §3.8. `?section=ghana&section=africa` means OR, matching how `category` already behaves. It composes with `category` as AND: `?category=flood&section=ghana` is floods on the Ghana desk.
+
+### Public organisation directory — **all new**, §8.8
+
+Unauthenticated. Reader-facing. Returns `PublicOrganisation`, never `BusinessAccount`.
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| GET | `/organisations` | none — `?q=` searches name, `?sector=` filters |
+| GET | `/organisations/{id}` | none |
+| GET | `/organisations/{id}/incidents` | none — published and credited to it, paginated |
+| GET | `/organisations/{id}/surveys` | none — live surveys only |
+
 ### Editorial — **all new**
 
 | Method | Path | Capability |
@@ -1596,6 +1747,14 @@ Every one of these is a rule the clients already follow and the server MUST enfo
 18. **Never let the SLA clock restart.** Once acknowledged, the answer is fixed.
 19. **Never delete from the response log.** Append-only.
 20. **Never accept an organisation context from anything but a verified membership** on the authenticated user.
+21. **Never credit an organisation as `publisher` unless it has both licensed and published the report.** Receiving a report is not endorsing it. §3.6, §4.5.
+22. **Never return a `BusinessAccount` from a public directory endpoint.** Build `PublicOrganisation` explicitly; tier, subscription status, seat count, usage and interests are commercially sensitive. §8.8.
+23. **Never list an organisation still in onboarding in the public directory.** A listing reads as a platform endorsement, and it has not been screened. §9.
+24. **Never let a `section` affect routing, commission, SLA or permissions.** It is a display axis, and a report's `category` is what every decision keys off. §3.8.
+25. **Never pay a commission on a `newsroom` item.** There is no reporter to pay, and an item that earns one has been misclassified. §3.9, §10.2.
+26. **Never set `assurance` or `verification` on a `newsroom` item.** There is no capture to classify, and a class carried over from a citizen report would lend agency copy a guarantee the platform cannot make. §3.9, §4.
+27. **Never return a capture timestamp or coordinates on a `newsroom` item.** Both are claims about an act of filming that did not happen. §3.9.
+28. **Never publish an incident without a `section`.** The field is non-null on the client; an absent value renders an empty desk rather than an error. §3.8.
 
 ---
 

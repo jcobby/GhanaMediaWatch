@@ -67,6 +67,16 @@ function toRowPatch(record: OutboxRecord): Partial<NewIncidentRow> {
   };
 }
 
+/** JSON list of institution ids, defensively parsed. */
+function parseIds(raw: string): string[] {
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
 export interface CaptureMetadata {
   isAnonymous: boolean;
   showLocation: boolean;
@@ -75,6 +85,9 @@ export interface CaptureMetadata {
   severity: string;
   landmark: string | null;
   consentJson: string;
+  destination: string;
+  /** Parsed on the way out — callers want the list, not the JSON. */
+  directedBusinessIds: string[];
   latitude: number | null;
   longitude: number | null;
   accuracyM: number;
@@ -164,6 +177,23 @@ export const incidentsRepository = {
     return row?.mediaUri ?? null;
   },
 
+  /**
+   * The frame the reporter chose as this report's thumbnail, if they chose one.
+   *
+   * Its own lookup rather than a field on `CaptureMetadata`, which is defined as
+   * what the create-incident call needs — and this is read at the *end* of an
+   * upload, after the file has been assembled, by which point that object is
+   * long out of scope. A resumed upload never builds one at all.
+   */
+  findPosterChoice(id: string): { mediaKind: string; posterAtMs: number | null } | null {
+    const row = db
+      .select({ mediaKind: incidents.mediaKind, posterAtMs: incidents.posterAtMs })
+      .from(incidents)
+      .where(eq(incidents.id, id))
+      .get();
+    return row ? { mediaKind: row.mediaKind, posterAtMs: row.posterAtMs ?? null } : null;
+  },
+
   /** Everything the create-incident call needs that the queue does not carry. */
   findCaptureMetadata(id: string): CaptureMetadata | null {
     const row = db.select().from(incidents).where(eq(incidents.id, id)).get();
@@ -176,6 +206,10 @@ export const incidentsRepository = {
       severity: row.severity,
       landmark: row.landmark,
       consentJson: row.consentJson,
+      destination: row.destination,
+      // Tolerant of a malformed value: a report that cannot be parsed should
+      // still upload as an undirected one rather than fail to upload at all.
+      directedBusinessIds: parseIds(row.directedBusinessIds),
       latitude: row.latitude === null ? null : Number(row.latitude),
       longitude: row.longitude === null ? null : Number(row.longitude),
       accuracyM: row.accuracyM ?? 0,

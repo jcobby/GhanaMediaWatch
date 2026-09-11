@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, EmptyState, Glass, Pressable, Text } from '@/components/ui';
-import { SURVEYS } from '@/api/dawuroData';
+import { useSurveys } from '@/hooks/useSurveys';
 import { accentGradient, useColors } from '@/lib/theme';
 import { formatDistance } from '@/lib/format';
 import { haversineMetres } from '@/lib/geo';
@@ -31,21 +31,33 @@ export function SurveyListScreen() {
   const insets = useSafeAreaInsets();
   const viewer = useViewerLocation();
 
+  /*
+   * Real surveys, from the server.
+   *
+   * These were seeded, so somebody could open one, answer five questions and
+   * submit — against a survey no organisation had commissioned, for a reward
+   * nobody was going to pay. It is the same promise the earnings screen makes,
+   * broken at the other end.
+   */
+  const { data: surveys, isPending: surveysPending, isError: surveysFailed } = useSurveys();
+
   const available = useMemo(
     () =>
-      SURVEYS.filter((s) => isAcceptingResponses(s)).map((survey) => {
-        const distanceM = survey.targetArea
-          ? haversineMetres(viewer.location, survey.targetArea)
-          : null;
-        return {
-          survey,
-          distanceM,
-          // Outside the target radius the reporter is not who the business is
-          // asking, so it is shown but not offered.
-          inRange: survey.targetArea === null || (distanceM ?? 0) <= survey.targetArea.radiusM,
-        };
-      }),
-    [viewer.location],
+      (surveys ?? [])
+        .filter((s) => isAcceptingResponses(s))
+        .map((survey) => {
+          const distanceM = survey.targetArea
+            ? haversineMetres(viewer.location, survey.targetArea)
+            : null;
+          return {
+            survey,
+            distanceM,
+            // Outside the target radius the reporter is not who the organisation is
+            // asking, so it is shown but not offered.
+            inRange: survey.targetArea === null || (distanceM ?? 0) <= survey.targetArea.radiusM,
+          };
+        }),
+    [surveys, viewer.location],
   );
 
   const totalAvailable = available
@@ -88,7 +100,26 @@ export function SurveyListScreen() {
         ) : null}
       </View>
 
-      {available.length === 0 ? (
+      {/*
+        Three kinds of nothing, told apart.
+
+        "Still loading", "we could not ask" and "nobody is paying for questions
+        right now" all render as an empty list, and only the last one means the
+        reporter should stop checking back.
+      */}
+      {surveysPending ? (
+        <EmptyState
+          icon="clipboard-outline"
+          title={t('surveys.loadingTitle')}
+          description={t('surveys.loadingBody')}
+        />
+      ) : surveysFailed ? (
+        <EmptyState
+          icon="cloud-offline-outline"
+          title={t('surveys.unavailableTitle')}
+          description={t('surveys.unavailableBody')}
+        />
+      ) : available.length === 0 ? (
         <EmptyState
           icon="clipboard-outline"
           title={t('surveys.emptyTitle')}

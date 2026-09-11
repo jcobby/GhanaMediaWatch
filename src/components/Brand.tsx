@@ -1,6 +1,5 @@
 import { Image } from 'expo-image';
 import type { StyleProp, ImageStyle } from 'react-native';
-import { useIsDark } from '@/lib/theme';
 
 /**
  * The GNA marks, in one place.
@@ -9,18 +8,27 @@ import { useIsDark } from '@/lib/theme';
  * black letters and brown drums, and the reversed one with silver letters and
  * gold drums for dark grounds.
  *
- * Which one is drawn follows the theme rather than being passed in. A caller
- * that has to remember to ask for the right variant is a caller that will
- * eventually forget, and black-on-black is not a subtle failure.
+ * The variant is passed in, because the app has one appearance and the ground
+ * under a mark is now a property of the surface rather than of a theme. Nearly
+ * everything sits on the white page and takes the default; the masthead and
+ * media overlays are dark, and say so.
  */
 
 /** The drums, bells and arc, without the wordmark. For small placements. */
-export function GnaMark({ size = 28, style }: { size?: number; style?: StyleProp<ImageStyle> }) {
-  const dark = useIsDark();
+export function GnaMark({
+  size = 28,
+  style,
+  reversed = false,
+}: {
+  size?: number;
+  style?: StyleProp<ImageStyle>;
+  /** Silver-and-gold artwork, for a dark ground. */
+  reversed?: boolean;
+}) {
   return (
     <Image
       source={
-        dark
+        reversed
           ? require('../../assets/brand/gna-mark-reversed.png')
           : require('../../assets/brand/gna-mark.png')
       }
@@ -44,15 +52,22 @@ export function GnaMark({ size = 28, style }: { size?: number; style?: StyleProp
 export function GnaHorizontal({
   height = 30,
   style,
+  reversed = false,
 }: {
   height?: number;
   style?: StyleProp<ImageStyle>;
+  /**
+   * Silver-and-gold artwork, for a dark ground.
+   *
+   * The masthead needs this: it is black while the page under it is white, so
+   * the standard black-type lockup would be invisible on it.
+   */
+  reversed?: boolean;
 }) {
-  const dark = useIsDark();
   return (
     <Image
       source={
-        dark
+        reversed
           ? require('../../assets/brand/gna-horizontal-reversed.png')
           : require('../../assets/brand/gna-horizontal.png')
       }
@@ -66,12 +81,20 @@ export function GnaHorizontal({
 }
 
 /** The full lockup — mark, GNA, and the two lines beneath. */
-export function GnaLogo({ width = 210, style }: { width?: number; style?: StyleProp<ImageStyle> }) {
-  const dark = useIsDark();
+export function GnaLogo({
+  width = 210,
+  style,
+  reversed = false,
+}: {
+  width?: number;
+  style?: StyleProp<ImageStyle>;
+  /** Silver-and-gold artwork, for a dark ground. */
+  reversed?: boolean;
+}) {
   return (
     <Image
       source={
-        dark
+        reversed
           ? require('../../assets/brand/gna-digital-platform-reversed.png')
           : require('../../assets/brand/gna-digital-platform.png')
       }

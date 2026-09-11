@@ -1,5 +1,5 @@
-import { BusinessApprovalScreen } from '@/features/platform/BusinessApprovalScreen';
+import { OrganisationApprovalScreen } from '@/features/platform/OrganisationApprovalScreen';
 
 export default function Route() {
-  return <BusinessApprovalScreen />;
+  return <OrganisationApprovalScreen />;
 }

@@ -20,7 +20,8 @@ const minutesAgo = (m: number): string => new Date(Date.now() - m * 60_000).toIS
 const img = (category: IncidentCategory, lock: number): string =>
   placeholderImage(`cmt-${lock}`, category, { width: 540, height: 960 });
 
-const CLIP = 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
+const CLIP =
+  'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4';
 
 /** Attached to the first seeded incident so the demo has somewhere obvious to look. */
 const first = SAMPLE_INCIDENTS[0]?.id ?? 'inc_001';

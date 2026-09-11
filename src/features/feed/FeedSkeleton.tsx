@@ -1,4 +1,4 @@
-import { View } from 'react-native';
+import { useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Skeleton } from '@/components/ui';
 
@@ -12,9 +12,15 @@ import { Skeleton } from '@/components/ui';
  *
  * Six rows rather than two: the list layout fits about seven on a phone, and a
  * skeleton that stops after two implies the feed is nearly empty.
+ *
+ * The lead is in it for the same reason as the rows. Without it the feed loaded
+ * as a list and then shoved everything down by the height of a 16:9 image the
+ * moment data arrived, which reads as the screen reloading rather than filling
+ * in — and it is the first thing anybody sees of the app.
  */
 export function FeedSkeleton() {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
 
   return (
     <View className="flex-1 bg-canvas-soft" style={{ paddingTop: insets.top }}>
@@ -34,7 +40,20 @@ export function FeedSkeleton() {
         <Skeleton className="h-3 w-20 rounded-xs" />
       </View>
 
-      {[0, 1, 2, 3, 4, 5].map((i) => (
+      {/* Lead */}
+      <View className="bg-canvas">
+        <View style={{ width, height: Math.round((width * 9) / 16) }}>
+          <Skeleton className="h-full w-full rounded-none" />
+        </View>
+        <View className="gap-2 px-4 pb-4 pt-3.5">
+          <Skeleton className="h-5 w-full rounded-xs" />
+          <Skeleton className="h-5 w-[70%] rounded-xs" />
+          <Skeleton className="mt-1 h-2.5 w-40 rounded-xs" />
+        </View>
+      </View>
+      <View className="h-2 bg-canvas-soft" />
+
+      {[0, 1, 2, 3, 4].map((i) => (
         <View key={i} className="flex-row gap-3 border-b border-hairline/[0.06] px-4 py-3.5">
           <View style={{ width: 112, height: 86 }}>
             <Skeleton className="h-full w-full rounded-sm" />

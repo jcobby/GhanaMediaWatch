@@ -38,6 +38,11 @@ export function initialiseDatabase(): void {
       show_location INTEGER NOT NULL DEFAULT 1,
       show_date INTEGER NOT NULL DEFAULT 1,
       show_time INTEGER NOT NULL DEFAULT 1,
+      severity TEXT NOT NULL DEFAULT 'concern',
+      landmark TEXT,
+      consent_json TEXT NOT NULL DEFAULT '{}',
+      destination TEXT NOT NULL DEFAULT 'marketplace',
+      directed_business_ids TEXT NOT NULL DEFAULT '[]',
       latitude TEXT,
       longitude TEXT,
       accuracy_m INTEGER,
@@ -54,6 +59,7 @@ export function initialiseDatabase(): void {
       mime_type TEXT NOT NULL,
       byte_size INTEGER NOT NULL DEFAULT 0,
       duration_ms INTEGER,
+      poster_at_ms INTEGER,
       width INTEGER,
       height INTEGER,
       sha256 TEXT,
@@ -74,6 +80,49 @@ export function initialiseDatabase(): void {
     CREATE INDEX IF NOT EXISTS idx_incidents_state_created ON incidents (state, created_at);
     CREATE INDEX IF NOT EXISTS idx_incidents_next_retry ON incidents (next_retry_at);
   `);
+
+  addMissingColumns();
+}
+
+/**
+ * Brings an existing table up to the current schema.
+ *
+ * `CREATE TABLE IF NOT EXISTS` does nothing to a table that already exists, so
+ * a column added after a build has shipped is missing on every device that
+ * already ran the old one — and the failure is at insert time, on the reporter's
+ * phone, after they have filmed something.
+ *
+ * Three columns had already drifted this way: `severity`, `landmark` and
+ * `consent_json` were declared in `schema.ts` and written by `submitCapture`
+ * while the DDL never created them. Nothing caught it because the schema and
+ * the DDL are two hand-maintained lists that no test compared.
+ *
+ * Driven off `PRAGMA table_info` rather than a version number, so it is
+ * idempotent and cannot double-apply.
+ */
+function addMissingColumns(): void {
+  const existing = new Set(
+    sqlite
+      .getAllSync<{ name: string }>('PRAGMA table_info(incidents)')
+      .map((column) => column.name),
+  );
+
+  // Every column added after the original DDL, with the definition it needs.
+  // A default is required: these rows already exist and cannot be null-filled
+  // into a NOT NULL column.
+  const later: [string, string][] = [
+    ['severity', "TEXT NOT NULL DEFAULT 'concern'"],
+    ['landmark', 'TEXT'],
+    ['consent_json', "TEXT NOT NULL DEFAULT '{}'"],
+    ['destination', "TEXT NOT NULL DEFAULT 'marketplace'"],
+    ['directed_business_ids', "TEXT NOT NULL DEFAULT '[]'"],
+    ['poster_at_ms', 'INTEGER'],
+  ];
+
+  for (const [name, definition] of later) {
+    if (existing.has(name)) continue;
+    sqlite.execSync(`ALTER TABLE incidents ADD COLUMN ${name} ${definition};`);
+  }
 }
 
 export { schema };

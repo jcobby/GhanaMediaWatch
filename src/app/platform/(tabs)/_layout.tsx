@@ -8,7 +8,7 @@ import { useTabScreenOptions } from '@/components/RoleTabBar';
  * Platform operator navigation.
  *
  * Four tabs matching the four things an operator actually does: watch the
- * service, override routing, admit businesses, and release money. Each is a
+ * service, override routing, admit organisations, and release money. Each is a
  * queue, so each gets a tab rather than being buried behind a dashboard tile.
  */
 export default function PlatformTabsLayout() {

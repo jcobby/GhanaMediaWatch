@@ -9,10 +9,25 @@ import { Text, type TextTone } from './Text';
 export type ButtonVariant = 'primary' | 'glass' | 'ghost' | 'danger';
 export type ButtonSize = 'sm' | 'md' | 'lg';
 
+/**
+ * Height and shape, on the element that clips.
+ *
+ * Horizontal padding is deliberately *not* here. The primary variant clips a
+ * gradient to this box, and padding on a clipping container insets its child —
+ * so the gradient stopped short of the edges and the page showed through as a
+ * white gutter, leaving a purple rectangle floating inside a white pill.
+ */
 const SIZE: Record<ButtonSize, string> = {
-  sm: 'h-10 px-4 rounded-pill',
-  md: 'h-12 px-5 rounded-pill',
-  lg: 'h-14 px-7 rounded-pill',
+  sm: 'h-10 rounded-pill',
+  md: 'h-12 rounded-pill',
+  lg: 'h-14 rounded-pill',
+};
+
+/** Applied to the fill, so it reaches the edge and the label still breathes. */
+const PADDING: Record<ButtonSize, string> = {
+  sm: 'px-4',
+  md: 'px-5',
+  lg: 'px-7',
 };
 
 const LABEL_TONE: Record<ButtonVariant, TextTone> = {
@@ -48,7 +63,7 @@ export function Button({
   const isDisabled = disabled || loading;
 
   const content = (
-    <View className="flex-row items-center justify-center gap-2">
+    <View className={cn('flex-row items-center justify-center gap-2', PADDING[size])}>
       {loading ? <ActivityIndicator size="small" color={c.textPrimary} /> : leading}
       <Text
         variant={size === 'lg' ? 'title-sm' : 'body'}
@@ -82,6 +97,8 @@ export function Button({
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}
+          // Fills the pill edge to edge; the label's own padding keeps it clear
+          // of the curve.
         >
           {content}
         </LinearGradient>

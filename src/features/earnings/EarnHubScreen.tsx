@@ -6,11 +6,13 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
-import { BUSINESSES, COMMISSION_LEDGER, EARNINGS_SUMMARY, SURVEYS } from '@/api/dawuroData';
-import { accentGradient, categoryColor, useColors } from '@/lib/theme';
+import { receiving, useOrganisations } from '@/hooks/useOrganisations';
+import { useSurveys } from '@/hooks/useSurveys';
+import { useCommissions, useEarnings } from '@/hooks/useEarnings';
+import { accentGradient, categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis } from '@/types/dawuro';
-import { useBusinessStore } from '@/stores/businessStore';
+import { useBusinessStore } from '@/stores/organisationStore';
 import { payoutProgress } from './commission';
 import { isAcceptingResponses } from '@/features/surveys/surveyLogic';
 
@@ -31,16 +33,40 @@ export function EarnHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const summary = EARNINGS_SUMMARY;
+  const { data: earnings } = useEarnings();
+  const { data: ledger } = useCommissions();
+
+  /*
+   * Zero, not undefined, while the request is in flight.
+   *
+   * A reporter with no earnings and a reporter whose totals have not loaded
+   * see the same thing — which is correct, because the honest reading of both
+   * is "nothing here yet". Rendering `undefined` through `formatCedis` would
+   * put "GH₵NaN" on the money screen.
+   */
+  const summary = earnings ?? {
+    pendingPesewas: 0,
+    paidPesewas: 0,
+    lifetimePesewas: 0,
+    reportsLicensed: 0,
+    payoutThresholdPesewas: 0,
+    nextPayoutIso: null,
+  };
   const progress = payoutProgress(summary.pendingPesewas, summary.payoutThresholdPesewas);
   const canWithdraw = summary.pendingPesewas >= summary.payoutThresholdPesewas;
 
-  // Reads through the same overrides the business account screen writes, so
+  // Reads through the same overrides the organisation account screen writes, so
   // an organisation narrowing its interests shows up here as less demand.
   const overrides = useBusinessStore((s) => s.interestOverrides);
 
-  const openSurveys = useMemo(() => SURVEYS.filter((s) => isAcceptingResponses(s)), []);
-  const recent = COMMISSION_LEDGER.slice(0, 3);
+  const { data: surveys } = useSurveys();
+  const { data: directory } = useOrganisations();
+
+  const openSurveys = useMemo(
+    () => (surveys ?? []).filter((s) => isAcceptingResponses(s)),
+    [surveys],
+  );
+  const recent = (ledger ?? []).slice(0, 3);
 
   /*
    * What organisations are actively buying, derived from their declared
@@ -49,11 +75,21 @@ export function EarnHubScreen() {
    */
   const demand = useMemo(() => {
     const counts = new Map<string, number>();
-    BUSINESSES.filter((b) => b.subscriptionStatus === 'active').forEach((b) =>
-      (overrides[b.id] ?? b.interests).forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)),
+    /*
+      Only what the newsroom itself has told this phone.
+
+      This tallied `b.interests` from the directory, which never carries them —
+      so every organisation contributed an undefined list and the tally was
+      built entirely on locally stored overrides while appearing to summarise
+      the platform. An organisation with no override contributes nothing, which
+      is the honest answer: the phone does not know what it is looking for
+      until `GET /organisations` says.
+    */
+    receiving(directory).forEach((b) =>
+      (overrides[b.id] ?? []).forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)),
     );
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  }, [overrides]);
+  }, [directory, overrides]);
 
   return (
     <ScrollView
@@ -163,6 +199,20 @@ export function EarnHubScreen() {
           <Text variant="caption" tone="muted">
             {t('earn.inDemandHelp')}
           </Text>
+          {/*
+            No organisations means no demand, and saying so is the point.
+
+            An empty row of chips reads as a rendering fault. What it actually
+            means is that nobody is currently buying footage — which is the
+            single most useful thing this screen can tell somebody deciding
+            whether to go and film something.
+          */}
+          {demand.length === 0 ? (
+            <Text variant="body-sm" tone="muted">
+              {t('earn.noDemand')}
+            </Text>
+          ) : null}
+
           <View className="flex-row flex-wrap gap-2">
             {demand.map(([category, count]) => (
               <View
@@ -174,7 +224,7 @@ export function EarnHubScreen() {
                     width: 7,
                     height: 7,
                     borderRadius: 4,
-                    backgroundColor: categoryColor[category as keyof typeof categoryColor],
+                    backgroundColor: categoryHue(category),
                   }}
                 />
                 <Text variant="body-sm">{t(`category.${category}`)}</Text>
@@ -211,7 +261,7 @@ export function EarnHubScreen() {
               className="flex-row items-center gap-3 rounded-lg p-3.5"
             >
               <View
-                style={{ backgroundColor: categoryColor[entry.category] }}
+                style={{ backgroundColor: categoryHue(entry.category) }}
                 className="h-9 w-1 rounded-pill"
               />
               <View className="flex-1 gap-0.5">

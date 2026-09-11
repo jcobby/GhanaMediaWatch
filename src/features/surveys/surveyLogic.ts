@@ -76,7 +76,7 @@ export interface SurveyCost {
 }
 
 /**
- * What a survey commits the business to.
+ * What a survey commits the organisation to.
  *
  * The full target is charged, not the responses received so far — an
  * organisation budgeting for a survey needs the worst case, and discovering
@@ -139,7 +139,7 @@ export function completionProgress(
   return done / questions.length;
 }
 
-/** How full the survey is, 0..1, for the business's progress display. */
+/** How full the survey is, 0..1, for the organisation's progress display. */
 export function fillRate(survey: Pick<Survey, 'responsesReceived' | 'responsesTarget'>): number {
   if (survey.responsesTarget <= 0) return 0;
   return Math.min(1, survey.responsesReceived / survey.responsesTarget);

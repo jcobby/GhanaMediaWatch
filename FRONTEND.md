@@ -1,6 +1,6 @@
 # Dawuro Platform — Frontend Architecture
 
-**Version 2.0 · 27 August 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)**
+**Version 2.1 · 2 September 2026 · supersedes the GhanaMediaWatch frontend architecture (v1, 19 August)**
 
 ---
 
@@ -24,7 +24,7 @@ Dawuro has **two frontends and one shared rules package**. v1 of this document d
 | Camera | `react-native-vision-camera` | **`expo-camera`** — vision-camera was never installed |
 | Expo Go | "will not work from Phase 4" | **Works.** `npm start` runs `expo start --go` |
 | Palette | Warm paper `#FAF6F0` | **Light Glass**, cool neutrals on `#F4F5FA`, accent `#5B3DF5` |
-| Build state | Phase 1 only | All phases built; 214 mobile tests, 339 core tests |
+| Build state | Phase 1 only | All phases built; 261 mobile tests, 370 core tests |
 
 ---
 
@@ -58,7 +58,9 @@ Dawuro has **two frontends and one shared rules package**. v1 of this document d
 
 **The editor is console-only.** Editorial judgement means reading corroboration side by side; a phone is the wrong instrument.
 
-**Business and platform_owner have surfaces on both**, and this is the one piece of genuine duplication in the system — see §3.3.
+**Business and platform_owner have surfaces on both**, split by consequence rather than by convenience. Anything reversible and time-critical — routing a report to the right body — works wherever the operator is. Anything irreversible and evidentiary — approving an institution, releasing a payout batch — is console-only, and the phone says so where the button used to be rather than hiding the queue.
+
+The split exists because both consoles could previously do both, which is not redundancy: it is two answers to “has this been done”, and for money there is only one right answer.
 
 ### The division of labour with the backend
 
@@ -174,12 +176,33 @@ This is not accidental scope creep worth deleting on sight — a field officer a
 
 **It imports nothing from React, React Native, Next, the DOM, or Node.** Anything touching a camera, filesystem, network or screen does not belong in it. That constraint is what makes the package testable in isolation and reusable on a server.
 
-~3,600 lines, **339 tests across 15 suites**, all passing. One of those suites, `specVectors.test.ts`, asserts the exact numbers printed in `BACKEND_SPEC.md` §15 — so the spec fails CI if the logic moves underneath it.
+~3,600 lines, **370 tests across 17 suites**, all passing. One of those suites, `specVectors.test.ts`, asserts the exact numbers printed in `BACKEND_SPEC.md` §15 — so the spec fails CI if the logic moves underneath it.
 
 The full contents are documented in `BACKEND_SPEC.md` §3–§12 rather than repeated here.
+
 ---
 
 ## 5. Mobile architecture
+
+### 5.0 The home screen is a newsroom feed
+
+Worth stating first, because it is the screen the whole app is judged on and it changed shape after v2.0.
+
+It is a **news list**, not a social card feed: a thumbnail on the left, headline right, and a meta line of category · time · comment count. Above it sits a fixed black masthead carrying the GNA lockup and a strip of **desks** — Ghana, Africa, World, Business, Politics, Sport. A reader navigates by desk, the way they would pick up a section of a paper.
+
+Three consequences for the backend:
+
+1. **`section` is required on every published incident** (`BACKEND_SPEC.md` §3.8). A report with no desk does not appear in the feed at all — silently, with no error and no empty state. It is the failure mode most likely to be read as data loss.
+2. **A desk is not a category.** `category` is filed by the reporter and drives routing, commission and the editorial queue; `section` is chosen by an editor at release and drives nothing but placement. Never derive one from the other.
+3. `GET /incidents` needs a repeatable `section` filter. The client currently filters locally over fixtures — a stand-in, not a design.
+
+There is also a **slides mode** — a full-screen, auto-advancing reader for people who would rather be shown the news than scroll it. It reads the same feed payload; no separate endpoint.
+
+### 5.0.1 One fixed appearance
+
+The app has **one theme**: a black masthead over a white page, with no way to change it. A dark/light switch was built and removed. It gave one question — what colour is this app — three sources of truth that disagreed: a value stored on the device, the reader's OS setting, and the app's own default. The app would come up dark for someone who had never asked for dark, and each fix moved the failure to a different one of the three.
+
+Nothing here concerns the backend except as a warning about the shape of that bug: it produced no error, and the visible symptom pointed at the palette, which was the one part that was correct.
 
 ### 5.1 The API layer
 
@@ -288,6 +311,19 @@ A playback URL points at footage that may be licensed, restricted or pending rev
 
 ## 6. Console architecture
 
+### 6.0 Where a report reaches the public
+
+The console is where a report becomes visible, so this is the part of it the backend most needs to understand.
+
+**`/published`** is the business-side release surface. A business licenses a report privately, then decides separately whether the public sees it — releasing is a decision, not a consequence of paying. Releasing does two things at once:
+
+- Credits the report to the organisation. This is the `publisher.kind: 'organisation'` variant (`BACKEND_SPEC.md` §3.6). The reporter is still the author and still earns the commission; the organisation is only the publisher.
+- **Sets the desk.** The picker is part of the release rather than a setting elsewhere, because a report released without a desk does not appear on the phone at all.
+
+**`/editorial`** is the workbench where verification is decided. Note carefully that today `vettingState` is *derived* from `VerificationState` rather than stored: `vettingStateFor()` returns `published` the moment a report reaches `verified_high_confidence` or `verified_in_part`. So "is this true?" and "should the public see this?" are currently the same act, and partly-verified material publishes automatically.
+
+**Treat that as a known design issue, not as the intended contract.** If the server is to enforce "nothing appears without approval" — which is the product rule — publication needs to be a stored decision with its own permission, separate from the verification judgement. See §12.
+
 ### 6.1 Route groups
 
 Two — three, counting editorial — each with its own layout and sidebar. Route groups are a filesystem convention and **do not appear in the URL**: `(business)/inbox` serves `/inbox`.
@@ -379,12 +415,14 @@ A **UUID v4** generated on first launch and persisted in `expo-secure-store` is 
 
 | | Suites | Tests |
 | --- | ---: | ---: |
-| Mobile | 14 | 214 |
-| `@dawuro/core` | 15 | 339 |
+| Mobile | 23 | 261 |
+| `@dawuro/core` | 17 | 370 |
+| Console app | 2 | 8 |
 
 Priority targets are the pure logic — the sync state machine, the GPS gate, backoff, commission, routing, assignment, the editorial gate, permissions and the palette. Business rules are tested directly against fixtures rather than through a rendered screen, which is why they can be trusted to match the server.
 
 CI gate, both repos: **typecheck, lint at zero warnings, tests.**
+
 ---
 
 ## 10. Running it
@@ -464,7 +502,7 @@ FRONTEND.md       ──┘
 
 **Console** — business inbox, routing desk, editorial workbench and decided log, institutional onboarding with per-step review, platform approvals, payouts, organisations, published archive, team management, invites and affiliations, the public verification page, and both role shells.
 
-**Core** — every rule in `BACKEND_SPEC.md` §3–§12, with 339 tests.
+**Core** — every rule in `BACKEND_SPEC.md` §3–§12, with 370 tests.
 
 ### Not built
 
@@ -478,9 +516,22 @@ FRONTEND.md       ──┘
 
 **Payouts** have a ledger and batches but no mobile-money integration.
 
+### Known design issues the server must not inherit
+
+These are not missing screens — they are places where the clients encode something the backend should decide differently. Each is verifiable in the code today.
+
+**Publication is a side effect of verification.** `vettingStateFor()` derives `published` from `VerificationState`, so an editor cannot verify a report and hold it back, and `verified_in_part` — partly verified — goes live automatically. For a national news agency that is the wrong default.
+
+**No capability governs the public feed.** The capability list has `view_editorial_queue`, `decide_verification` and `assign_editors`, and nothing about publishing. "Who may put a citizen's video in front of the country" is not expressible.
+
+**The platform owner cannot approve anything.** `decide_verification` is held only by `editorial_lead` and `verification_editor`. `super_admin` does not have it, while its own description claims it holds every permission.
+
+**The reporter's destination choice is collected and then dropped.** `DestinationPicker` is a real control on the review screen: the reporter chooses `public`, `marketplace`, `directed` or `both`, and picks named businesses for a directed submission. `submitCapture()` is then called without either value. So the single choice that decides whether a report earns a commission and who is allowed to see it never leaves the screen it was made on — and the server, when it exists, will receive nothing to route on.
+
+**Human approval is the throughput ceiling.** If every report needs a person, the editorial queue is the product's capacity. Priority scoring exists — expedited class, then severity, then age, with age last so a stale observation cannot outrank a fresh emergency — but there is no time target or breach state for editorial the way `slaState` gives institutions one.
+
 ### Known rough edges
 
-- The mobile app is still named **GhanaMediaWatch** in `app.json` — name, slug and scheme — with the stock Expo icon and no splash. The console has the dawuro gong favicon; the phone does not.
 - Mobile and console **duplicate the business and platform tiers** (§3.3).
 - The seeded fixtures are a scatter of unrelated reports rather than one coherent story that can be walked end to end.
 

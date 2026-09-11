@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
-import { Controller, useForm } from 'react-hook-form';
+import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,6 +10,7 @@ import { Button, Pressable, Text } from '@/components/ui';
 import { useColors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
+import { hapticUnlock } from '@/lib/haptics';
 import { AuthField } from './AuthField';
 import { passwordStrength, signUpSchema, type SignUpValues } from './schemas';
 
@@ -21,10 +22,10 @@ export function SignUpScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const signIn = useAuthStore((s) => s.signIn);
+  const register = useAuthStore((s) => s.register);
   const [submitting, setSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState, watch } = useForm<SignUpValues>({
+  const { control, handleSubmit, formState } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       displayName: '',
@@ -36,17 +37,36 @@ export function SignUpScreen() {
     mode: 'onBlur',
   });
 
-  const password = watch('password');
-  const accepted = watch('acceptedTerms');
+  /*
+   * `useWatch`, not the form's `watch`.
+   *
+   * `watch` re-reads a mutable store during render, which the React Compiler
+   * cannot reason about — it bailed out of compiling this whole screen, and
+   * the lint gate is set to zero warnings, so one bailout here meant `npm run
+   * lint` failed for every change anywhere in the app. `useWatch` is the
+   * subscription form react-hook-form provides for exactly this, and it
+   * subscribes to one field rather than re-rendering on every keystroke in the
+   * form.
+   */
+  const password = useWatch({ control, name: 'password' });
+  const accepted = useWatch({ control, name: 'acceptedTerms' });
   const strength = passwordStrength(password);
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitting(true);
     try {
-      // The backend's /auth/signin creates the account when the email is new,
-      // so there is no separate register call. Flagged in API_CONTRACT.md —
-      // a real signup endpoint that takes a password is still needed.
-      await signIn(values.email, values.displayName);
+      await register(values.email, values.password, values.displayName);
+
+      /*
+       * Say that it worked.
+       *
+       * The screen used to swap for the feed and nothing else — no line, no
+       * sound, no shift under the thumb. Somebody who has just typed a password
+       * twice has no way to tell "account created" from "the app moved on
+       * without me", and the natural response is to go back and try again.
+       */
+      hapticUnlock();
+      toast.success(t('auth.accountCreatedTitle'), t('auth.accountCreatedBody'));
       router.replace('/(tabs)');
     } catch (cause) {
       toast.error(
@@ -67,6 +87,7 @@ export function SignUpScreen() {
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}
         contentContainerClassName="gap-6 px-6"
         keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
       >
         <View className="flex-row items-center gap-3">
           <Pressable

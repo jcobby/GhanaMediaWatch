@@ -36,6 +36,7 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        masthead: withAlpha('--color-masthead'),
         canvas: {
           DEFAULT: withAlpha('--color-canvas'),
           soft: withAlpha('--color-canvas-soft'),

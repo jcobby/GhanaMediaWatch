@@ -25,6 +25,33 @@ export const api: ApiClient =
 
 export const isLiveBackend = MODE === 'http' && Boolean(RAW_URL);
 
+/*
+ * Say which backend this bundle is talking to, once, at startup.
+ *
+ * `EXPO_PUBLIC_*` variables are inlined when the bundle is built, so editing
+ * `.env` under a running Metro changes nothing until it restarts — and there is
+ * no sign of that anywhere on screen. Time went into a client that was still
+ * calling a dead tunnel while the file on disk named a live host, with everyone
+ * reading the file rather than the running process.
+ *
+ * The host only. Never a path and never a token: this line lands in a terminal
+ * that gets screenshotted.
+ */
+if (__DEV__) {
+  /* eslint-disable-next-line no-console --
+   * Same reasoning as the request log in `http.ts`: the rule exists to keep
+   * diagnostics out of production, and the `__DEV__` guard above is what
+   * enforces that. `console.warn` would satisfy the linter and be worse —
+   * React Native draws a yellow box for each one, and this is a single line
+   * about configuration.
+   */
+  console.log(
+    isLiveBackend
+      ? `  API  ${RAW_URL.replace(/^https?:\/\//, '').replace(/\/.*$/, '')}`
+      : '  API  mock — no backend',
+  );
+}
+
 /**
  * Ensures the app holds a usable token before the first authenticated request.
  *

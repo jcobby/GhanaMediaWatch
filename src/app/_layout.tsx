@@ -14,7 +14,7 @@ import {
   Inter_600SemiBold,
   Inter_700Bold,
 } from '@expo-google-fonts/inter';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { ensureSession } from '@/api';
 import { initialiseDatabase } from '@/db/client';
@@ -23,10 +23,10 @@ import { registerUploader } from '@/services/uploader';
 import { ensureMediaDirectory } from '@/services/media';
 import { useOutboxStore } from '@/stores/outboxStore';
 import { useAuthStore } from '@/stores/authStore';
-import { useThemeStore } from '@/stores/themeStore';
 import { ToastHost } from '@/components/ui';
 import { BootScreen } from '@/components/BootScreen';
-import { useColors, useIsDark } from '@/lib/theme';
+import { useColors } from '@/lib/theme';
+import { queryClient } from '@/lib/queryClient';
 
 // Hold the native splash until fonts resolve, so the first frame is never
 // rendered in a fallback face that then reflows.
@@ -45,27 +45,9 @@ const BOOT_DEADLINE_MS = 4000;
  */
 const BOOT_MINIMUM_MS = 1500;
 
-/**
- * One client for the app's lifetime.
- *
- * Retries are capped at two: on a flaky mobile connection an aggressive retry
- * policy turns one failed screen into thirty seconds of silent spinning, which
- * reads as a hang. Two attempts, then show the designed error state.
- */
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      retry: 2,
-      retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 8000),
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 export default function RootLayout() {
   const c = useColors();
   const authHydrated = useAuthStore((s) => s.hydrated);
-  const isDark = useIsDark();
   /*
    * A deadline on the boot screen.
    *
@@ -102,10 +84,6 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    // The stored theme is read alongside the profile, so the first painted
-    // frame is already the right one. Reading it later would flash the
-    // default palette at anyone who chose the other.
-    void useThemeStore.getState().hydrate();
     void useAuthStore.getState().hydrate();
 
     const deadline = setTimeout(() => setBootDeadlinePassed(true), BOOT_DEADLINE_MS);
@@ -158,7 +136,7 @@ export default function RootLayout() {
       <SafeAreaProvider>
         <QueryClientProvider client={queryClient}>
           <ErrorBoundary label="root">
-            <StatusBar style={isDark ? 'light' : 'dark'} />
+            <StatusBar style="dark" />
             <Stack
               screenOptions={{
                 headerShown: false,
@@ -174,9 +152,19 @@ export default function RootLayout() {
               <Stack.Screen name="capture/review" options={{ presentation: 'card' }} />
               <Stack.Screen name="org" />
               <Stack.Screen name="platform" />
-              <Stack.Screen name="earnings" />
-              <Stack.Screen name="business" />
-              <Stack.Screen name="businesses" />
+              {/*
+                A folder is only a single screen when it has its own `_layout`.
+                `business`, `org`, `platform` and `surveys` do; `organisations` and
+                `earnings` do not, so their routes are named file by file.
+
+                Getting this wrong is a warning at startup and nothing else —
+                the screen still opens, because the router falls back to its own
+                inferred route. It stays wrong until somebody reads the log.
+              */}
+              <Stack.Screen name="earnings/index" />
+              <Stack.Screen name="organisation" />
+              <Stack.Screen name="organisations/index" />
+              <Stack.Screen name="organisations/[id]" />
               <Stack.Screen name="surveys" />
             </Stack>
             <ToastHost />

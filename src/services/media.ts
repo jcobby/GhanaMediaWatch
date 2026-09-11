@@ -67,8 +67,16 @@ export function readChunk(uri: string, offset: number, length: number): Uint8Arr
 /**
  * SHA-256 of the complete file, for the server to verify at completion.
  *
- * Reads in windows rather than whole so hashing a large video does not spike
- * memory the way a single read would.
+ * Hashes the file's **bytes**. It used to concatenate the windows as base64 and
+ * hash that string, which produces the digest of the base64 *text* — a
+ * different value from the digest of the file, and never the one the server
+ * computes over what it received. Every completed upload would have been
+ * rejected for a hash mismatch on footage that arrived perfectly intact.
+ *
+ * Still read in windows, then assembled into one buffer because `Crypto.digest`
+ * has no streaming form. That buffer is the raw file, which is smaller than the
+ * base64 string this replaced — so the memory cost went down, not up. If the
+ * 200 MB cap ever rises, this is the line to revisit.
  */
 export async function hashFile(uri: string, windowBytes = 4 * 1024 * 1024): Promise<string> {
   const size = fileSize(uri);
@@ -76,20 +84,23 @@ export async function hashFile(uri: string, windowBytes = 4 * 1024 * 1024): Prom
 
   const handle = new File(uri).open();
   try {
-    // expo-crypto has no streaming digest, so the windows are concatenated as
-    // base64 and hashed once. Documented here because it does hold the encoded
-    // file in memory — acceptable at the 200 MB cap, and the first thing to
-    // revisit if that cap rises.
-    let encoded = '';
+    const whole = new Uint8Array(size);
     for (let offset = 0; offset < size; offset += windowBytes) {
       handle.offset = offset;
-      const bytes = handle.readBytes(Math.min(windowBytes, size - offset));
-      encoded += bytesToBase64(bytes);
+      whole.set(handle.readBytes(Math.min(windowBytes, size - offset)), offset);
     }
-    return await Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, encoded);
+    const digest = await Crypto.digest(Crypto.CryptoDigestAlgorithm.SHA256, whole);
+    return bytesToHex(new Uint8Array(digest));
   } finally {
     handle.close();
   }
+}
+
+/** Lowercase hex, which is the form the API's `sha256` field is matched against. */
+export function bytesToHex(bytes: Uint8Array): string {
+  let out = '';
+  for (const byte of bytes) out += byte.toString(16).padStart(2, '0');
+  return out;
 }
 
 /**

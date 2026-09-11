@@ -4,15 +4,26 @@ import { UPLOAD_CHUNK_SIZE_BYTES } from '@/lib/constants';
 import { chunkCount } from '@/services/chunkPlan';
 import { SAMPLE_INCIDENTS } from './fixtures';
 import { MY_REPORTS, ORG_STATS, ORG_TREND } from './mockData';
+import { outcomeFor } from './outcomeData';
+import { ORGANISATIONS, COMMISSION_LEDGER, EARNINGS_SUMMARY, SURVEYS } from './dawuroData';
+import type {
+  CommissionEntry,
+  DirectoryOrganisation,
+  EarningsSummary,
+  Survey,
+} from '@/types/dawuro';
+import type { ReportOutcome } from '@/types/outcome';
 import type {
   ApiClient,
   AuthTokens,
+  Caller,
   CreateIncidentRequest,
   CreateIncidentResponse,
   DeviceRegistration,
   MapData,
   MapQuery,
   OrgDashboard,
+  RegisterRequest,
   SignInRequest,
   UploadStatus,
 } from './client';
@@ -90,6 +101,7 @@ export class MockApiClient implements ApiClient {
       accessToken: 'mock-device-token',
       refreshToken: null,
       expiresAt: new Date(Date.now() + 60 * 86_400_000).toISOString(),
+      kind: 'device',
     });
   }
 
@@ -98,6 +110,7 @@ export class MockApiClient implements ApiClient {
       accessToken: 'mock-user-token',
       refreshToken: 'mock-refresh-token',
       expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      kind: 'user',
     });
   }
 
@@ -138,6 +151,69 @@ export class MockApiClient implements ApiClient {
 
   getMyIncidents(): Promise<Page<AuthoredIncident>> {
     return this.simulate({ items: MY_REPORTS, nextCursor: null, hasMore: false });
+  }
+
+  deleteIncident(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  register(input: RegisterRequest): Promise<AuthTokens> {
+    // Same envelope as signing in — the difference is on the server.
+    return this.signIn({ email: input.email, password: input.password });
+  }
+
+  getReportResponses(incidentId: string): Promise<ReportOutcome> {
+    // The seeded outcomes cover silence, referral, and resolution — the three
+    // shapes the timeline has to render.
+    return this.simulate(outcomeFor(incidentId) ?? { incidentId, recipients: [], responses: [] });
+  }
+
+  getEarnings(): Promise<EarningsSummary> {
+    return this.simulate(EARNINGS_SUMMARY);
+  }
+
+  getCommissions(): Promise<CommissionEntry[]> {
+    return this.simulate(COMMISSION_LEDGER);
+  }
+
+  /*
+   * Narrowed to the directory shape the real endpoint sends.
+   *
+   * The fixtures are full `OrganisationAccount` records, so returning them as-is
+   * would let a screen developed against the mock read `interests` or
+   * `subscriptionStatus` and work perfectly — then find both undefined against
+   * the live service. A mock that is more generous than the server is how that
+   * bug got written in the first place.
+   */
+  getOrganisations(): Promise<DirectoryOrganisation[]> {
+    return this.simulate(ORGANISATIONS);
+  }
+
+  refresh(): Promise<AuthTokens> {
+    return this.simulate({
+      accessToken: 'mock-user-token',
+      refreshToken: 'mock-refresh-token',
+      expiresAt: new Date(Date.now() + 900_000).toISOString(),
+      kind: 'user',
+    });
+  }
+
+  getSurveys(): Promise<Survey[]> {
+    return this.simulate(SURVEYS);
+  }
+
+  submitSurveyResponse(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  /** The demo account operates the seeded organisation. */
+  getCaller(): Promise<Caller> {
+    return this.simulate({
+      userId: 'usr_demo',
+      orgId: 'org_demo',
+      role: 'owner',
+      memberships: [{ orgId: 'org_demo', role: 'owner', name: 'Adom TV News' }],
+    });
   }
 
   getOrgDashboard(): Promise<OrgDashboard> {

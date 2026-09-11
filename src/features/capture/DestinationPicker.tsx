@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Glass, Pressable, Sheet, Text } from '@/components/ui';
-import { BUSINESSES } from '@/api/dawuroData';
+import { Badge, Glass, Pressable, Sheet, Text } from '@/components/ui';
+import { receiving, useOrganisations } from '@/hooks/useOrganisations';
 import { useColors } from '@/lib/theme';
 import { estimateCommission } from '@/features/earnings/commission';
 import { formatCedis, type SubmissionDestination } from '@/types/dawuro';
@@ -12,7 +12,7 @@ import type { IncidentCategory, MediaKind } from '@/types/api';
 interface DestinationPickerProps {
   destination: SubmissionDestination;
   onChange: (destination: SubmissionDestination) => void;
-  selectedBusinessIds: string[];
+  selectedOrganisationIds: string[];
   onChangeBusinesses: (ids: string[]) => void;
   category: IncidentCategory;
   mediaKind: MediaKind;
@@ -33,7 +33,7 @@ const OPTIONS: {
  * Where a report goes — the decision that splits the two halves of the product.
  *
  * A reporter can publish to the public feed, offer the report to subscribing
- * businesses, send it to named institutions only, or both. The earnings figure
+ * organisations, send it to named institutions only, or both. The earnings figure
  * updates as they choose, because a payment model people cannot see before they
  * commit is one they will not trust.
  *
@@ -43,7 +43,7 @@ const OPTIONS: {
 export function DestinationPicker({
   destination,
   onChange,
-  selectedBusinessIds,
+  selectedOrganisationIds,
   onChangeBusinesses,
   category,
   mediaKind,
@@ -60,19 +60,48 @@ export function DestinationPicker({
         destination,
         mediaKind,
         locationConfidence,
-        licensedBy: destination === 'directed' ? Math.max(1, selectedBusinessIds.length) : 1,
+        licensedBy: destination === 'directed' ? Math.max(1, selectedOrganisationIds.length) : 1,
       }),
-    [category, destination, mediaKind, locationConfidence, selectedBusinessIds.length],
+    [category, destination, mediaKind, locationConfidence, selectedOrganisationIds.length],
   );
 
-  const needsBusinesses = destination === 'directed';
-  const selected = BUSINESSES.filter((b) => selectedBusinessIds.includes(b.id));
+  /*
+   * The real directory.
+   *
+   * This list used to be a fixture, so a reporter choosing "send to named
+   * institutions" picked from organisations that are not on the platform — and
+   * the report went to nobody. Where the directory is empty or cannot be read,
+   * the sheet says so rather than offering names.
+   */
+  const {
+    data: directory,
+    isPending: directoryPending,
+    isError: directoryFailed,
+  } = useOrganisations();
+  const available = receiving(directory);
 
-  const toggleBusiness = (id: string) => {
+  /*
+   * Whether anyone can license a report at all.
+   *
+   * Three of the four choices below — offer to organisations, send to named
+   * organisations, both — depend on an organisation existing to receive it. No
+   * organisation has joined the platform yet, so those three currently route a
+   * report to nobody while the screen quotes a commission for it.
+   *
+   * Promising money is the part that matters. Somebody films something at real
+   * risk because a screen said it could earn them seven cedis; if nothing can
+   * license it, that was never true and they find out weeks later, if ever.
+   */
+  const nobodyIsBuying = !directoryPending && !directoryFailed && available.length === 0;
+
+  const needsBusinesses = destination === 'directed';
+  const selected = available.filter((b) => selectedOrganisationIds.includes(b.id));
+
+  const toggleOrganisation = (id: string) => {
     onChangeBusinesses(
-      selectedBusinessIds.includes(id)
-        ? selectedBusinessIds.filter((b) => b !== id)
-        : [...selectedBusinessIds, id],
+      selectedOrganisationIds.includes(id)
+        ? selectedOrganisationIds.filter((b) => b !== id)
+        : [...selectedOrganisationIds, id],
     );
   };
 
@@ -85,6 +114,16 @@ export function DestinationPicker({
       <View className="gap-2">
         {OPTIONS.map((option) => {
           const active = destination === option.value;
+          /*
+           * Three of the four need an organisation to exist.
+           *
+           * They are shown rather than hidden — they are the product, and a
+           * reporter should understand that footage can be sold — but marked,
+           * because a choice that silently does nothing is worse than one that
+           * explains itself. Choosing one still works: the report is filed and
+           * waits, rather than being quietly dropped.
+           */
+          const inert = nobodyIsBuying && option.value !== 'public';
           return (
             <Pressable
               key={option.value}
@@ -116,9 +155,14 @@ export function DestinationPicker({
                   />
                 </View>
                 <View className="flex-1 gap-0.5">
-                  <Text variant="body" className="font-sans-semibold">
-                    {t(`destination.${option.value}.title`)}
-                  </Text>
+                  <View className="flex-row items-center gap-2">
+                    <Text variant="body" className="font-sans-semibold">
+                      {t(`destination.${option.value}.title`)}
+                    </Text>
+                    {inert ? (
+                      <Badge label={t('destination.notAvailableYet')} tone="warning" />
+                    ) : null}
+                  </View>
                   <Text variant="caption" tone="muted">
                     {t(`destination.${option.value}.body`)}
                   </Text>
@@ -142,7 +186,7 @@ export function DestinationPicker({
       {needsBusinesses ? (
         <Pressable
           onPress={() => setPickerOpen(true)}
-          accessibilityLabel={t('destination.chooseBusinesses')}
+          accessibilityLabel={t('destination.chooseOrganisations')}
         >
           <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
             <Ionicons name="business-outline" size={18} color={c.accent} />
@@ -150,7 +194,7 @@ export function DestinationPicker({
               <Text variant="body-sm" className="font-sans-semibold">
                 {selected.length > 0
                   ? selected.map((b) => b.name).join(', ')
-                  : t('destination.chooseBusinesses')}
+                  : t('destination.chooseOrganisations')}
               </Text>
               <Text variant="caption" tone="muted">
                 {t('destination.recipientCount', { count: selected.length })}
@@ -168,16 +212,20 @@ export function DestinationPicker({
         </View>
         <View className="flex-1">
           <Text variant="body" className="font-sans-semibold">
-            {estimate.reporterPesewas > 0
-              ? t('destination.estimatedEarning', {
-                  amount: formatCedis(estimate.reporterPesewas),
-                })
-              : t('destination.noEarning')}
+            {nobodyIsBuying
+              ? t('destination.nobodyBuyingTitle')
+              : estimate.reporterPesewas > 0
+                ? t('destination.estimatedEarning', {
+                    amount: formatCedis(estimate.reporterPesewas),
+                  })
+                : t('destination.noEarning')}
           </Text>
           <Text variant="caption" tone="muted">
-            {estimate.reporterPesewas > 0
-              ? t('destination.earningHelp')
-              : t('destination.noEarningHelp')}
+            {nobodyIsBuying
+              ? t('destination.nobodyBuyingHelp')
+              : estimate.reporterPesewas > 0
+                ? t('destination.earningHelp')
+                : t('destination.noEarningHelp')}
           </Text>
         </View>
       </Glass>
@@ -185,23 +233,67 @@ export function DestinationPicker({
       <Sheet
         visible={pickerOpen}
         onClose={() => setPickerOpen(false)}
-        title={t('destination.chooseBusinesses')}
-        subtitle={t('destination.chooseBusinessesHelp')}
+        title={t('destination.chooseOrganisations')}
+        subtitle={t('destination.chooseOrganisationsHelp')}
       >
         <ScrollView className="max-h-96" showsVerticalScrollIndicator={false}>
           <View className="gap-2">
-            {BUSINESSES.filter((b) => b.subscriptionStatus === 'active').map((business) => {
-              const isSelected = selectedBusinessIds.includes(business.id);
-              // Businesses whose declared interests match earn a hint — a
-              // reporter should not have to guess who wants a flood report.
-              const relevant = business.interests.includes(category);
+            {/*
+              Three answers, kept apart.
+
+              "Still loading", "we could not ask" and "there is nobody to send
+              to" mean different things to somebody deciding where their footage
+              goes, and only the last one means they should choose a different
+              destination. Rendering all three as an empty sheet — which is what
+              a bare `.map` over an empty array does — tells them nothing.
+            */}
+            {directoryPending ? (
+              <Text variant="body-sm" tone="muted" className="py-6 text-center">
+                {t('destination.loadingOrganisations')}
+              </Text>
+            ) : directoryFailed ? (
+              <View className="gap-1 py-6">
+                <Text variant="body-sm" className="text-center">
+                  {t('destination.directoryFailedTitle')}
+                </Text>
+                <Text variant="caption" tone="muted" className="text-center">
+                  {t('destination.directoryFailedBody')}
+                </Text>
+              </View>
+            ) : available.length === 0 ? (
+              <View className="gap-1 py-6">
+                <Text variant="body-sm" className="text-center">
+                  {t('destination.noOrganisationsTitle')}
+                </Text>
+                <Text variant="caption" tone="muted" className="text-center">
+                  {t('destination.noOrganisationsBody')}
+                </Text>
+              </View>
+            ) : null}
+
+            {available.map((organisation) => {
+              const isSelected = selectedOrganisationIds.includes(organisation.id);
+              /*
+                No "matches your report" hint, because the phone cannot know.
+
+                This read `organisation.interests` to mark organisations whose
+                declared categories matched — but the public directory does not
+                send interests, so the field was always undefined and the hint
+                never appeared for anyone. Reading it as an empty list is the
+                same answer with less pretence.
+
+                Restoring the hint needs `interests` on `GET /organisations`,
+                which is requested of the backend. Until then a reporter picks
+                by name and sector, which is what the endpoint gives them.
+              */
+              const relevant = false;
               return (
                 <Pressable
-                  key={business.id}
-                  onPress={() => toggleBusiness(business.id)}
+                  key={organisation.id}
+                  onPress={() => toggleOrganisation(organisation.id)}
                   accessibilityRole="checkbox"
                   accessibilityState={{ checked: isSelected }}
-                  accessibilityLabel={business.name}
+                  accessibilityLabel={organisation.name}
                   className={
                     isSelected
                       ? 'flex-row items-center gap-3 rounded-lg border border-accent bg-accent-wash p-3'
@@ -214,16 +306,16 @@ export function DestinationPicker({
                   <View className="flex-1">
                     <View className="flex-row items-center gap-1.5">
                       <Text variant="body-sm" className="font-sans-semibold">
-                        {business.name}
+                        {organisation.name}
                       </Text>
-                      {business.verified ? (
+                      {organisation.verified ? (
                         <Ionicons name="checkmark-circle" size={13} color={c.info} />
                       ) : null}
                     </View>
                     <Text variant="caption" tone={relevant ? 'success' : 'muted'}>
                       {relevant
                         ? t('destination.interestedIn', { category: t(`category.${category}`) })
-                        : t(`sector.${business.sector}`)}
+                        : t(`sector.${organisation.sector}`)}
                     </Text>
                   </View>
                   <View

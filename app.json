@@ -6,13 +6,13 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "light",
     "newArchEnabled": true,
     "backgroundColor": "#F4F5FA",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#0E101A"
+      "backgroundColor": "#F4F5FA"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -94,7 +94,7 @@
             "targetSdkVersion": 36
           },
           "ios": {
-            "deploymentTarget": "15.1"
+            "deploymentTarget": "16.4"
           }
         }
       ],
@@ -104,7 +104,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 300,
           "resizeMode": "contain",
-          "backgroundColor": "#0E101A"
+          "backgroundColor": "#F4F5FA"
         }
       ],
       [

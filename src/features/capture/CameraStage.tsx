@@ -3,13 +3,15 @@ import { View } from 'react-native';
 import { CameraView, useCameraPermissions, useMicrophonePermissions } from 'expo-camera';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Glass, Pressable, Sheet, Text } from '@/components/ui';
-import { MAX_VIDEO_DURATION_S } from '@/lib/constants';
+import { MAX_VIDEO_DURATION_S, MIN_VIDEO_DURATION_S } from '@/lib/constants';
 import { colors } from '@/lib/theme';
 import { hapticPress, hapticRecord, hapticWarning } from '@/lib/haptics';
 import { useCaptureStore } from '@/stores/captureStore';
+import { toast } from '@/stores/toastStore';
 import { lockFix, type LocationFix } from './gpsGate';
 import { AudioRecorder } from './AudioRecorder';
 
@@ -17,6 +19,30 @@ interface CameraStageProps {
   fix: LocationFix;
   confidence: 'high' | 'low';
   accuracyM: number;
+}
+
+/**
+ * What the file actually is, from the name the recorder gave it.
+ *
+ * This was hardcoded to `video/mp4` for every recording. `expo-camera` writes
+ * MP4 on Android and QuickTime on iOS, so every iPhone clip was uploaded
+ * declaring a container it is not: verified on the live service, a stored
+ * recording begins `ftypqt` — the QuickTime brand — while its record says
+ * `video/mp4`.
+ *
+ * Browsers mostly cope, because the codecs inside are the same H.264 and AAC.
+ * "Mostly" is the problem: it is a claim about the bytes that is simply untrue,
+ * it is what a strict player rejects, and it is the sort of mismatch that
+ * surfaces as "the video does not work" on one device and nowhere else.
+ *
+ * Anything unrecognised stays `video/mp4`, which is what it was before and the
+ * right guess for a camera file.
+ */
+function videoMimeType(uri: string): string {
+  const extension = uri.split('?')[0]?.split('.').pop()?.toLowerCase();
+  if (extension === 'mov' || extension === 'qt') return 'video/quicktime';
+  if (extension === 'webm') return 'video/webm';
+  return 'video/mp4';
 }
 
 /**
@@ -35,8 +61,8 @@ type Mode = 'photo' | 'video' | 'audio' | 'live';
  * custom native module, which Expo Go cannot load on any SDK. Since iOS testing
  * here depends on Expo Go — no Mac available — the finer format and frame
  * control Vision Camera offers is not worth losing the ability to run the app
- * at all. Everything the brief requires (photo, video, hold-to-record, torch,
- * flip, duration cap) is supported.
+ * at all. Everything the brief requires (photo, video, torch, flip,
+ * duration cap) is supported.
  */
 export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
   const { t } = useTranslation();
@@ -54,30 +80,104 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
   // rather than selecting a mode whose shutter would do nothing.
   const [liveSheet, setLiveSheet] = useState(false);
   const [recording, setRecording] = useState(false);
+  /**
+   * A stop has been asked for and the file has not arrived yet.
+   *
+   * Rendered, unlike `stoppingRef`, because the gap is visible: `recordAsync`
+   * settles some way after the stop, and until it does the shutter still shows
+   * a stop button that now ignores every tap. A control that silently does
+   * nothing reads as a broken app — which is how a working save gets reported
+   * as a failure.
+   */
+  const [stopping, setStopping] = useState(false);
   const [elapsedS, setElapsedS] = useState(0);
   const [busy, setBusy] = useState(false);
+  /*
+   * Whether the camera preview has been set at least once.
+   *
+   * `recordAsync` resolves "when the camera preview stops", so a recording
+   * started before there is a preview ends immediately and writes a zero-byte
+   * file. Waiting for `onCameraReady` — documented as "camera preview has been
+   * set" — is what prevents that.
+   *
+   * This was tracked as *which mode* was ready, on the assumption that the
+   * event fires again when the `mode` prop changes. The SDK does not document
+   * that, and if it does not fire again the flag never reaches `'video'` and
+   * recording is blocked for the rest of the session — which is exactly what
+   * happened: the shutter did nothing at all.
+   *
+   * A boolean cannot deadlock. It is the documented meaning of the event, and
+   * the other cause of an empty file — a recording stopped before the encoder
+   * has written a frame — is handled by the minimum duration instead.
+   */
+  const [cameraReady, setCameraReady] = useState(false);
+
+  /*
+   * When the recording started, and whether it still is.
+   *
+   * Refs rather than state because both are read from callbacks that outlive
+   * the render that created them, and each was wrong in a different way:
+   *
+   * - `recordAsync` is awaited across the whole recording, so the closure that
+   *   resolves it is the one built *before* filming began, when `elapsedS` was
+   *   still 0. Every clip was therefore filed as `durationMs: 0`. Wall-clock
+   *   time is also simply more accurate than counting one-second ticks, and the
+   *   SDK gives us nothing to use instead — `recordAsync` resolves to `uri` and,
+   *   on iOS, `codec`. Duration is ours to measure.
+   *
+   * - The stop handler used to be attached only once `recording` had become
+   *   true, so an end-of-recording gesture that beat that re-render had nothing
+   *   to stop it and the clip ran on to the full sixty seconds. Stopping now
+   *   decides for itself off a ref that is set synchronously, which is what
+   *   makes a second tap safe however fast it lands.
+   */
+  const startedAtRef = useRef(0);
+  const recordingRef = useRef(false);
+  /**
+   * Whether a stop has already been asked for on this recording.
+   *
+   * `recordingRef` stays true until `recordAsync` settles, which is well after
+   * the stop is requested — so without this every other route to a stop is
+   * still open in the gap: a second tap, the duration cap, the delayed stop.
+   * Asking twice is a native throw on iOS.
+   */
+  const stoppingRef = useRef(false);
+  /** A delayed stop waiting out the minimum duration, so it can be cancelled. */
+  const pendingStopRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  /*
+   * What the camera session is asked to be, in its own vocabulary.
+   *
+   * `Mode` here has four values because the switcher does — audio and live are
+   * not camera sessions at all — while `CameraView` knows only stills and
+   * video. Derived once so the prop and the readiness check can never disagree
+   * about which session is running.
+   */
+  const cameraMode: 'picture' | 'video' = mode === 'video' ? 'video' : 'picture';
 
   const setPending = useCaptureStore((s) => s.setPending);
 
-  // Recording timer, and the client-side duration cap.
+  /*
+   * Recording timer, and the client-side duration cap.
+   *
+   * The reset runs in the cleanup rather than synchronously at the top of the
+   * effect. Setting state as an effect *begins* triggers a second render pass
+   * before paint — cascading renders, which the React Compiler flags — whereas
+   * clearing on the way out happens once the recording has genuinely stopped
+   * and produces the same zero.
+   */
   useEffect(() => {
-    if (!recording) {
-      setElapsedS(0);
-      return;
-    }
+    if (!recording) return;
     const id = setInterval(() => setElapsedS((s) => s + 1), 1000);
-    return () => clearInterval(id);
+    return () => {
+      clearInterval(id);
+      setElapsedS(0);
+    };
   }, [recording]);
 
-  useEffect(() => {
-    if (recording && elapsedS >= MAX_VIDEO_DURATION_S) {
-      hapticWarning();
-      cameraRef.current?.stopRecording();
-    }
-  }, [recording, elapsedS]);
-
   const handlePhoto = useCallback(async () => {
-    if (busy) return;
+    // The docs are explicit that a still requires the camera to be ready.
+    if (busy || !cameraReady) return;
     setBusy(true);
     hapticPress();
     try {
@@ -100,11 +200,17 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
     } finally {
       setBusy(false);
     }
-  }, [busy, fix, confidence, setPending, router]);
+  }, [busy, cameraReady, fix, confidence, setPending, router]);
 
   const handleVideoStart = useCallback(async () => {
-    if (busy || recording) return;
+    // Not while the session is still configuring: a recording started then
+    // stops the instant the preview settles, and the file comes back empty.
+    if (busy || recordingRef.current || !cameraReady) return;
     hapticRecord();
+    recordingRef.current = true;
+    stoppingRef.current = false;
+    setStopping(false);
+    startedAtRef.current = Date.now();
     setRecording(true);
     try {
       const video = await cameraRef.current?.recordAsync({
@@ -114,24 +220,129 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
       setPending({
         uri: video.uri,
         kind: 'video',
-        mimeType: 'video/mp4',
+        mimeType: videoMimeType(video.uri),
         width: null,
         height: null,
-        durationMs: elapsedS * 1000,
+        durationMs: Math.max(0, Date.now() - startedAtRef.current),
         fix: lockFix(fix),
         confidence,
       });
       router.push('/capture/review');
+    } catch (cause) {
+      /*
+       * A recording that failed, said so in words.
+       *
+       * There was no `catch` here at all. `recordAsync` is awaited across the
+       * whole recording, so anything it rejects with — the session interrupted
+       * by a call, storage filling up, the encoder refusing — became an
+       * unhandled promise rejection: no message, nothing the reporter could
+       * read, and on a release build nothing at all. Somebody who had just
+       * filmed an incident was left looking at a camera that had plainly done
+       * *something* and would not say what.
+       *
+       * The reason is kept rather than replaced with house wording. This is a
+       * native failure we cannot enumerate from here, and "the camera stopped"
+       * with the platform's own sentence after it is worth more to somebody in
+       * the field — and to whoever they report it to — than a tidy sentence
+       * that names nothing.
+       */
+      hapticWarning();
+      toast.error(
+        t('capture.recordFailedTitle'),
+        cause instanceof Error && cause.message.trim()
+          ? cause.message
+          : t('capture.recordFailedBody'),
+      );
     } finally {
+      recordingRef.current = false;
+      stoppingRef.current = false;
+      setStopping(false);
       setRecording(false);
     }
-  }, [busy, recording, elapsedS, fix, confidence, setPending, router]);
+  }, [busy, cameraReady, fix, confidence, setPending, router, t]);
+
+  /**
+   * Stop, exactly once, and never so soon that nothing was written.
+   *
+   * **Once is the part tap-to-record made load-bearing.** `recordingRef` stays
+   * true until `recordAsync` settles, which is some way after the stop is asked
+   * for — so between the tap and the file arriving, every other route to a stop
+   * is still open: an impatient second tap, the sixty-second cap coming due, the
+   * delayed stop below. Under hold-to-record a second release was physically
+   * impossible without another press. Under tap-to-record it is one twitchy
+   * finger, and `stopRecording` on a camera that has already stopped is a native
+   * throw on iOS — which is exactly the "it stopped but something went wrong"
+   * this fixed.
+   *
+   * **And never inside the first second.** A recording that starts and ends in
+   * the same second gives the encoder no frames to mux and produces a file of
+   * zero bytes rather than an error, so the reporter is told "nothing was
+   * recorded" about footage they watched themselves film. Waiting out the
+   * remainder costs a moment and makes that impossible.
+   */
+  const stopRecording = useCallback(() => {
+    if (!recordingRef.current || stoppingRef.current) return;
+    stoppingRef.current = true;
+    setStopping(true);
+
+    const elapsedMs = Date.now() - startedAtRef.current;
+    const minimumMs = MIN_VIDEO_DURATION_S * 1000;
+
+    /*
+     * Guarded, because this is a native call on a session whose state we are
+     * inferring. A throw here would replace a recording that very likely
+     * succeeded with a crash; `recordAsync` is the thing that knows, and it
+     * will resolve with the file or reject with a reason either way.
+     */
+    const ask = () => {
+      try {
+        cameraRef.current?.stopRecording();
+      } catch {
+        /* Already stopped, or the session is gone. `recordAsync` settles. */
+      }
+    };
+
+    if (elapsedMs >= minimumMs) {
+      ask();
+      return;
+    }
+    // Tracked so unmounting cannot leave it to fire against a dead camera.
+    pendingStopRef.current = setTimeout(ask, minimumMs - elapsedMs);
+  }, []);
+
+  /*
+   * The cap, through the same single stop path as everything else.
+   *
+   * It used to call `stopRecording` directly, so a reporter tapping stop at the
+   * exact moment the sixty seconds came due produced two stops on one
+   * recording — the case `stoppingRef` exists for.
+   */
+  useEffect(() => {
+    if (recording && elapsedS >= MAX_VIDEO_DURATION_S) {
+      hapticWarning();
+      stopRecording();
+    }
+  }, [recording, elapsedS, stopRecording]);
 
   const handleVideoStop = useCallback(() => {
-    if (!recording) return;
+    if (!recordingRef.current || stoppingRef.current) return;
     hapticRecord();
-    cameraRef.current?.stopRecording();
-  }, [recording]);
+    stopRecording();
+  }, [stopRecording]);
+
+  /*
+   * Nothing left running after this screen goes away.
+   *
+   * A reporter can leave mid-recording — a back gesture, a call, the app being
+   * pushed to the background. The delayed stop above would then fire against a
+   * camera that no longer exists.
+   */
+  useEffect(
+    () => () => {
+      if (pendingStopRef.current) clearTimeout(pendingStopRef.current);
+    },
+    [],
+  );
 
   // Permissions. Video needs the microphone too — footage of an incident
   // without its audio loses most of its evidential value.
@@ -165,12 +376,15 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
 
   return (
     <View className="flex-1 bg-black">
+      {/* Full-screen camera preview — dark whatever it is pointed at. */}
+      <StatusBar style="light" />
       <CameraView
         ref={cameraRef}
         style={{ flex: 1 }}
         facing={facing}
         enableTorch={torch}
-        mode={mode === 'video' ? 'video' : 'picture'}
+        mode={cameraMode}
+        onCameraReady={() => setCameraReady(true)}
       />
 
       {/* Persistent GPS pill — the gate's state stays visible while filming. */}
@@ -297,15 +511,37 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
           </Glass>
         ) : null}
 
+        {/*
+          Tap to start, tap to stop.
+
+          It was hold-to-record, which is wrong for what this app is for. A
+          reporter filming an incident needs both hands, or needs to hold the
+          phone steady at arm's length, or is filming something they should not
+          be seen filming — and hold-to-record means a thumb pinned to the glass
+          for the whole shot, where any slip ends the recording early. It also
+          caps a clip at how long someone can comfortably hold still, on a
+          control whose whole purpose is a sixty-second maximum.
+
+          Hold is gone rather than kept alongside. Both gestures on one control
+          means a press has to decide whether it was a tap or a hold, and that
+          ambiguity is exactly what produced the two recording bugs documented
+          above — an end that beat a re-render, and a hold the long-press timer
+          never registered.
+        */}
         {mode !== 'audio' ? (
           <Pressable
-            onPress={mode === 'photo' ? handlePhoto : undefined}
-            onLongPress={mode === 'video' ? handleVideoStart : undefined}
-            onPressOut={mode === 'video' && recording ? handleVideoStop : undefined}
-            delayLongPress={180}
+            onPress={
+              mode === 'photo' ? handlePhoto : recording ? handleVideoStop : handleVideoStart
+            }
             haptic={false}
-            disabled={busy}
-            accessibilityLabel={mode === 'video' ? t('capture.holdToRecord') : t('capture.photo')}
+            disabled={busy || stopping}
+            accessibilityLabel={
+              mode === 'photo'
+                ? t('capture.photo')
+                : recording
+                  ? t('capture.stopRecording')
+                  : t('capture.tapToRecord')
+            }
             className="h-20 w-20 items-center justify-center rounded-pill border-4 border-white/70"
           >
             {/* Ring countdown: the border fills as the cap approaches. */}
@@ -323,9 +559,13 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
           </Pressable>
         ) : null}
 
-        {mode === 'video' && !recording ? (
+        {mode === 'video' ? (
           <Text variant="caption" onMedia tone="muted">
-            {t('capture.holdToRecord')}
+            {stopping
+              ? t('capture.savingRecording')
+              : recording
+                ? t('capture.stopRecording')
+                : t('capture.tapToRecord')}
           </Text>
         ) : null}
       </View>

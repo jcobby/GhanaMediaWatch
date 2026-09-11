@@ -1,7 +1,7 @@
 import { autoRoute, canReceive, needsReview, type RoutableSubmission } from '../autoRoute';
-import type { BusinessAccount } from '@/types/dawuro';
+import type { OrganisationAccount } from '@/types/dawuro';
 
-function biz(overrides: Partial<BusinessAccount> = {}): BusinessAccount {
+function biz(overrides: Partial<OrganisationAccount> = {}): OrganisationAccount {
   return {
     id: 'b1',
     name: 'Test Org',

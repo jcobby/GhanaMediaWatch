@@ -1,5 +1,5 @@
 import type {
-  BusinessAccount,
+  OrganisationAccount,
   CommissionEntry,
   EarningsSummary,
   RoutingItem,
@@ -23,7 +23,7 @@ const daysAhead = (d: number): string => new Date(Date.now() + d * 86_400_000).t
 /**
  * Platform operators are seeded, never self-registered.
  *
- * The role can route reports, approve businesses and release payouts — it is
+ * The role can route reports, approve organisations and release payouts — it is
  * not something an open sign-up form should ever be able to create. In
  * production these come from an internal provisioning process; here they are
  * fixed credentials so the module can be demonstrated.
@@ -60,8 +60,8 @@ export const DEMO_PASSWORD = 'dawuro';
 export interface DemoLogin {
   email: string;
   displayName: string;
-  accountType: 'reporter' | 'business' | 'platform_owner';
-  /** Set for business accounts — links the login to a seeded organisation. */
+  accountType: 'reporter' | 'organisation' | 'platform_owner';
+  /** Set for organisation accounts — links the login to a seeded organisation. */
   businessId?: string;
   businessName?: string;
   /** What this account is useful for demonstrating. */
@@ -84,7 +84,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
   {
     email: 'ops@ama.gov.gh',
     displayName: 'AMA Operations',
-    accountType: 'business',
+    accountType: 'organisation',
     businessId: 'biz_ama',
     businessName: 'Accra Metropolitan Assembly',
     showcases: 'Report inbox near its monthly allowance',
@@ -92,7 +92,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
   {
     email: 'newsroom@joynews.gh',
     displayName: 'Joy Newsroom',
-    accountType: 'business',
+    accountType: 'organisation',
     businessId: 'biz_joy',
     businessName: 'Joy News',
     showcases: 'Media-house inbox — disorder, fire, corruption',
@@ -100,7 +100,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
   {
     email: 'control@nadmo.gov.gh',
     displayName: 'NADMO Control',
-    accountType: 'business',
+    accountType: 'organisation',
     businessId: 'biz_nadmo',
     businessName: 'NADMO',
     showcases: 'Enterprise tier, high volume',
@@ -117,9 +117,9 @@ export function findDemoLogin(email: string): DemoLogin | undefined {
   return DEMO_LOGINS.find((l) => l.email.toLowerCase() === email.trim().toLowerCase());
 }
 
-// ─── businesses ────────────────────────────────────────────────────────────
+// ─── organisations ────────────────────────────────────────────────────────────
 
-export const BUSINESSES: BusinessAccount[] = [
+export const ORGANISATIONS: OrganisationAccount[] = [
   {
     id: 'biz_ec',
     name: 'Electoral Commission of Ghana',
@@ -417,25 +417,25 @@ export const SURVEYS: Survey[] = [
   },
 ];
 
-// ─── pending business applications ─────────────────────────────────────────
+// ─── pending organisation applications ─────────────────────────────────────────
 
-export interface BusinessApplication {
+export interface OrganisationApplication {
   id: string;
   organisationName: string;
-  sector: BusinessAccount['sector'];
+  sector: OrganisationAccount['sector'];
   contactName: string;
   email: string;
   phone: string;
   registrationNumber: string;
-  requestedTier: BusinessAccount['tier'];
-  interests: BusinessAccount['interests'];
+  requestedTier: OrganisationAccount['tier'];
+  interests: OrganisationAccount['interests'];
   submittedAtIso: string;
   status: 'pending' | 'approved' | 'rejected';
   /** Anything an operator should weigh before granting access to footage. */
   flags: string[];
 }
 
-export const BUSINESS_APPLICATIONS: BusinessApplication[] = [
+export const ORGANISATION_APPLICATIONS: OrganisationApplication[] = [
   {
     id: 'app_1',
     organisationName: 'Ghana Water Company Limited',

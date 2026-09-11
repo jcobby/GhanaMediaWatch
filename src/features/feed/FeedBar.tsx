@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Text } from '@/components/ui';
 import { GnaHorizontal } from '@/components/Brand';
-import { useColors } from '@/lib/theme';
 
 /**
  * The bar above the category tabs.
@@ -33,24 +32,23 @@ export function FeedBar({
   onOpenSlides: () => void;
   onOpenBusinesses: () => void;
 }) {
-  const c = useColors();
   const { t } = useTranslation();
 
   return (
-    <View className="flex-row items-center gap-2 bg-canvas-soft px-4 pb-2.5 pt-1">
+    <View className="flex-row items-center gap-2 px-4 pb-2.5 pt-1">
       {searching ? (
-        <View className="h-9 flex-1 flex-row items-center gap-2 rounded-sm bg-canvas-raise px-3">
-          <Ionicons name="search" size={15} color={c.textFaint} />
+        <View className="h-9 flex-1 flex-row items-center gap-2 rounded-sm bg-white/10 px-3">
+          <Ionicons name="search" size={15} color="rgba(255,255,255,0.6)" />
           <TextInput
             value={query}
             onChangeText={onQuery}
             placeholder={t('feed.searchPlaceholder')}
-            placeholderTextColor={c.textFaint}
+            placeholderTextColor="rgba(255,255,255,0.5)"
             autoFocus
             accessibilityLabel={t('feed.search')}
             style={{
               flex: 1,
-              color: c.textPrimary,
+              color: '#FFFFFF',
               fontFamily: 'Inter_400Regular',
               fontSize: 15,
             }}
@@ -62,9 +60,9 @@ export function FeedBar({
         // side by side with only a gap they look like one long name, and
         // "GNA Dawuro" is not what either is called.
         <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
-          <GnaHorizontal height={28} />
-          <View className="h-5 w-px bg-hairline/15" />
-          <Text variant="title-sm" className="shrink font-display" numberOfLines={1}>
+          <GnaHorizontal height={28} reversed />
+          <View className="h-5 w-px bg-white/20" />
+          <Text variant="title-sm" onMedia className="shrink font-display" numberOfLines={1}>
             {t('app.name')}
           </Text>
         </View>
@@ -75,7 +73,11 @@ export function FeedBar({
         accessibilityLabel={t('feed.search')}
         className="h-9 w-9 items-center justify-center rounded-pill"
       >
-        <Ionicons name={searching ? 'close' : 'search'} size={19} color={c.textPrimary} />
+        <Ionicons
+          name={searching ? 'close' : 'search'}
+          size={19}
+          color={searching ? '#FFFFFF' : 'rgba(255,255,255,0.75)'}
+        />
       </Pressable>
 
       {!searching ? (
@@ -86,12 +88,19 @@ export function FeedBar({
             like search or the map, and it needs to be found without being
             explained.
           */}
+          {/*
+            Slides is tinted rather than filled.
+            A solid accent pill next to the logo won the whole bar — the eye
+            went to it before the brand or the first report, which is the wrong
+            order for a control most people will use occasionally. Tinted, it
+            still reads as the one thing here that is not a plain icon.
+          */}
           <Pressable
             onPress={onOpenSlides}
             accessibilityLabel={t('slides.open')}
-            className="h-9 flex-row items-center gap-1.5 rounded-pill bg-accent px-3"
+            className="h-9 flex-row items-center gap-1.5 rounded-pill bg-white/15 px-3"
           >
-            <Ionicons name="play" size={13} color={c.textOnDark} />
+            <Ionicons name="play" size={12} color="#FFFFFF" />
             <Text variant="caption" onMedia className="font-sans-semibold">
               {t('slides.label')}
             </Text>
@@ -99,10 +108,10 @@ export function FeedBar({
 
           <Pressable
             onPress={onOpenBusinesses}
-            accessibilityLabel={t('businesses.title')}
+            accessibilityLabel={t('organisations.title')}
             className="h-9 w-9 items-center justify-center rounded-pill"
           >
-            <Ionicons name="business-outline" size={19} color={c.textPrimary} />
+            <Ionicons name="business-outline" size={19} color="rgba(255,255,255,0.75)" />
           </Pressable>
 
           <Pressable
@@ -110,7 +119,7 @@ export function FeedBar({
             accessibilityLabel={t('feed.map')}
             className="h-9 w-9 items-center justify-center rounded-pill"
           >
-            <Ionicons name="map-outline" size={19} color={c.textPrimary} />
+            <Ionicons name="map-outline" size={19} color="rgba(255,255,255,0.75)" />
           </Pressable>
         </>
       ) : null}

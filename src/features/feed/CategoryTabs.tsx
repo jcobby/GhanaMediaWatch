@@ -83,13 +83,13 @@ function Tab({
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
-      className="px-4 pb-2.5 pt-3"
+      className="px-3.5 pb-2 pt-2.5"
     >
       <Text
-        variant="body-sm"
+        variant="caption"
         tone={active ? 'primary' : 'muted'}
         className={active ? 'font-sans-semibold uppercase' : 'font-sans-medium uppercase'}
-        style={{ letterSpacing: 0.6 }}
+        style={{ letterSpacing: 0.9, fontSize: 12.5 }}
         numberOfLines={1}
       >
         {label}
@@ -97,9 +97,11 @@ function Tab({
 
       {/* The underline carries the category's own hue, so the strip reads as
           coloured sections rather than one accent repeated. */}
+      {/* The rule sits under the label rather than at the strip's edge, so a
+          tab reads as underlined text rather than as a filled segment. */}
       <View
-        className="absolute bottom-0 left-3 right-3 rounded-t-pill"
-        style={{ height: 3, backgroundColor: active ? hue : 'transparent' }}
+        className="absolute bottom-0 left-3.5 right-3.5 rounded-t-pill"
+        style={{ height: 2.5, backgroundColor: active ? hue : 'transparent' }}
       />
     </Pressable>
   );

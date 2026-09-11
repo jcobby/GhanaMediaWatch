@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="description" content="Version 2.0 · 27 August 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)">
+<meta name="description" content="Version 2.1 · 2 September 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)">
 <title>Dawuro Platform — Backend Specification</title>
 <style>
   *,*::before,*::after{box-sizing:border-box}
@@ -46,6 +46,15 @@
     color:var(--ink-2); text-decoration:none; font-size:12.5px; line-height:1.35;
   }
   .rail a:hover{background:var(--accent-wash); color:var(--accent-ink)}
+
+  /* Part dividers in a combined document. Set as a label rather than as a
+     louder link: they are where you are, not usually where you are going. */
+  .rail li.part{margin:16px 0 4px}
+  .rail li.part:first-child{margin-top:0}
+  .rail li.part a{
+    font-size:10px; font-weight:700; letter-spacing:.14em; text-transform:uppercase;
+    color:var(--ink-3);
+  }
 
   /* ── document ──────────────────────────────────────────────────── */
   .doc{min-width:0}
@@ -154,14 +163,12 @@
 <li><a href="#0-how-to-use-this-document">0. How to use this document</a></li>
 <li><a href="#1-what-dawuro-is">1. What Dawuro is</a></li>
 <li><a href="#2-conventions">2. Conventions</a></li>
-<li><a href="#use-a-64-bit-integer-column-numericdecimal-is-acceptable-floatrealdouble-is-a-defect">Use a 64-bit integer column. NUMERIC/DECIMAL is acceptable; FLOAT/REAL/DOUBLE is a defect.</a></li>
 <li><a href="#3-domain-model">3. Domain model</a></li>
 <li><a href="#4-the-trust-model">4. The trust model</a></li>
 <li><a href="#5-capture-and-upload">5. Capture and upload</a></li>
 <li><a href="#6-routing-which-institutions-receive-a-report">6. Routing — which institutions receive a report</a></li>
 <li><a href="#7-assignment-which-employee-handles-it">7. Assignment — which employee handles it</a></li>
 <li><a href="#8-organisations">8. Organisations</a></li>
-<li><a href="#an-individual-reporter-declares-an-institution-they-are-affiliated-with-or-declares-themselves-independent-both-are-first-class-independence-is-not-a-missing-value">An individual reporter declares an institution they are affiliated with, or declares themselves independent. Both are first-class; independence is not a missing value.</a></li>
 <li><a href="#9-institutional-onboarding">9. Institutional onboarding</a></li>
 <li><a href="#10-money">10. Money</a></li>
 <li><a href="#11-response-and-sla">11. Response and SLA</a></li>
@@ -175,13 +182,45 @@
   </nav>
   <main class="doc">
 <h1 id="dawuro-platform-backend-specification">Dawuro Platform — Backend Specification</h1>
-<p><strong>Version 2.0 · 27 August 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)</strong></p>
+<p><strong>Version 2.1 · 2 September 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)</strong></p>
 <hr>
 <h2 id="0-how-to-use-this-document">0. How to use this document</h2>
 <p>This is the complete specification for the Dawuro backend. <strong>Both clients are already built</strong> — an Expo mobile app for reporters and a Next.js console for institutions and platform operators. They run today against fixtures. This document describes the server they need.</p>
 <p>It is written to be handed to an AI coding assistant in full. It is deliberately self-contained: every type, every constant and every rule appears here literally, so nothing has to be inferred from a repository the assistant cannot see.</p>
 <p><strong>Normative language.</strong> <strong>MUST</strong> is a requirement — breaking it is a defect. <strong>SHOULD</strong> is a strong recommendation with room for a documented alternative. <strong>MAY</strong> is genuinely optional.</p>
 <p><strong>Read §4 and §14 before writing any code.</strong> §4 is the trust model, which is the product; §14 is the list of things that must never happen. Everything else is mechanics.</p>
+<h3 id="what-changed-in-21">What changed in 2.1</h3>
+<p>Four additions since 2.0, all driven by mobile work done between 27 August and 2 September. Nothing in 2.0 was removed or contradicted; if you have already started, these are additive.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Change</th>
+<th>Where</th>
+<th>Impact</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><strong><code>section</code> on every incident</strong> — a news desk, separate from <code>category</code></td>
+<td>§3.8, §3.6</td>
+<td>New required non-null field. New feed filter.</td>
+</tr>
+<tr>
+<td><strong><code>publisher.kind: &#39;organisation&#39;</code></strong> — a third publisher variant</td>
+<td>§3.6</td>
+<td>New union member. Gated on §4.5.</td>
+</tr>
+<tr>
+<td><strong>Public organisation directory</strong> — unauthenticated, reader-facing</td>
+<td>§8.8</td>
+<td>Four new endpoints and a new projection type.</td>
+</tr>
+<tr>
+<td><strong>Invariants 21–25</strong></td>
+<td>§14</td>
+<td>Two are data-leak rules. Read them.</td>
+</tr>
+</tbody></table></div>
+<p>The one to be careful with is <strong>§8.8</strong>. It exposes institutions to the public for the first time, and the private account record it derives from carries subscription and usage data that must not travel with it.</p>
 <p><strong>Language.</strong> All shapes are given as TypeScript because both clients are TypeScript and these exact declarations are compiled against today. Implement the server in whatever you like; the JSON on the wire must match these shapes exactly.</p>
 <h3 id="what-already-exists">What already exists</h3>
 <div class="tw"><table>
@@ -361,7 +400,8 @@ X-Dawuro-Org: biz_01JBX7Q2K9        # only when acting as an institution
 <li>Where a calculation involves multipliers (commission, §10.2), <strong>round once at the end</strong>. Rounding at each step compounds error across a payout batch, and a ledger that does not balance is worse than no ledger.</li>
 <li>Reconciliation is by subtraction, not by a second rounding: <code>reporterPesewas = grossPesewas − platformFeePesewas</code>.</li>
 </ul>
-<h2 id="use-a-64-bit-integer-column-numericdecimal-is-acceptable-floatrealdouble-is-a-defect">Use a 64-bit integer column. <code>NUMERIC</code>/<code>DECIMAL</code> is acceptable; <code>FLOAT</code>/<code>REAL</code>/<code>DOUBLE</code> is a defect.</h2>
+<p>Use a 64-bit integer column. <code>NUMERIC</code>/<code>DECIMAL</code> is acceptable; <code>FLOAT</code>/<code>REAL</code>/<code>DOUBLE</code> is a defect.</p>
+<hr>
 <h2 id="3-domain-model">3. Domain model</h2>
 <h3 id="31-incident-categories">3.1 Incident categories</h3>
 <p>23 categories in 6 groups. The groups exist for interface organisation; the category is what is stored and routed on.</p>
@@ -529,14 +569,23 @@ export interface PreciseLocation extends PublicLocation {
 
 export type Publisher =
   | { kind: &#39;anonymous&#39; }
-  | { kind: &#39;user&#39;; id: string; displayName: string; avatarUrl: string | null };
+  | { kind: &#39;user&#39;; id: string; displayName: string; avatarUrl: string | null }
+  | {
+      kind: &#39;organisation&#39;;                // NEW — see the note below
+      id: string;
+      displayName: string;
+      verified: boolean;                   // set by a platform administrator
+      logoUrl: string | null;
+    };
 
 export interface IncidentCounts { reactions: number; comments: number }
 
 export interface Incident {
   id: string;
   reportId: string;                       // see §3.7
+  origin: ItemOrigin;                     // NEW — see §3.9
   category: IncidentCategory;
+  section: NewsSection;                   // NEW — see §3.8
   description: string;
   vettingState: VettingState;
   publishedAt: string;
@@ -565,6 +614,9 @@ export interface AuthoredIncident extends Omit&lt;Incident, &#39;location&#39;&g
 }
 </code></pre>
 <p><code>assurance</code> and <code>verification</code> are separate fields and MUST remain separate. See §4.</p>
+<p><strong>On <code>publisher.kind === &#39;organisation&#39;</code>.</strong> The reporter is still the author; the organisation is the publisher. Those are different roles and the model keeps them apart — a report credited to Joy News was still filed by a person, and that person is still owed commission for it (§10.2) and still owns the consent flags on it (§3.3).</p>
+<p>An organisation may be named here <strong>only</strong> when it has licensed the report and then chosen to release it publicly, so both gates in §4.5 must have passed. Crediting an organisation that merely received a report would tell a reader an institution stands behind a claim it has not looked at.</p>
+<p><code>verified</code> on this variant is the institution&#39;s onboarding status (§9), not the report&#39;s verification state (§4.2). They are unrelated fields with unfortunately similar names: a fully onboarded organisation can publish an unverified report. Do not render one from the other.</p>
 <h3 id="37-report-id">3.7 Report ID</h3>
 <p><code>id</code> is for machines. <code>reportId</code> is the human reference <strong>burned into the video frame at capture</strong>, read down a phone line, and typed into the public verification page. Both clients generate it with this exact function and the server MUST produce identical output.</p>
 <pre><code class="language-ts">// Excludes every vowel, so an id can never spell a word — nobody should have
@@ -592,6 +644,134 @@ export function formatReportId(seed: string): string {
 <p><code>Math.imul</code> is a 32-bit signed multiply with wraparound. In other languages, multiply as unsigned 32-bit and mask to <code>0xFFFFFFFF</code>. Test vectors are in §15.</p>
 <p>Format: <code>DW-XXX-XXX</code>. Lookups MUST be case-insensitive.</p>
 <p><strong>This is a hash, so collisions are possible.</strong> For production, either persist a generated <code>reportId</code> with a uniqueness constraint and re-seed on collision, or switch to a sequence. Do not assume the hash alone is unique across millions of rows.</p>
+<h3 id="38-news-sections-new">3.8 News sections — <strong>new</strong></h3>
+<p>The mobile home screen is a newsroom feed, not a taxonomy browser, so reports are grouped by <strong>desk</strong>.</p>
+<pre><code class="language-ts">export type NewsSection =
+  | &#39;ghana&#39; | &#39;africa&#39; | &#39;world&#39; | &#39;business&#39; | &#39;politics&#39; | &#39;sport&#39;;
+
+/** Order as a newsroom runs them: nearest first. The client renders this order. */
+export const NEWS_SECTIONS: NewsSection[] = [
+  &#39;ghana&#39;, &#39;africa&#39;, &#39;world&#39;, &#39;business&#39;, &#39;politics&#39;, &#39;sport&#39;,
+];
+</code></pre>
+<p><strong>A section is not a category, and the two must not be merged.</strong> They answer different questions and are set by different people at different times:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th></th>
+<th><code>category</code> (§3.1)</th>
+<th><code>section</code></th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Answers</td>
+<td>what was filed</td>
+<td>where it ran</td>
+</tr>
+<tr>
+<td>Set by</td>
+<td>the reporter, at capture</td>
+<td>an editor, at publication</td>
+</tr>
+<tr>
+<td>Drives</td>
+<td>routing (§6), commission (§10.2), the editorial queue</td>
+<td>feed navigation only</td>
+</tr>
+<tr>
+<td>Closed set of</td>
+<td>23</td>
+<td>6</td>
+</tr>
+</tbody></table></div>
+<p>A burst main in Kaneshie is a <code>flood</code> on the <code>ghana</code> desk. Collapsing them means either the newsroom inherits a taxonomy it does not use, or routing loses the precision it depends on — an institution subscribing to <code>flood</code> must not start receiving everything filed under a &quot;Ghana&quot; heading.</p>
+<p><strong>Server obligations:</strong></p>
+<ul>
+<li><code>section</code> is <strong>required and non-null</strong> on every published incident. The client&#39;s type is not optional and a missing value renders an empty desk.</li>
+<li>Reports awaiting review have no section yet. Assign one at the publish transition (§4.3); until then the field may be absent from author-only responses, never from public ones.</li>
+<li>Default to <code>ghana</code> if an editor publishes without choosing. It is the desk that is right most of the time, and an unset desk is worse than an imprecise one — the report simply disappears from the feed.</li>
+<li><code>GET /incidents</code> MUST accept a <code>section</code> filter (§13). The client currently filters locally against fixtures; that is a stand-in for this parameter, not a design.</li>
+</ul>
+<p>Sections are display-only. No money, routing, SLA or permission decision may key off one.</p>
+<h3 id="39-item-origin-new">3.9 Item origin — <strong>new</strong></h3>
+<p>A feed of six desks cannot be filled by citizens alone. Only Ghana can be; Africa, World, Business, Politics and Sport are the agency&#39;s own copy. So a feed item is one of two things:</p>
+<pre><code class="language-ts">export type ItemOrigin = &#39;citizen_report&#39; | &#39;newsroom&#39;;
+</code></pre>
+<p><strong><code>citizen_report</code></strong> is the product. Someone filmed it, the GPS gate passed, §4 applies in full, and the reporter earns if an institution licenses it.</p>
+<p><strong><code>newsroom</code></strong> is agency copy — wire and desk-written stories. It is <strong>outside</strong> the trust model, not exempted from it: there is no capture to classify, no location to verify and nobody to pay.</p>
+<p>This distinction is load-bearing. The clients previously had no way to express it, so the wire stories were dressed as incident reports — a summit in Abuja carried GPS coordinates, a named citizen reporter, and a capture timestamp. Both of the product&#39;s promises broke quietly: a reader could no longer take &quot;captured here, then&quot; at face value, and the commission model held a report with a reporter nobody could pay.</p>
+<p><strong>Server obligations for a <code>newsroom</code> item:</strong></p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Required value</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>capturedAtIso</code></td>
+<td><code>null</code></td>
+<td>There was no capture. A timestamp is a claim about an act that did not happen.</td>
+</tr>
+<tr>
+<td><code>capturedAtPrecision</code></td>
+<td><code>&#39;hidden&#39;</code></td>
+<td>Follows from the above.</td>
+</tr>
+<tr>
+<td><code>location.latitude</code> / <code>.longitude</code></td>
+<td><code>null</code></td>
+<td>A coordinate asserts somebody was standing there. The dateline in <code>location.label</code> is fine — that is what the story is <em>about</em>.</td>
+</tr>
+<tr>
+<td><code>reporter</code></td>
+<td><code>{ kind: &#39;anonymous&#39; }</code></td>
+<td>Nobody filmed it.</td>
+</tr>
+<tr>
+<td><code>publisher</code></td>
+<td><code>kind: &#39;organisation&#39;</code> — the agency</td>
+<td>It is the agency&#39;s copy, published in its own name.</td>
+</tr>
+<tr>
+<td><code>assurance</code>, <code>verification</code></td>
+<td>Never set from a capture pipeline</td>
+<td>There is no capture to classify. Treat §4 as not applying.</td>
+</tr>
+<tr>
+<td>Commission</td>
+<td><strong>Never</strong></td>
+<td>§10.2 pays a reporter. There is no reporter.</td>
+</tr>
+</tbody></table></div>
+<p>Newsroom items do not enter the capture protocol (§5) at all. They arrive through the agency&#39;s own editorial tooling:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Capability</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>POST</td>
+<td><code>/newsroom/items</code></td>
+<td><code>publish_newsroom</code> — <strong>new</strong></td>
+</tr>
+<tr>
+<td>PATCH</td>
+<td><code>/newsroom/items/{id}</code></td>
+<td><code>publish_newsroom</code></td>
+</tr>
+<tr>
+<td>DELETE</td>
+<td><code>/newsroom/items/{id}</code></td>
+<td><code>publish_newsroom</code></td>
+</tr>
+</tbody></table></div>
+<p><code>publish_newsroom</code> is a new capability and deliberately narrow: it publishes agency copy and confers nothing over citizen reports. An account that can write a wire story must not thereby be able to verify, license or take down somebody&#39;s footage.</p>
+<p><strong>Open:</strong> wire ingestion itself — a syndication feed, an agency CMS, or hand entry — is not specified here. The contract above is what the clients need whichever it turns out to be.</p>
 <hr>
 <h2 id="4-the-trust-model">4. The trust model</h2>
 <p>This is the core of the product. Read it completely before implementing anything that touches it.</p>
@@ -1413,7 +1593,61 @@ export function inviteProblem(invite: Invite, nowIso: string): InviteProblem | n
 }
 </code></pre>
 <p>An organisation may be affiliated to another organisation. Affiliation is directional and MUST NOT be allowed to form a cycle — <code>canAffiliate</code> rejects an affiliation that would make an organisation its own ancestor.</p>
-<h2 id="an-individual-reporter-declares-an-institution-they-are-affiliated-with-or-declares-themselves-independent-both-are-first-class-independence-is-not-a-missing-value">An individual reporter declares an institution they are affiliated with, or declares themselves <strong>independent</strong>. Both are first-class; independence is not a missing value.</h2>
+<p>An individual reporter declares an institution they are affiliated with, or declares themselves <strong>independent</strong>. Both are first-class; independence is not a missing value.</p>
+<h3 id="88-the-public-directory-new">8.8 The public directory — <strong>new</strong></h3>
+<p>The mobile app has a reader-facing directory: search for an institution, open it, read the reports it has published, and answer the surveys it is running. This is the reader&#39;s route into an organisation, and it is <strong>unauthenticated</strong> — anyone with the app can browse it.</p>
+<p>Everything in §8.1 is the organisation&#39;s <em>private</em> account record. Almost none of it may appear here:</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Field</th>
+<th>Public?</th>
+<th>Why</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>id</code>, <code>name</code>, <code>sector</code>, <code>logoUrl</code></td>
+<td>✅</td>
+<td>It is a directory</td>
+</tr>
+<tr>
+<td><code>verified</code></td>
+<td>✅</td>
+<td>The reader is deciding whether to trust a source</td>
+</tr>
+<tr>
+<td><code>tier</code>, <code>subscriptionStatus</code>, <code>renewsAtIso</code></td>
+<td>❌</td>
+<td>What an institution pays is nobody&#39;s business</td>
+</tr>
+<tr>
+<td><code>seatsUsed</code>, <code>reportsUsedThisPeriod</code></td>
+<td>❌</td>
+<td>Reveals internal size and activity</td>
+</tr>
+<tr>
+<td><code>interests</code></td>
+<td>❌</td>
+<td>Reveals what it is watching for, and to whom</td>
+</tr>
+</tbody></table></div>
+<p>So the directory has its own projection. Do not reach for <code>BusinessAccount</code> and delete fields at the serialiser — one added field later and the leak is silent:</p>
+<pre><code class="language-ts">export interface PublicOrganisation {
+  id: string;
+  name: string;
+  sector: BusinessSector;
+  verified: boolean;
+  logoUrl: string | null;
+  /** Published reports credited to this organisation. Not its licensed total. */
+  publishedCount: number;
+  /** Live surveys a reader could answer right now. */
+  openSurveyCount: number;
+}
+</code></pre>
+<p><strong><code>publishedCount</code> is not the licensing count.</strong> An organisation may license a hundred reports and publish two. Exposing the former tells a competitor its download volume, and tells a reader a number that has nothing to do with what they can read.</p>
+<p><strong>Only <code>status: &#39;live&#39;</code> surveys appear</strong>, and a <code>draft</code> survey must never be reachable by guessing its id — a draft is an institution&#39;s unreleased work. Closed surveys may be listed as closed but MUST NOT accept responses.</p>
+<p>An organisation still in onboarding (§9) MUST NOT appear in the directory at all. It has not been screened, and a directory listing is an implicit endorsement by the platform.</p>
+<hr>
 <h2 id="9-institutional-onboarding">9. Institutional onboarding</h2>
 <p>Registration says who is asking. Onboarding is the evidence, and it is a different shape of thing: a sequence of steps an applicant works through at their own pace, each one submitted and then reviewed by a platform administrator before any of it counts.</p>
 <p>Two rules give the flow its shape:</p>
@@ -2091,6 +2325,38 @@ export interface Survey {
 <td>user — <strong>new</strong></td>
 </tr>
 </tbody></table></div>
+<p><code>GET /incidents</code> gains a repeatable <strong><code>section</code></strong> filter — <strong>new</strong>, §3.8. <code>?section=ghana&amp;section=africa</code> means OR, matching how <code>category</code> already behaves. It composes with <code>category</code> as AND: <code>?category=flood&amp;section=ghana</code> is floods on the Ghana desk.</p>
+<h3 id="public-organisation-directory-all-new-88">Public organisation directory — <strong>all new</strong>, §8.8</h3>
+<p>Unauthenticated. Reader-facing. Returns <code>PublicOrganisation</code>, never <code>BusinessAccount</code>.</p>
+<div class="tw"><table>
+<thead>
+<tr>
+<th>Method</th>
+<th>Path</th>
+<th>Auth</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>GET</td>
+<td><code>/organisations</code></td>
+<td>none — <code>?q=</code> searches name, <code>?sector=</code> filters</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/organisations/{id}</code></td>
+<td>none</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/organisations/{id}/incidents</code></td>
+<td>none — published and credited to it, paginated</td>
+</tr>
+<tr>
+<td>GET</td>
+<td><code>/organisations/{id}/surveys</code></td>
+<td>none — live surveys only</td>
+</tr>
+</tbody></table></div>
 <h3 id="editorial-all-new">Editorial — <strong>all new</strong></h3>
 <div class="tw"><table>
 <thead>
@@ -2340,6 +2606,14 @@ export interface Survey {
 <li><strong>Never let the SLA clock restart.</strong> Once acknowledged, the answer is fixed.</li>
 <li><strong>Never delete from the response log.</strong> Append-only.</li>
 <li><strong>Never accept an organisation context from anything but a verified membership</strong> on the authenticated user.</li>
+<li><strong>Never credit an organisation as <code>publisher</code> unless it has both licensed and published the report.</strong> Receiving a report is not endorsing it. §3.6, §4.5.</li>
+<li><strong>Never return a <code>BusinessAccount</code> from a public directory endpoint.</strong> Build <code>PublicOrganisation</code> explicitly; tier, subscription status, seat count, usage and interests are commercially sensitive. §8.8.</li>
+<li><strong>Never list an organisation still in onboarding in the public directory.</strong> A listing reads as a platform endorsement, and it has not been screened. §9.</li>
+<li><strong>Never let a <code>section</code> affect routing, commission, SLA or permissions.</strong> It is a display axis, and a report&#39;s <code>category</code> is what every decision keys off. §3.8.</li>
+<li><strong>Never pay a commission on a <code>newsroom</code> item.</strong> There is no reporter to pay, and an item that earns one has been misclassified. §3.9, §10.2.</li>
+<li><strong>Never set <code>assurance</code> or <code>verification</code> on a <code>newsroom</code> item.</strong> There is no capture to classify, and a class carried over from a citizen report would lend agency copy a guarantee the platform cannot make. §3.9, §4.</li>
+<li><strong>Never return a capture timestamp or coordinates on a <code>newsroom</code> item.</strong> Both are claims about an act of filming that did not happen. §3.9.</li>
+<li><strong>Never publish an incident without a <code>section</code>.</strong> The field is non-null on the client; an absent value renders an empty desk rather than an error. §3.8.</li>
 </ol>
 <hr>
 <h2 id="15-test-vectors">15. Test vectors</h2>

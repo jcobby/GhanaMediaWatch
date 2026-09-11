@@ -55,6 +55,17 @@ const authored = (
     vettingState: state,
     isAnonymous: index % 2 === 0,
     rejectionReason: null,
+    /*
+     * The reporter's own routing decision, which decides what the outcome
+     * timeline may claim. Left off the demo entirely until now, so every demo
+     * report was read as a public submission — including the ones the demo
+     * routes to institutions.
+     */
+    destination: index % 3 === 0 ? 'public' : index % 3 === 1 ? 'directed' : 'both',
+    requestedBusinessIds: [],
+    createdAt: base.publishedAt,
+    // Null unless an editor ran it. This is the whole point of the state.
+    publishedAt: state === 'published' ? base.publishedAt : null,
     displayFlags: { showLocation: true, showDate: true, showTime: true },
     location: {
       ...base.location,

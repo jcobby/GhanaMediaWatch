@@ -2,7 +2,7 @@ import type { IncidentCategory, MediaKind } from '@/types/api';
 import type { SubmissionDestination } from '@/types/dawuro';
 
 /**
- * What a reporter earns when a business licenses their report.
+ * What a reporter earns when an organisation licenses their report.
  *
  * Pure integer arithmetic in pesewas. Money never touches a float: cedis as a
  * decimal accumulate rounding error across a payout batch, and a ledger that
@@ -49,7 +49,7 @@ const VIDEO_MULTIPLIER = 1.5;
  */
 const AUDIO_MULTIPLIER = 1.25;
 
-/** A report sent to named businesses only is worth more for being exclusive. */
+/** A report sent to named organisations only is worth more for being exclusive. */
 const DIRECTED_MULTIPLIER = 1.25;
 
 /**
@@ -66,12 +66,12 @@ export interface CommissionInput {
   destination: SubmissionDestination;
   mediaKind: MediaKind;
   locationConfidence: 'high' | 'low';
-  /** Number of businesses licensing it. Each additional one adds half a share. */
+  /** Number of organisations licensing it. Each additional one adds half a share. */
   licensedBy?: number;
 }
 
 export interface CommissionBreakdown {
-  /** What the business is charged, before the platform's share. */
+  /** What the organisation is charged, before the platform's share. */
   grossPesewas: number;
   platformFeePesewas: number;
   /** What the reporter receives. */

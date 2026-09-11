@@ -8,7 +8,7 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Glass, Pressable, Text } from '@/components/ui';
 import { Sparkline } from '@/components/Sparkline';
 import {
-  BUSINESS_APPLICATIONS,
+  ORGANISATION_APPLICATIONS,
   PAYOUT_BATCHES,
   PLATFORM_METRICS,
   ROUTING_QUEUE,
@@ -37,7 +37,9 @@ export function PlatformDashboardScreen() {
   const signOut = useAuthStore((s) => s.signOut);
 
   const m = PLATFORM_METRICS;
-  const pendingApplications = BUSINESS_APPLICATIONS.filter((a) => a.status === 'pending').length;
+  const pendingApplications = ORGANISATION_APPLICATIONS.filter(
+    (a) => a.status === 'pending',
+  ).length;
   const needsRouting = ROUTING_QUEUE.filter((r) => r.status === 'awaiting_routing').length;
   const draftBatch = PAYOUT_BATCHES.find((b) => b.status === 'draft');
 
@@ -79,7 +81,7 @@ export function PlatformDashboardScreen() {
       </View>
 
       {/* Things that are stuck. These lead because nothing else matters if a
-          business application has been waiting two days. */}
+          organisation application has been waiting two days. */}
       <View className="gap-2">
         <Text variant="label" tone="muted">
           {t('platform.needsYou')}
@@ -112,7 +114,7 @@ export function PlatformDashboardScreen() {
         </View>
       </View>
 
-      {/* Money. Revenue against payouts, because the gap is the business. */}
+      {/* Money. Revenue against payouts, because the gap is the organisation. */}
       <LinearGradient
         colors={[...accentGradient]}
         start={{ x: 0, y: 0 }}
@@ -182,21 +184,21 @@ export function PlatformDashboardScreen() {
 
       {/* Scale */}
       <View className="flex-row gap-3">
-        <Stat label={t('platform.businesses')} value={String(m.activeBusinesses)} />
+        <Stat label={t('platform.organisations')} value={String(m.activeBusinesses)} />
         <Stat label={t('platform.reporters')} value={m.activeReporters.toLocaleString('en-GH')} />
         <Stat label={t('platform.unmatched')} value={String(m.awaitingReview)} />
       </View>
 
       <Pressable
-        onPress={() => router.push('/platform/businesses')}
-        accessibilityLabel={t('platform.manageBusinesses')}
+        onPress={() => router.push('/platform/organisations')}
+        accessibilityLabel={t('platform.manageOrganisations')}
       >
         <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-4">
           <View className="h-10 w-10 items-center justify-center rounded-pill bg-accent-wash">
             <Ionicons name="briefcase-outline" size={18} color={c.accent} />
           </View>
           <Text variant="body" className="flex-1 font-sans-semibold">
-            {t('platform.manageBusinesses')}
+            {t('platform.manageOrganisations')}
           </Text>
           <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
         </Glass>

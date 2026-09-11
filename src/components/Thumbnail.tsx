@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import { Image } from 'expo-image';
+import { Image, type ImageSource } from 'expo-image';
+import { Ionicons } from '@expo/vector-icons';
+import { categoryIcon } from '@/lib/categoryIcon';
+import type { Poster } from '@/lib/videoPoster';
 import type { IncidentCategory } from '@/types/api';
 
 /**
@@ -48,19 +51,51 @@ function isUnrenderable(uri: string | undefined): boolean {
 
 export function Thumbnail({
   uri,
+  poster,
+  cacheKey,
   category,
   style,
   contentFit = 'cover',
+  glyphSize = 26,
 }: {
+  /** The address the service published for this report's still, if it published one. */
   uri: string | undefined;
+  /**
+   * A name for this image that does not change when its URL does.
+   *
+   * **Why the feed reloads every picture, every time.** Media URLs are signed:
+   * `/v1/media/{id}?exp=…&sig=…`, with a fresh deadline and therefore a fresh
+   * signature on every API response. `expo-image` keys its cache on the URL
+   * unless told otherwise, so the same photograph arrived under a different key
+   * on each load and was downloaded again from scratch — the cache could never
+   * hit, and closing and reopening the app re-fetched the entire feed.
+   *
+   * Pass the incident id. Media is one-to-one with a report, so it identifies
+   * the bytes exactly and never changes.
+   */
+  cacheKey?: string;
+  /**
+   * A frame the phone cut from the clip itself.
+   *
+   * The service sends no poster for a video, and the alternative on screen is a
+   * drawing of the category — a column of raindrops where a column of scenes
+   * should be. Wins over `uri` and skips the unrenderable check below: there is
+   * no URL to inspect, because this is either a path we wrote or a native image
+   * reference `expo-image` takes as a source directly. See `lib/videoPoster`.
+   */
+  poster?: Poster | null;
   category: IncidentCategory;
   style?: StyleProp<ViewStyle>;
   contentFit?: 'cover' | 'contain';
+  /** Scaled by the caller — a full-bleed slide needs a larger mark than a row. */
+  glyphSize?: number;
 }) {
   const [failed, setFailed] = useState(false);
 
   const scene = SCENES[category] ?? SCENES.other;
-  const showReal = !isUnrenderable(uri) && !failed;
+  const source: ImageSource | Poster | null =
+    poster ?? (isUnrenderable(uri) ? null : { uri, cacheKey });
+  const showReal = source !== null && !failed;
 
   return (
     <View style={style} className="overflow-hidden bg-canvas-raise">
@@ -73,12 +108,48 @@ export function Thumbnail({
         transition={0}
       />
 
+      {/*
+        The category glyph, over the placeholder only.
+        A synthetic gradient says nothing on its own — six of them in a column
+        read as six loading states. The glyph turns each into a statement of
+        what kind of report it is, readable before a word of the headline.
+
+        It is deliberately not drawn over a real photograph: there it would be
+        clutter obscuring the thing the reader came to see.
+      */}
+      {!showReal ? (
+        <View
+          style={{
+            position: 'absolute',
+            width: '100%',
+            height: '100%',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
+          <Ionicons name={categoryIcon[category]} size={glyphSize} color="rgba(255,255,255,0.32)" />
+        </View>
+      ) : null}
+
       {showReal ? (
         <Image
-          source={{ uri }}
+          source={source}
           style={{ position: 'absolute', width: '100%', height: '100%' }}
           contentFit={contentFit}
           transition={160}
+          /*
+            Decoded frames stay in memory as well as on disk. The default keeps
+            only the file, so scrolling a feed back up re-decoded every image it
+            had already drawn — cheap next to a download, but it is the pause
+            you feel when a list does not scroll smoothly.
+          */
+          cachePolicy="memory-disk"
+          /*
+            Rows are recycled as the list scrolls. Without this the view keeps
+            drawing the previous report's picture until the new one decodes, so
+            a fast scroll shows the wrong photograph against the right headline.
+          */
+          recyclingKey={cacheKey}
           onError={() => setFailed(true)}
         />
       ) : null}

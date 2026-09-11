@@ -43,6 +43,21 @@ export const incidents = sqliteTable(
     landmark: text('landmark'),
     consentJson: text('consent_json').notNull().default('{}'),
 
+    /**
+     * Where the reporter chose to send it, and to whom.
+     *
+     * Stored rather than derived because it is a decision, not a property of
+     * the footage: it sets whether the report earns a commission and who is
+     * allowed to see it. It was previously collected on the review screen and
+     * then dropped on the floor, so the most consequential choice a reporter
+     * makes never left the screen it was made on.
+     *
+     * `directedBusinessIds` is JSON because it is a list the client only ever
+     * reads whole — nothing queries inside it.
+     */
+    destination: text('destination').notNull().default('marketplace'),
+    directedBusinessIds: text('directed_business_ids').notNull().default('[]'),
+
     // The fix, locked at the moment of capture and never updated afterwards.
     latitude: text('latitude'),
     longitude: text('longitude'),
@@ -65,6 +80,15 @@ export const incidents = sqliteTable(
     mimeType: text('mime_type').notNull(),
     byteSize: integer('byte_size').notNull().default(0),
     durationMs: integer('duration_ms'),
+    /**
+     * The moment of the clip the reporter chose as its thumbnail, in
+     * milliseconds from the start. Null when they did not choose.
+     *
+     * Kept on the queued row rather than in memory because the upload can
+     * happen hours later, in another town, after the app has been closed — and
+     * a choice that quietly evaporated would be worse than never offering it.
+     */
+    posterAtMs: integer('poster_at_ms'),
     width: integer('width'),
     height: integer('height'),
     /** Verified server-side at completion; a mismatch forces a re-upload. */

@@ -22,16 +22,25 @@
  *      "dark mode"; it is the only thing legible over an arbitrary photo, and
  *      every photo-led app does the same.
  *
- * Two themes, dark by default.
+ * ONE THEME. A black masthead over a white page, and no way to change it.
  *
- * Dark leads because this app is used outdoors at night as often as in an
- * office — a reporter filming a fire at 9pm should not be flashed by a white
- * screen — and because the media surfaces are dark regardless, so a dark shell
- * is the one that does not fight them.
+ * A dark/light switch was built here and taken back out. It gave one question
+ * — what colour is this app — three answers that disagreed: a value stored on
+ * the device, the reader's OS setting, and the app's own default. The app
+ * would come up dark for someone who had never asked for dark, and every fix
+ * moved the problem to a different one of the three.
  *
- * Light is kept, and kept good, for daylight and for older readers:
- * intraocular scatter roughly doubles between 20 and 70, and white-on-black
- * haloes badly for them. Both palettes are designed, neither is an inversion.
+ * So there is one `:root` block below and no `.dark` block at all. Nothing to
+ * keep in step, and nothing that can get out of step.
+ *
+ * Keep this file syntactically valid, and check it by compiling rather than by
+ * reading. Removing the old dark block left one unbalanced `}` here, which
+ * makes the whole stylesheet fail to parse — and nothing stops for that. Metro
+ * bundles, the app boots, and *every* token is undefined at once: the masthead
+ * renders transparent and the white labels on it land on the white page. It
+ * looks like a theme bug, so it draws you back to the palette, which is the
+ * one place that is fine. `compiledTokens.test.ts` is the check that catches
+ * it, because it asks what the runtime receives rather than what this says.
  */
 @layer base {
   :root {
@@ -77,55 +86,12 @@
 
     /* Live / urgent — reserved for active incidents only. */
     --color-live: 200 18 56;
-  }
+    /* The masthead. Identical in both themes: the page belongs to the reader,
+       the bar belongs to the publication.
 
-  /*
-   * Dark.
-   *
-   * Not an inversion of the above. The grounds are lifted off pure black —
-   * true #000 with light text produces halation on an OLED panel, which is
-   * the specific complaint people have about "dark mode that hurts".
-   *
-   * Text steps are compressed rather than mirrored: on a dark ground the eye
-   * needs less separation between levels, and a faint grey that reads as
-   * "quiet" on white reads as "broken" on black.
-   *
-   * The accent and semantics are all lifted, because a colour tuned to clear
-   * contrast against white fails against near-black.
-   */
-  .dark:root,
-  .dark {
-    --color-canvas: 14 16 26;
-    --color-canvas-soft: 22 25 38;
-    --color-canvas-raise: 32 36 52;
-
-    --color-glass: 30 34 50;
-    /* Media panels stay as they are — they sit on photography, not on theme. */
-    --color-glass-media: 16 17 26;
-
-    --color-hairline: 255 255 255;
-    --color-hairline-media: 255 255 255;
-
-    --color-text-primary: 240 242 250;
-    --color-text-secondary: 199 204 220;
-    --color-text-muted: 160 167 189;
-    --color-text-faint: 118 126 150;
-    --color-text-on-dark: 255 255 255;
-
-    --color-accent: 139 116 255;
-    --color-accent-alt: 96 150 255;
-    --color-accent-bright: 167 149 255;
-    --color-accent-wash: 44 38 78;
-
-    --color-success: 74 222 128;
-    --color-success-wash: 16 48 34;
-    --color-warning: 251 191 36;
-    --color-warning-wash: 56 42 12;
-    --color-danger: 248 113 113;
-    --color-danger-wash: 58 20 24;
-    --color-info: 125 170 255;
-    --color-info-wash: 22 36 68;
-
-    --color-live: 251 113 133;
+       Neutral rather than the navy of the dark palette — above a white page a
+       blue-cast bar reads as the dark theme leaking in at the top rather than
+       as a masthead. */
+    --color-masthead: 26 26 29;
   }
 }

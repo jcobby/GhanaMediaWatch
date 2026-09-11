@@ -1,11 +1,50 @@
 import type { ConsentFlags, Severity } from '@/types/context';
 import * as Crypto from 'expo-crypto';
+import * as Device from 'expo-device';
 import { incidentsRepository } from '@/db/incidentsRepository';
 import { hashFile, fileSize, persistCapture } from '@/services/media';
 import { drain } from '@/services/sync';
 import { useOutboxStore } from '@/stores/outboxStore';
 import type { PendingCapture } from '@/stores/captureStore';
 import type { IncidentCategory } from '@/types/api';
+import type { SubmissionDestination } from '@/types/dawuro';
+
+/**
+ * When this launch of the app began.
+ *
+ * The fallback for `deviceUptimeMs`, and a truthful one: the device has
+ * certainly been up at least as long as the app has been running. A lower bound
+ * is a usable tamper signal; a wrong number is not.
+ */
+const APP_STARTED_AT = Date.now();
+
+/**
+ * How long the device has been switched on, in milliseconds.
+ *
+ * **This was `Math.round(now - (fix.timestamp - now))`**, which simplifies to
+ * `2 × now − timestamp`. For a fresh GPS fix `timestamp ≈ now`, so it evaluated
+ * to *now* — an epoch value around 1.79 × 10¹², sent as a duration. Every report
+ * this app has ever filed has claimed the phone had been switched on for about
+ * fifty-six years.
+ *
+ * The field exists as a tamper signal: a device clock inconsistent with its
+ * uptime is a strong hint the capture time was fabricated. A constant absurd
+ * value is not a weak signal, it is a broken one — it can never agree with the
+ * clock, so the check it feeds can never mean anything.
+ *
+ * `expo-device` measures the real thing. Where it cannot, the app's own run
+ * time stands in: still a real duration, still a lower bound on the device's,
+ * and never a timestamp.
+ */
+async function deviceUptimeMs(): Promise<number> {
+  try {
+    const uptime = await Device.getUptimeAsync();
+    if (Number.isFinite(uptime) && uptime > 0) return Math.round(uptime);
+  } catch {
+    // Unsupported platform, or the module is unavailable. Fall through.
+  }
+  return Math.max(0, Date.now() - APP_STARTED_AT);
+}
 
 export interface SubmitCaptureInput {
   clientId: string;
@@ -16,7 +55,13 @@ export interface SubmitCaptureInput {
   displayFlags: { showLocation: boolean; showDate: boolean; showTime: boolean };
   severity: Severity;
   landmark: string;
+  /** The frame the reporter picked as the thumbnail, or null for the default. */
+  posterAtMs?: number | null;
   consent: ConsentFlags;
+  /** Public feed, marketplace, named institutions, or both. */
+  destination: SubmissionDestination;
+  /** Institutions named for a `directed` submission. Empty otherwise. */
+  directedBusinessIds: string[];
 }
 
 /**
@@ -43,10 +88,31 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
   const mediaUri = persistCapture(capture.uri, `${id}.${extension}`);
 
   const byteSize = fileSize(mediaUri);
+
+  /*
+   * An empty file is not a report.
+   *
+   * It happens when the camera hands back a URI for a recording that never
+   * wrote — a permission revoked mid-capture, storage full, the app killed
+   * during the stop. Queueing it produced the outbox row nobody could explain:
+   * "0 KB", three attempts, "Upload is missing chunks" — because there were no
+   * chunks to send, and no message anywhere said so.
+   *
+   * Refused here, while the reporter is still standing there and can film it
+   * again, rather than failing silently on a bus an hour later.
+   */
+  if (byteSize === 0) {
+    throw new Error('EMPTY_CAPTURE');
+  }
+
   // Hashed here rather than at upload time: the file is guaranteed present now,
   // and the server verifies this value at completion to catch corruption in
   // transit.
   const sha256 = await hashFile(mediaUri);
+
+  // Read now rather than at upload: it belongs to the moment of filing, and the
+  // row may sit in the outbox for hours before it is sent.
+  const uptimeMs = await deviceUptimeMs();
 
   const now = Date.now();
   const { fix } = capture;
@@ -66,6 +132,14 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
     landmark: input.landmark.trim() || null,
     consentJson: JSON.stringify(input.consent),
 
+    // The reporter's routing decision travels with the report from here on.
+    destination: input.destination,
+    // Only meaningful for a directed submission; stored empty otherwise so the
+    // column never holds a stale list from a changed mind.
+    directedBusinessIds: JSON.stringify(
+      input.destination === 'directed' ? input.directedBusinessIds : [],
+    ),
+
     // Stored at full precision regardless of the display flags — suppression is
     // a publishing decision, and the reporter may change it later.
     latitude: String(fix.latitude),
@@ -80,14 +154,20 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
     capturedAtIso: fix.capturedAtIso,
     capturedAtUtcOffsetMinutes: fix.capturedAtUtcOffsetMinutes,
     // Tamper signal: a device clock inconsistent with its uptime is a strong
-    // hint the capture time was fabricated.
-    deviceUptimeMs: Math.round(now - (fix.timestamp - now)),
+    // hint the capture time was fabricated. See `deviceUptimeMs` — this used to
+    // send an epoch timestamp in a field measured in elapsed milliseconds.
+    deviceUptimeMs: uptimeMs,
 
     mediaKind: capture.kind,
     mediaUri,
     mimeType: capture.mimeType,
     byteSize,
     durationMs: capture.durationMs,
+    /*
+     * Only for footage. A photograph is its own thumbnail, so a chosen frame on
+     * one would be a number nothing will ever read.
+     */
+    posterAtMs: capture.kind === 'video' ? (input.posterAtMs ?? null) : null,
     width: capture.width,
     height: capture.height,
     sha256,

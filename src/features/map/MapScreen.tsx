@@ -6,8 +6,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Chip, Glass, Pressable, Text } from '@/components/ui';
-import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, useColors } from '@/lib/theme';
+import { useFeed } from '@/hooks/useIncidents';
+import { categoryColor, categoryHue, useColors } from '@/lib/theme';
 import { formatDistance, formatRelativeTime } from '@/lib/format';
 import type { IncidentCategory } from '@/types/api';
 
@@ -39,10 +39,27 @@ export function MapScreen() {
   const [active, setActive] = useState<IncidentCategory | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
 
+  /*
+   * Published reports, from the server.
+   *
+   * The pins were seeded incidents, so the map showed floods and fires at
+   * coordinates nothing had ever been filed at — and tapping one opened a
+   * report that does not exist. A map is read as evidence: somebody points at a
+   * cluster and sends a crew.
+   *
+   * The published feed rather than `/incidents/map`, because the card that
+   * opens on tap needs the description and capture time, and the map endpoint
+   * returns clustered points without them. Worth revisiting for density: the
+   * clustered endpoint exists precisely so a busy map stays at 60fps.
+   */
+  const { data: page, isPending: feedPending, isError: feedFailed } = useFeed({ limit: 100 });
+
   const plottable = useMemo(
     () =>
-      SAMPLE_INCIDENTS.filter((i) => i.location.latitude !== null && i.location.longitude !== null),
-    [],
+      (page?.items ?? []).filter(
+        (i) => i.location.latitude !== null && i.location.longitude !== null,
+      ),
+    [page],
   );
 
   const visible = useMemo(
@@ -81,7 +98,7 @@ export function MapScreen() {
             tracksViewChanges={false}
           >
             <View
-              style={{ backgroundColor: categoryColor[incident.category] }}
+              style={{ backgroundColor: categoryHue(incident.category) }}
               className="h-6 w-6 items-center justify-center rounded-pill border-2 border-hairline/70"
             >
               <View className="h-1.5 w-1.5 rounded-pill bg-glass" />
@@ -110,6 +127,32 @@ export function MapScreen() {
         </ScrollView>
       </View>
 
+      {/*
+        An empty map is ambiguous, so it says which kind of empty it is.
+
+        Ghana with no pins on it looks identical whether nothing has been
+        published, the phone is offline, or the map is still loading — and only
+        one of those means there is genuinely nothing happening.
+      */}
+      {feedPending || feedFailed || plottable.length === 0 ? (
+        <View className="absolute left-4 right-4" style={{ top: insets.top + 76 }}>
+          <Glass elevation="high" className="rounded-lg px-4 py-3">
+            <Text variant="body-sm" className="text-center">
+              {feedPending
+                ? t('map.loading')
+                : feedFailed
+                  ? t('map.unavailableTitle')
+                  : t('map.emptyTitle')}
+            </Text>
+            {!feedPending ? (
+              <Text variant="caption" tone="muted" className="mt-1 text-center">
+                {feedFailed ? t('map.unavailableBody') : t('map.emptyBody')}
+              </Text>
+            ) : null}
+          </Glass>
+        </View>
+      ) : null}
+
       {/* Tap-to-preview card */}
       {selectedIncident ? (
         <View className="absolute left-4 right-4" style={{ bottom: insets.bottom + 88 }}>
@@ -127,7 +170,7 @@ export function MapScreen() {
                         width: 7,
                         height: 7,
                         borderRadius: 4,
-                        backgroundColor: categoryColor[selectedIncident.category],
+                        backgroundColor: categoryHue(selectedIncident.category),
                       }}
                     />
                     <Text variant="caption" tone="muted" className="uppercase">

@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Sheet, Text } from '@/components/ui';
-import { COMMISSION_LEDGER, EARNINGS_SUMMARY } from '@/api/dawuroData';
-import { accentGradient, categoryColor, useColors } from '@/lib/theme';
+import { useCommissions, useEarnings } from '@/hooks/useEarnings';
+import { accentGradient, categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis, type CommissionStatus } from '@/types/dawuro';
 import { payoutProgress, sumPesewas } from './commission';
@@ -27,7 +27,7 @@ const MOMO_NETWORKS = ['MTN MoMo', 'Telecel Cash', 'AT Money'] as const;
  * The reporter's wallet.
  *
  * Earnings are the reason a member of the public keeps filing reports, so the
- * ledger is deliberately legible: every row names the business that licensed
+ * ledger is deliberately legible: every row names the organisation that licensed
  * the report and what it paid. An opaque balance invites the suspicion that the
  * platform is skimming.
  */
@@ -42,7 +42,22 @@ export function EarningsScreen() {
   const [momoNumber, setMomoNumber] = useState('');
   const [processing, setProcessing] = useState(false);
 
-  const summary = EARNINGS_SUMMARY;
+  const { data: earnings } = useEarnings();
+  const { data: commissions } = useCommissions();
+
+  // Zero while loading: for a reporter with nothing yet, that is also the
+  // right answer, and `undefined` through `formatCedis` renders "GH₵NaN".
+  const summary = earnings ?? {
+    pendingPesewas: 0,
+    paidPesewas: 0,
+    lifetimePesewas: 0,
+    reportsLicensed: 0,
+    payoutThresholdPesewas: 0,
+    nextPayoutIso: null,
+  };
+  // Memoised because it feeds a `useMemo` below: a fresh `[]` on every render
+  // would invalidate the reconciliation on every render.
+  const ledger = useMemo(() => commissions ?? [], [commissions]);
   const progress = payoutProgress(summary.pendingPesewas, summary.payoutThresholdPesewas);
   const canWithdraw = summary.pendingPesewas >= summary.payoutThresholdPesewas;
 
@@ -54,11 +69,14 @@ export function EarningsScreen() {
    * instead of being quietly rendered.
    */
   const ledgerMismatch = useMemo(() => {
+    // Nothing to reconcile until both halves have arrived; an empty ledger
+    // against a non-zero total is a loading state, not a discrepancy.
+    if (!earnings || !commissions) return false;
     const earnedTotal = sumPesewas(
-      COMMISSION_LEDGER.filter((e) => e.status === 'earned').map((e) => e.amountPesewas),
+      ledger.filter((e) => e.status === 'earned').map((e) => e.amountPesewas),
     );
     return earnedTotal !== summary.pendingPesewas;
-  }, [summary.pendingPesewas]);
+  }, [earnings, commissions, ledger, summary.pendingPesewas]);
 
   const handleWithdraw = async () => {
     setProcessing(true);
@@ -77,9 +95,30 @@ export function EarningsScreen() {
     }
   };
 
+  /*
+   * The keyboard covers the bottom of the screen, which is where a form's last
+   * field and its submit button live. Every screen here that takes typed input
+   * needs this; only the sign-in screens had it, so the rest hid the control
+   * you were reaching for the moment you tapped to type.
+   *
+   * `padding` on iOS, matching the sign-in screens. Left unset on Android,
+   * where the window resizing under `adjustResize` already does it — the
+   * exception is a `Modal`, which that does not reach, and which `Sheet`
+   * handles itself.
+   */
   return (
-    <View className="flex-1 bg-canvas">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-canvas"
+    >
       <ScrollView
+        /*
+          Without this the first tap while the keyboard is up only dismisses
+          it, and the button under your finger does nothing — so every action
+          on a form takes two taps and the first one looks broken.
+        */
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 32 }}
         contentContainerClassName="gap-5 px-4"
         showsVerticalScrollIndicator={false}
@@ -155,14 +194,14 @@ export function EarningsScreen() {
             {t('earnings.ledger')}
           </Text>
           <View className="gap-2">
-            {COMMISSION_LEDGER.map((entry) => (
+            {ledger.map((entry) => (
               <Glass
                 key={entry.id}
                 elevation="low"
                 className="flex-row items-center gap-3 rounded-lg p-3.5"
               >
                 <View
-                  style={{ backgroundColor: categoryColor[entry.category] }}
+                  style={{ backgroundColor: categoryHue(entry.category) }}
                   className="h-10 w-1 rounded-pill"
                 />
                 <View className="flex-1 gap-1">
@@ -290,7 +329,7 @@ export function EarningsScreen() {
           />
         </View>
       </Sheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, TextInput, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, TextInput, View } from 'react-native';
 import MapView, { Circle, Marker, PROVIDER_DEFAULT } from 'react-native-maps';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -82,9 +82,30 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
     router.back();
   };
 
+  /*
+   * The keyboard covers the bottom of the screen, which is where a form's last
+   * field and its submit button live. Every screen here that takes typed input
+   * needs this; only the sign-in screens had it, so the rest hid the control
+   * you were reaching for the moment you tapped to type.
+   *
+   * `padding` on iOS, matching the sign-in screens. Left unset on Android,
+   * where the window resizing under `adjustResize` already does it — the
+   * exception is a `Modal`, which that does not reach, and which `Sheet`
+   * handles itself.
+   */
   return (
-    <View className="flex-1 bg-canvas">
+    <KeyboardAvoidingView
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+      className="flex-1 bg-canvas"
+    >
       <ScrollView
+        /*
+          Without this the first tap while the keyboard is up only dismisses
+          it, and the button under your finger does nothing — so every action
+          on a form takes two taps and the first one looks broken.
+        */
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 110 }}
         contentContainerClassName="gap-5 px-4"
         showsVerticalScrollIndicator={false}
@@ -234,7 +255,7 @@ export function QueryEditorScreen({ queryId }: QueryEditorScreenProps) {
       >
         <Button label={t('org.saveQuery')} size="lg" fullWidth onPress={handleSave} />
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

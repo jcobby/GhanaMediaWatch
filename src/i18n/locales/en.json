@@ -1,62 +1,72 @@
 {
   "audio": {
-    "title": "Record what you saw",
-    "start": "Start recording",
-    "stop": "Stop recording",
+    "failedBody": "Something went wrong with the microphone. Try again.",
+    "failedTitle": "Recording failed",
     "keep": "Use this recording",
-    "recordAgain": "Record again",
     "maxLength": "Up to {{seconds}} seconds",
+    "permissionBody": "Allow the microphone so you can record an account of what happened.",
+    "permissionTitle": "Microphone access needed",
+    "recordAgain": "Record again",
     "remaining": "{{seconds}} seconds left",
     "stamped": "Stamped with this location, accurate to ±{{accuracy}} m",
-    "permissionTitle": "Microphone access needed",
-    "permissionBody": "Allow the microphone so you can record an account of what happened.",
-    "failedTitle": "Recording failed",
-    "failedBody": "Something went wrong with the microphone. Try again."
+    "start": "Start recording",
+    "stop": "Stop recording",
+    "title": "Record what you saw"
   },
   "auth": {
-    "welcomeBack": "Welcome back",
-    "signInSubtitle": "Sign in to track your reports and get responses.",
-    "email": "Email",
-    "password": "Password",
-    "signIn": "Sign in",
-    "signUp": "Sign up",
-    "noAccount": "Don't have an account?",
-    "forgotPassword": "Forgot password?",
-    "signInFailed": "Couldn't sign you in",
-    "signUpFailed": "Couldn't create your account",
-    "createAccount": "Create account",
-    "signUpSubtitle": "An account lets you track your reports and see when they are actioned.",
-    "displayName": "Display name",
-    "displayNamePlaceholder": "How you appear on reports",
-    "passwordPlaceholder": "At least 10 characters",
+    "acceptTerms": "I agree to the terms of use and understand that reports may be reviewed before publication.",
+    "accountCreatedBody": "You can now track your reports and see what organisations do about them.",
+    "accountCreatedTitle": "Account created",
+    "accountType": {
+      "reporter": "Public",
+      "platform_owner": "Operator",
+      "organisation": "Organisation"
+    },
+    "backToSignIn": "Back to sign in",
     "confirmPassword": "Confirm password",
     "confirmPasswordPlaceholder": "Type it again",
-    "acceptTerms": "I agree to the terms of use and understand that reports may be reviewed before publication.",
+    "createAccount": "Create account",
+    "demoSubtitle": "Password for all of them: {{password}}",
+    "demoTitle": "Demo accounts",
+    "displayName": "Display name",
+    "displayNamePlaceholder": "How you appear on reports",
+    "email": "Email",
+    "forgotPassword": "Forgot password?",
+    "guestBody": "You can file reports now. Create an account later to track what happens to them.",
+    "guestTitle": "Reporting as a guest",
+    "noAccount": "Don't have an account?",
+    "password": "Password",
+    "passwordPlaceholder": "At least 10 characters",
+    "resetPassword": "Reset password",
+    "resetSentBody": "If that address has an account, a reset link is on its way.",
+    "resetSentTitle": "Check your email",
+    "resetSubtitle": "Enter your email and we will send you a reset link.",
+    "sendResetLink": "Send reset link",
+    "signIn": "Sign in",
+    "signInFailed": "Couldn't sign you in",
+    "signInSubtitle": "Sign in to track your reports and get responses.",
+    "signUp": "Sign up",
+    "signUpFailed": "Couldn't create your account",
+    "signUpSubtitle": "An account lets you track your reports and see when they are actioned.",
+    "signedOutBody": "Reports already on this phone stay queued and will still send.",
+    "signedOutTitle": "Signed out",
     "strength": {
       "tooShort": "Too short",
       "weak": "Weak",
       "good": "Good",
       "strong": "Strong"
     },
-    "resetPassword": "Reset password",
-    "resetSubtitle": "Enter your email and we will send you a reset link.",
-    "sendResetLink": "Send reset link",
-    "resetSentTitle": "Check your email",
-    "resetSentBody": "If that address has an account, a reset link is on its way.",
-    "backToSignIn": "Back to sign in",
     "useDemoAccount": "Use a demo account",
-    "demoTitle": "Demo accounts",
-    "demoSubtitle": "Password for all of them: {{password}}",
-    "accountType": {
-      "reporter": "Public",
-      "business": "Business",
-      "platform_owner": "Operator"
-    }
+    "welcomeBack": "Welcome back",
+    "welcomeBackBody": "Welcome back, {{name}}.",
+    "welcomeBackTitle": "Signed in",
+    "sessionEndedTitle": "You have been signed out",
+    "sessionEndedBody": "Your session expired and could not be renewed. Sign in again — anything queued on this phone still sends."
   },
-  "business": {
+  "organisation": {
     "allowanceRemaining": "{{count}} reports left this month",
     "allowanceUsed": "Monthly allowance used",
-    "brand": "Dawuro for business",
+    "brand": "Dawuro for organisations",
     "canRequest": "Can request reports",
     "confidence": {
       "high": "High",
@@ -65,7 +75,7 @@
     "contactName": "Primary contact",
     "contactNamePlaceholder": "Full name",
     "countsToward": "Counts toward your monthly allowance.",
-    "createAccount": "Create a business account",
+    "createAccount": "Create an organisation account",
     "detailsHelp": "We verify every organisation before activating an account.",
     "download": "Download original",
     "downloadBody": "The original file will be saved to your device.",
@@ -118,9 +128,11 @@
     "verificationBody": "These accounts receive footage of the public. We check every organisation before granting access.",
     "verificationTitle": "Verification required",
     "willBeCharged": "You will be charged {{amount}} for this report.",
-    "workEmail": "Work email"
+    "workEmail": "Work email",
+    "cannotSubmitTitle": "Organisation accounts are not open yet",
+    "cannotSubmitBody": "The service cannot register an organisation yet, so this application cannot be sent. Nothing you typed has been lost — copy it and contact Dawuro directly."
   },
-  "businessAccount": {
+  "organisationAccount": {
     "annualFee": "Annual fee",
     "atLeastOne": "Choose at least one category, or your inbox will stay empty.",
     "billing": "Billing",
@@ -149,11 +161,11 @@
     "thisMonth": "Reports this month",
     "unlimitedNote": "Your annual plan covers unlimited downloads."
   },
-  "businessTabs": {
+  "organisationTabs": {
+    "account": "Account",
     "inbox": "Inbox",
     "published": "Published",
-    "surveys": "Surveys",
-    "account": "Account"
+    "surveys": "Surveys"
   },
   "capture": {
     "accuracy": "Accuracy",
@@ -166,7 +178,11 @@
     "cameraPermissionTitle": "Camera access needed",
     "flip": "Flip camera",
     "grantAccess": "Allow access",
-    "holdToRecord": "Hold to record",
+    "tapToRecord": "Tap to record",
+    "recordFailedTitle": "The recording stopped",
+    "recordFailedBody": "The camera ended the recording before it finished. Please film it again.",
+    "stopRecording": "Tap to stop",
+    "savingRecording": "Saving…",
     "latitude": "Latitude",
     "live": "Live",
     "liveBody": "It will let a monitoring room watch an incident as it happens and send the nearest unit while you are still there. Record a video for now — it reaches the same organisations.",
@@ -194,18 +210,18 @@
     "video": "Video"
   },
   "category": {
-    "fire": "Fire",
     "accident": "Accident",
-    "disorder": "Disorder",
-    "infrastructure": "Infrastructure",
-    "utility": "Utility",
     "corruption": "Corruption",
-    "environment": "Environment",
-    "wildlife": "Wildlife",
-    "flood": "Flood",
     "crime": "Crime",
+    "disorder": "Disorder",
+    "environment": "Environment",
+    "fire": "Fire",
+    "flood": "Flood",
     "health": "Health",
-    "other": "Other"
+    "infrastructure": "Infrastructure",
+    "other": "Other",
+    "utility": "Utility",
+    "wildlife": "Wildlife"
   },
   "comments": {
     "addedFootage": "Added footage",
@@ -253,45 +269,58 @@
     "viewAll": "View all"
   },
   "destination": {
-    "label": "Where should this go?",
-    "public": {
-      "title": "Public feed",
-      "body": "Everyone sees it. No payment — visibility is the reward."
-    },
-    "marketplace": {
-      "title": "Offer to businesses",
-      "body": "Subscribing organisations can license it. You earn a commission."
+    "both": {
+      "title": "Public and organisations",
+      "body": "An editor reviews it for the feed, and organisations can license it."
     },
     "directed": {
       "title": "Send to specific organisations",
-      "body": "Only the ones you choose receive it. Exclusive, so it pays more."
+      "body": "An editor reviews it, then only the ones you choose receive it. Exclusive, so it pays more."
     },
-    "both": {
-      "title": "Public and businesses",
-      "body": "Published openly and offered for licensing."
-    },
-    "chooseBusinesses": "Choose organisations",
-    "chooseBusinessesHelp": "Only subscribing organisations are listed.",
-    "recipientCount": "{{count}} selected",
-    "interestedIn": "Actively looking for {{category}} reports",
-    "estimatedEarning": "You could earn {{amount}}",
     "earningHelp": "Paid once an organisation licenses this report.",
+    "estimatedEarning": "You could earn {{amount}}",
+    "interestedIn": "Actively looking for {{category}} reports",
+    "label": "Where should this go?",
+    "marketplace": {
+      "title": "Offer to organisations",
+      "body": "An editor reviews it, then subscribing organisations can license it. You earn a commission."
+    },
     "noEarning": "No payment for public reports",
-    "noEarningHelp": "Choose a business option above to earn a commission."
+    "noEarningHelp": "Choose a organisation option above to earn a commission.",
+    "public": {
+      "title": "Public feed",
+      "body": "An editor reviews it, then it runs on the feed for everyone. No payment — visibility is the reward."
+    },
+    "recipientCount": "{{count}} selected",
+    "loadingOrganisations": "Looking up organisations…",
+    "directoryFailedTitle": "Could not load organisations",
+    "directoryFailedBody": "Your report is safe. Send it to the public feed instead, or try again when you have a connection.",
+    "noOrganisationsTitle": "No organisations are taking reports yet",
+    "noOrganisationsBody": "Nobody has signed up to receive reports in your area. Send it to the public feed so people can still see it.",
+    "nobodyBuyingTitle": "No payment available yet",
+    "nobodyBuyingHelp": "No organisation has joined the platform, so nothing can be licensed and nothing can be paid. Sending to the public feed still gets it seen.",
+    "notAvailableYet": "No buyers yet",
+    "chooseOrganisations": "Choose organisations",
+    "chooseOrganisationsHelp": "Only subscribing organisations are listed."
   },
   "detail": {
+    "actions": "Actions",
     "ago": "{{time}} ago",
     "approxOrigin": "Approximate — location permission not granted",
     "captured": "Captured",
     "capturedAt": "Captured: {{value}}",
+    "comments": "Comments",
+    "contributions": "{{count}} people added footage of the same thing",
     "coordinates": "Coordinates",
     "directionsFailedBody": "No maps app or browser responded on this device.",
     "directionsFailedTitle": "Could not open directions",
     "distance": "Distance",
     "elapsed": "Elapsed",
     "errorTitle": "Couldn't load this incident",
+    "filedBy": "Filed by {{name}}",
     "fromYou": "From your current location",
     "getDirections": "Get directions",
+    "hideActions": "Hide actions",
     "locationHidden": "The reporter chose not to publish this location. It is still recorded for review.",
     "navigate": "Navigate",
     "openInMaps": "Open in Maps",
@@ -304,50 +333,53 @@
     "reportedTitle": "Thank you",
     "routeFrom": "Your location",
     "routeTo": "Incident",
+    "showLess": "Less",
+    "showMore": "More",
     "straightLine": "Straight-line distance"
   },
   "earn": {
+    "filmBody": "Send it to organisations who need it and get paid when they license it.",
+    "filmTitle": "Film something",
+    "inDemand": "What organisations want",
+    "inDemandHelp": "Reports in these categories reach a buyer fastest.",
+    "recent": "Recent",
+    "surveyBody": "{{count}} tasks open near you",
+    "surveyNone": "No tasks right now",
+    "surveyTitle": "Answer paid questions",
     "title": "Earn",
     "viewWallet": "View wallet and payouts",
     "waysToEarn": "Two ways to earn",
-    "filmTitle": "Film something",
-    "filmBody": "Send it to organisations who need it and get paid when they license it.",
-    "surveyTitle": "Answer paid questions",
-    "surveyBody": "{{count}} tasks open near you",
-    "surveyNone": "No tasks right now",
-    "inDemand": "What organisations want",
-    "inDemandHelp": "Reports in these categories reach a buyer fastest.",
-    "recent": "Recent"
+    "noDemand": "No organisation is buying footage yet. You can still file reports to the public feed — they just will not earn anything until agencies join."
   },
   "earnings": {
-    "title": "Earnings",
     "available": "Available to withdraw",
-    "withdraw": "Withdraw",
-    "thresholdMet": "You can withdraw now.",
-    "thresholdRemaining": "{{amount}} more to reach the payout minimum",
-    "progressLabel": "Payout progress, {{percent}} percent",
-    "paidOut": "Paid out",
-    "lifetime": "Lifetime",
-    "licensed": "Licensed",
+    "confirmWithdraw": "Send to mobile money",
+    "howBody": "You earn when an organisation licenses a report you sent to organisations. Public feed reports do not earn — the reward there is reach. Urgent categories, video, and exclusive submissions pay more.",
+    "howTitle": "How earnings work",
     "ledger": "Your reports",
+    "licensed": "Licensed",
+    "lifetime": "Lifetime",
+    "mismatchNotice": "Your balance is being recalculated. If it still looks wrong after a refresh, contact support.",
+    "momoNumber": "Mobile money number",
+    "network": "Network",
     "notYetLicensed": "Not yet licensed",
+    "paidOut": "Paid out",
+    "payoutSentBody": "Simulated payout to {{network}}.",
+    "payoutSentTitle": "{{amount}} on its way",
+    "progressLabel": "Payout progress, {{percent}} percent",
+    "simulationNotice": "Simulation only — no money moves. A real payout needs a mobile-money integration and identity checks.",
     "status": {
       "pending": "Pending",
       "earned": "Earned",
       "paid": "Paid",
       "void": "Not paid"
     },
-    "howTitle": "How earnings work",
-    "howBody": "You earn when an organisation licenses a report you sent to businesses. Public feed reports do not earn — the reward there is reach. Urgent categories, video, and exclusive submissions pay more.",
-    "withdrawTitle": "Withdraw to mobile money",
+    "thresholdMet": "You can withdraw now.",
+    "thresholdRemaining": "{{amount}} more to reach the payout minimum",
+    "title": "Earnings",
+    "withdraw": "Withdraw",
     "withdrawSubtitle": "Sending {{amount}}",
-    "network": "Network",
-    "momoNumber": "Mobile money number",
-    "confirmWithdraw": "Send to mobile money",
-    "simulationNotice": "Simulation only — no money moves. A real payout needs a mobile-money integration and identity checks.",
-    "payoutSentTitle": "{{amount}} on its way",
-    "payoutSentBody": "Simulated payout to {{network}}.",
-    "mismatchNotice": "Your balance is being recalculated. If it still looks wrong after a refresh, contact support."
+    "withdrawTitle": "Withdraw to mobile money"
   },
   "error": {
     "boundaryBody": "You can go back and try again. Your captured reports are saved on this device and were not affected.",
@@ -364,6 +396,7 @@
     "endOfFeed": "That's everything for now",
     "errorBody": "The feed could not be loaded. Check your connection and try again.",
     "errorTitle": "Couldn't load the feed",
+    "exitSlides": "Close slides",
     "fromYou": "from you",
     "latest": "Latest",
     "map": "Open the map",
@@ -380,46 +413,90 @@
     "searchPlaceholder": "Search descriptions and places",
     "share": "Share",
     "shareVerify": "Check this report at Dawuro — reference {{id}}",
+    "slides": "Slides",
     "tagline": "A fool-proof eye-witness account",
     "title": "Near you",
+    "topStory": "Top story",
     "unmute": "Unmute",
     "video": "Video"
   },
   "map": {
     "all": "All",
     "hint": "{{count}} incidents shown · tap a pin",
-    "openIncident": "View incident"
+    "openIncident": "View incident",
+    "loading": "Loading reports…",
+    "emptyTitle": "No published reports to show",
+    "emptyBody": "Reports appear here once a newsroom or agency releases them. Nothing is hidden from you.",
+    "unavailableTitle": "Could not load the map",
+    "unavailableBody": "This phone could not reach the service. The map is empty because nothing loaded, not because nothing happened."
   },
   "onboarding": {
-    "gps": {
-      "title": "Verified location, every time",
-      "body": "The camera unlocks only once your phone has an accurate GPS fix, so every report can be found on the ground."
-    },
-    "offline": {
-      "title": "Works without signal",
-      "body": "Capture anywhere. Reports are saved on your phone and upload themselves the moment you are back online."
-    },
     "anonymous": {
       "title": "Report anonymously",
       "body": "Publish without a profile. A device identifier is still recorded so abuse can be traced — we will not pretend otherwise."
     },
+    "continueWithout": "Continue without an account",
     "createAccount": "Create an account",
-    "continueWithout": "Continue without an account"
+    "earn": {
+      "title": "You are paid when it is used",
+      "body": "When an institution licenses your footage, you earn a commission on it. Filing is free and always will be."
+    },
+    "field": {
+      "title": "Built for the field",
+      "body": "The camera waits for an accurate GPS fix, so your footage carries proof of where it was taken. No signal? It saves to your phone and sends itself when you are back."
+    },
+    "gps": {
+      "title": "Verified location, every time",
+      "body": "The camera unlocks only once your phone has an accurate GPS fix, so every report can be found on the ground."
+    },
+    "haveAccount": "I already have an account",
+    "offline": {
+      "title": "Works without signal",
+      "body": "Capture anywhere. Reports are saved on your phone and upload themselves the moment you are back online."
+    },
+    "reaches": {
+      "title": "It reaches someone who can act",
+      "body": "Your report goes to the organisations whose job it is — the Assembly, NADMO, the utility. You can see which ones have it, and what each of them did about it."
+    },
+    "what": {
+      "title": "Film what is happening",
+      "body": "A blocked drain, a fire, a pole down across the path. If you can see it, you can report it — and the Ghana News Agency stands behind what gets published."
+    }
   },
   "org": {
-    "dashboard": "Organisation",
-    "yourOrganisation": "Your organisation",
-    "last14Days": "Last 14 days",
-    "reportsMatched": "Reports matched",
-    "vsPreviousWeek": "vs previous week",
+    "alertsOff": "Alerts off",
+    "alertsOn": "Alerts on",
     "byCategory": "By category",
-    "watchQueries": "Watch queries",
-    "needsAttention": "Needs attention",
-    "openInbox": "Open inbox",
-    "matches": "{{count}} matches",
-    "noPermission": "Your role does not have access to this.",
+    "categories": "Categories",
+    "categoryRequiredBody": "A query with no categories matches nothing.",
+    "categoryRequiredTitle": "Pick at least one category",
+    "dashboard": "Organisation",
+    "editQuery": "Edit query",
     "inbox": "Report inbox",
     "inboxCount": "{{count}} reports",
+    "larger": "Larger radius",
+    "last14Days": "Last 14 days",
+    "mapHint": "Tap the map or drag the pin to move the centre.",
+    "matches": "{{count}} matches",
+    "nameRequiredBody": "Give it a name your team will recognise.",
+    "nameRequiredTitle": "Name this query",
+    "needsAttention": "Needs attention",
+    "newQuery": "New query",
+    "noPermission": "Your role does not have access to this.",
+    "noQueriesBody": "Create one to start receiving matching reports from the public.",
+    "noQueriesTitle": "No watch queries yet",
+    "openInbox": "Open inbox",
+    "pushAlerts": "Push alerts",
+    "pushAlertsHelp": "Notify this organisation when a new report matches.",
+    "queryName": "Query name",
+    "queryNamePlaceholder": "e.g. Flooding — Odaw catchment",
+    "querySaved": "Query saved",
+    "querySavedBody": "Matching reports will appear in your inbox.",
+    "radius": "Radius",
+    "reportsMatched": "Reports matched",
+    "saveQuery": "Save query",
+    "selectedCount": "{{count}} selected",
+    "smaller": "Smaller radius",
     "status": {
       "new": "New",
       "in_review": "In review",
@@ -427,52 +504,38 @@
       "dismissed": "Dismissed"
     },
     "statusApplied": "Updated {{count}} reports",
-    "selectedCount": "{{count}} selected",
-    "newQuery": "New query",
-    "editQuery": "Edit query",
-    "queryName": "Query name",
-    "queryNamePlaceholder": "e.g. Flooding — Odaw catchment",
-    "watchArea": "Watch area",
-    "mapHint": "Tap the map or drag the pin to move the centre.",
-    "radius": "Radius",
-    "smaller": "Smaller radius",
-    "larger": "Larger radius",
-    "categories": "Categories",
-    "pushAlerts": "Push alerts",
-    "pushAlertsHelp": "Notify this organisation when a new report matches.",
     "suppressedNote": "Reports whose reporter hid the location are never matched by a geofence, including for paying organisations.",
-    "saveQuery": "Save query",
-    "querySaved": "Query saved",
-    "querySavedBody": "Matching reports will appear in your inbox.",
-    "nameRequiredTitle": "Name this query",
-    "nameRequiredBody": "Give it a name your team will recognise.",
-    "categoryRequiredTitle": "Pick at least one category",
-    "categoryRequiredBody": "A query with no categories matches nothing.",
-    "noQueriesTitle": "No watch queries yet",
-    "noQueriesBody": "Create one to start receiving matching reports from the public.",
-    "alertsOn": "Alerts on",
-    "alertsOff": "Alerts off"
+    "vsPreviousWeek": "vs previous week",
+    "watchArea": "Watch area",
+    "watchQueries": "Watch queries",
+    "yourOrganisation": "Your organisation"
   },
   "outbox": {
-    "title": "Outbox",
-    "emptyTitle": "Nothing waiting to send",
-    "emptyBody": "Captured reports queue here and upload themselves as soon as you're online.",
-    "retryAll": "Retry all",
-    "waitingForWifi": "Waiting for Wi-Fi",
-    "pendingCount": "{{count}} waiting to send",
     "allSent": "Everything has been sent",
     "attempt": "{{count}} attempts",
+    "cancelled": "Report removed from the queue",
+    "emptyBody": "Captured reports queue here and upload themselves as soon as you're online.",
+    "emptyTitle": "Nothing waiting to send",
+    "explainer": "Reports upload one at a time, oldest first, and resume automatically after a dropped connection.",
+    "pendingCount": "{{count}} waiting to send",
+    "progressLabel": "Upload progress, {{percent}} percent",
+    "retryAll": "Retry all",
     "retrying": "Retrying now",
     "retryingAll": "Retrying all failed uploads",
-    "cancelled": "Report removed from the queue",
-    "progressLabel": "Upload progress, {{percent}} percent",
-    "explainer": "Reports upload one at a time, oldest first, and resume automatically after a dropped connection.",
+    "sentBody": "It is with Dawuro now. You will see here what organisations do about it.",
+    "sentTitle": "Report sent",
     "state": {
       "queued": "Queued",
       "uploading": "Uploading",
       "uploaded": "Sent",
       "failed": "Failed"
-    }
+    },
+    "title": "Outbox",
+    "waitingForWifi": "Waiting for Wi-Fi",
+    "mediaGone": "The recording is no longer on this phone, so this cannot be sent.",
+    "mediaEmpty": "This recording is empty — nothing was captured. Film it again to send it.",
+    "allSentBody": "Everything on this phone has been sent. Find what you have filed under Profile.",
+    "viewSent": "View my reports"
   },
   "platform": {
     "acrossReporters": "across {{count}} reporters",
@@ -482,7 +545,7 @@
     "approve": "Approve",
     "approved": "Approved",
     "approvedBody": "They can now receive routed reports.",
-    "approvedTitle": "Business approved",
+    "approvedTitle": "Organisation approved",
     "autoRouted": "auto-routed",
     "awaiting": "Awaiting",
     "awaitingCount": "{{count}} awaiting routing",
@@ -493,7 +556,6 @@
     },
     "batchReleasedBody": "Simulated transfers have been queued.",
     "batchReleasedTitle": "Batch released",
-    "businesses": "Businesses",
     "confirmRelease": "Yes, release",
     "confirmRouting": "Route to {{count}}",
     "console": "Dawuro console",
@@ -504,7 +566,6 @@
       "registration_unverified": "Registration unverified"
     },
     "interestMatch": "Matches their declared interests",
-    "manageBusinesses": "Manage businesses",
     "marginThisMonth": "Margin this month",
     "needsRouting": "Reports to review",
     "needsYou": "Needs your attention",
@@ -520,7 +581,7 @@
     "payoutSimulation": "Simulation only. No money moves. A real payout run needs a mobile-money provider and a settlement account.",
     "payouts": "Payouts",
     "pending": "Pending",
-    "pendingApplications": "Business applications",
+    "pendingApplications": "Organisation applications",
     "pendingCount": "{{count}} awaiting decision",
     "queueClearBody": "Every submission has been routed.",
     "queueClearTitle": "Queue is clear",
@@ -551,41 +612,65 @@
       "past_due": "Past due",
       "cancelled": "Cancelled"
     },
-    "unmatched": "Unmatched"
+    "unmatched": "Unmatched",
+    "organisations": "Organisations",
+    "manageOrganisations": "Manage organisations"
   },
   "platformTabs": {
-    "console": "Console",
-    "routing": "Routing",
     "approvals": "Approvals",
-    "payouts": "Payouts"
+    "console": "Console",
+    "payouts": "Payouts",
+    "routing": "Routing"
   },
   "profile": {
-    "reports": "My reports",
-    "settings": "Settings",
     "all": "All",
+    "fileFirst": "File your first report",
     "filed": "Filed",
-    "published": "Published",
-    "reactions": "Reactions",
-    "pendingExplainer": "Waiting for review. It will appear publicly once approved.",
     "guest": "Guest",
     "guestSubtitle": "Reporting without an account",
-    "signIn": "Sign in"
+    "mark": {
+      "delivered": "Published",
+      "waiting": "With the newsroom",
+      "declined": "Not published"
+    },
+    "noReportsBody": "Reports you send appear here, with what each organisation has done about them.",
+    "noReportsTitle": "Nothing filed yet",
+    "noneInStateBody": "You have reports, just none matching this filter.",
+    "noneInStateTitle": "None at this stage",
+    "openPublic": "Open the public page",
+    "pendingExplainer": "Waiting for review. It will appear publicly once approved.",
+    "published": "Published",
+    "publishedAsYou": "Filed under your name",
+    "reactions": "Reactions",
+    "reportTitle": "Your report",
+    "reports": "My reports",
+    "reportsErrorBody": "Your reports are safe. This phone just could not reach the server to list them.",
+    "reportsErrorTitle": "Could not load your reports",
+    "settings": "Settings",
+    "signIn": "Sign in",
+    "withdraw": "Withdraw this report",
+    "withdrawBody": "It comes off the feed and out of the review queue, and you cannot undo it. The record is kept for lawful process, and any organisation that has already licensed it keeps their copy.",
+    "withdrawFailedTitle": "Could not withdraw it",
+    "withdrawTitle": "Withdraw this report?",
+    "withdrawing": "Withdrawing…",
+    "withdrawnBody": "It is no longer in the queue or on the feed.",
+    "withdrawnTitle": "Report withdrawn"
   },
   "published": {
-    "title": "Licensed reports",
-    "subtitle": "{{count}} of {{total}} released to the public",
-    "emptyTitle": "Nothing licensed yet",
+    "creditedTo": "Credited to {{name}} on the public feed",
     "emptyBody": "Reports you license appear here, ready to release publicly.",
-    "live": "Public",
+    "emptyTitle": "Nothing licensed yet",
     "heldPrivate": "Held privately",
+    "live": "Public",
     "release": "Release to the public",
     "releaseHelp": "Publishing shows this report on the public feed, credited to your organisation.",
-    "withhold": "Remove from public feed",
-    "releasedTitle": "Released publicly",
     "releasedBody": "Now on the public feed, credited to {{name}}.",
-    "withheldTitle": "Removed from the feed",
+    "releasedTitle": "Released publicly",
+    "subtitle": "{{count}} of {{total}} released to the public",
+    "title": "Licensed reports",
     "withheldBody": "It stays in your licensed library.",
-    "creditedTo": "Credited to {{name}} on the public feed"
+    "withheldTitle": "Removed from the feed",
+    "withhold": "Remove from public feed"
   },
   "review": {
     "anonymitySheetBody": "The public and other users see no profile on your report — it appears as Anonymous.",
@@ -598,6 +683,9 @@
     "containsMinors": "Children are recognisable",
     "containsMinorsHelp": "Faces of anyone under 18.",
     "description": "Description",
+    "posterLabel": "Thumbnail",
+    "posterHelp": "Pick the moment that best shows what you are reporting.",
+    "posterFrame": "Frame at {{seconds}} seconds",
     "descriptionPlaceholder": "What is happening? Keep it factual.",
     "distressing": "Injury or distressing scenes",
     "distressingHelp": "Blood, bodies, or people in severe distress.",
@@ -616,8 +704,8 @@
     "noDescription": "No description added",
     "nothingBody": "Capture a photo or video first.",
     "nothingTitle": "Nothing to review",
-    "previewHelp": "This is exactly how your report appears to other people.",
-    "previewLabel": "What the public will see",
+    "previewHelp": "The whole capture, and the details other people will see with it. Play it back before you send.",
+    "previewLabel": "Check your capture",
     "privateProperty": "Shows a private home",
     "privatePropertyHelp": "Inside a home, or its gate or entrance.",
     "publicPlace": "A public place",
@@ -640,25 +728,28 @@
     "whatThisMeans": "What does anonymous mean?",
     "whatToPublish": "What to publish",
     "whatsInIt": "What's in the footage?",
-    "yourName": "You"
+    "yourName": "You",
+    "needDescription": "Add a short description before sending.",
+    "emptyCaptureTitle": "Nothing was recorded",
+    "emptyCaptureBody": "The file came back empty, so there is nothing to send. Check that Dawuro still has camera and microphone permission, then film it again."
   },
   "safety": {
-    "title": "Before you film",
-    "emergencyFirst": "If someone is in immediate danger, call 112 first. Filming is not help.",
+    "dontExpose": "Do not film victims, casualties or children up close.",
+    "dontObstruct": "Do not get in the way of fire, ambulance or police crews.",
+    "dontProvoke": "Do not provoke anyone or stage what you are filming.",
     "dontRisk": "Do not put yourself at risk to get the shot.",
     "dontTrespass": "Do not enter private property or restricted areas.",
-    "dontProvoke": "Do not provoke anyone or stage what you are filming.",
-    "dontObstruct": "Do not get in the way of fire, ambulance or police crews.",
-    "dontExpose": "Do not film victims, casualties or children up close."
+    "emergencyFirst": "If someone is in immediate danger, call 112 first. Filming is not help.",
+    "title": "Before you film"
   },
   "sector": {
     "government": "Government agency",
-    "media": "Media house",
-    "utility": "Utility provider",
     "insurance": "Insurance",
+    "media": "Media house",
     "ngo": "NGO",
+    "other": "Other",
     "research": "Research",
-    "other": "Other"
+    "utility": "Utility provider"
   },
   "settings": {
     "anonymousDefault": "Publish anonymously by default",
@@ -669,6 +760,7 @@
     "legal": "About and legal",
     "notifications": "Push notifications",
     "notificationsHelp": "Alerts for incidents near you.",
+    "replayIntro": "Show the introduction again",
     "signOut": "Sign out",
     "storage": "Storage used",
     "theme": {
@@ -681,41 +773,31 @@
     "wifiOnlyHelp": "Photos still upload on mobile data. Videos wait for Wi-Fi."
   },
   "surveys": {
-    "title": "Paid tasks",
-    "newSurvey": "New survey",
-    "availableNow": "{{amount}} available near you",
-    "availableHelp": "Answer a few questions and get paid.",
-    "emptyTitle": "No tasks right now",
-    "emptyBody": "Organisations post paid surveys here. Check back soon.",
-    "questionCount": "{{count}} questions",
-    "spacesLeft": "{{count}} spaces left",
-    "outOfRange": "Outside the target area",
-    "anywhere": "Anywhere in Ghana",
-    "onCompletion": "on completion",
-    "progressLabel": "Survey progress, {{percent}} percent",
-    "optional": "Optional",
-    "scaleLow": "Not at all",
-    "scaleHigh": "Very badly",
-    "textPlaceholder": "Type your answer",
+    "addOption": "Add option",
     "addPhoto": "Add a photo",
-    "photoAttached": "Photo attached",
-    "submitFor": "Submit and earn {{amount}}",
-    "answerRequired": "Answer the required questions to submit.",
-    "submittedTitle": "{{amount}} added to your earnings",
-    "submittedBody": "Thanks — your answers help this organisation act.",
-    "surveyTitle": "Survey title",
-    "titlePlaceholder": "e.g. Drainage before the rains",
-    "description": "Description",
-    "descriptionPlaceholder": "Tell people what this is for and how long it takes.",
-    "questions": "Questions",
     "addQuestion": "Add a question",
     "addQuestionHelp": "Pick the kind of answer you need.",
-    "removeQuestion": "Remove question",
-    "questionPlaceholder": "Question {{number}}",
-    "optionPlaceholder": "Option {{number}}",
-    "addOption": "Add option",
-    "required": "Required",
-    "maxQuestions": "Maximum of {{count}} questions. Longer surveys get careless answers.",
+    "answerRequired": "Answer the required questions to submit.",
+    "anywhere": "Anywhere in Ghana",
+    "availableHelp": "Answer a few questions and get paid.",
+    "availableNow": "{{amount}} available near you",
+    "builderTeaser": "Ask the public a question and pay for answers",
+    "committed": "{{amount}} committed",
+    "costNote": "Charged up front for the full target. Unused rewards are refunded when the survey closes.",
+    "description": "Description",
+    "descriptionPlaceholder": "Tell people what this is for and how long it takes.",
+    "each": "each",
+    "emptyBody": "Organisations post paid surveys here. Check back soon.",
+    "emptyTitle": "No tasks right now",
+    "issue": {
+      "no_title": "Give the survey a title.",
+      "no_questions": "Add at least one question.",
+      "question_missing_prompt": "Every question needs a prompt.",
+      "choice_needs_options": "Choice questions need at least two options.",
+      "reward_too_low": "The reward is too low to be worth answering.",
+      "no_target": "Set how many responses you want.",
+      "closes_in_past": "The closing date must be in the future."
+    },
     "kind": {
       "single_choice": "Single choice",
       "multi_choice": "Multiple choice",
@@ -730,48 +812,66 @@
       "text": "Write a short answer",
       "photo": "Attach a picture"
     },
-    "rewardPer": "Reward per response",
-    "responsesWanted": "Responses wanted",
-    "rewardsTotal": "Rewards to reporters",
-    "platformFee": "Platform fee",
-    "totalCommitted": "Total committed",
-    "costNote": "Charged up front for the full target. Unused rewards are refunded when the survey closes.",
-    "publishFor": "Publish for {{amount}}",
-    "publishedTitle": "Survey published",
-    "publishedBody": "It is now visible to reporters. Target: {{count}} responses.",
-    "issue": {
-      "no_title": "Give the survey a title.",
-      "no_questions": "Add at least one question.",
-      "question_missing_prompt": "Every question needs a prompt.",
-      "choice_needs_options": "Choice questions need at least two options.",
-      "reward_too_low": "The reward is too low to be worth answering.",
-      "no_target": "Set how many responses you want.",
-      "closes_in_past": "The closing date must be in the future."
-    },
-    "builderTeaser": "Ask the public a question and pay for answers",
-    "noneTitle": "No surveys yet",
+    "maxQuestions": "Maximum of {{count}} questions. Longer surveys get careless answers.",
+    "newSurvey": "New survey",
     "noneBody": "Ask the public a question and pay for answers.",
-    "each": "each",
+    "noneTitle": "No surveys yet",
+    "onCompletion": "on completion",
+    "optionPlaceholder": "Option {{number}}",
+    "optional": "Optional",
+    "outOfRange": "Outside the target area",
+    "photoAttached": "Photo attached",
+    "platformFee": "Platform fee",
+    "progressLabel": "Survey progress, {{percent}} percent",
+    "publishFor": "Publish for {{amount}}",
+    "publishedBody": "It is now visible to reporters. Target: {{count}} responses.",
+    "publishedTitle": "Survey published",
+    "questionCount": "{{count}} questions",
+    "questionPlaceholder": "Question {{number}}",
+    "questions": "Questions",
+    "removeQuestion": "Remove question",
+    "required": "Required",
+    "responsesOf": "{{received}} of {{target}} responses",
+    "responsesWanted": "Responses wanted",
+    "rewardPer": "Reward per response",
+    "rewardsTotal": "Rewards to reporters",
+    "scaleHigh": "Very badly",
+    "scaleLow": "Not at all",
+    "spacesLeft": "{{count}} spaces left",
+    "stallingHint": "Filling slowly. Consider raising the reward or widening the area.",
     "status": {
       "draft": "Draft",
       "live": "Live",
       "closed": "Closed"
     },
-    "responsesOf": "{{received}} of {{target}} responses",
-    "stallingHint": "Filling slowly. Consider raising the reward or widening the area.",
-    "committed": "{{amount}} committed"
+    "submitFor": "Submit and earn {{amount}}",
+    "submittedBody": "Thanks — your answers help this organisation act.",
+    "submittedTitle": "{{amount}} added to your earnings",
+    "surveyTitle": "Survey title",
+    "textPlaceholder": "Type your answer",
+    "title": "Paid tasks",
+    "titlePlaceholder": "e.g. Drainage before the rains",
+    "totalCommitted": "Total committed",
+    "loadingTitle": "Looking for paid questions…",
+    "loadingBody": "One moment.",
+    "unavailableTitle": "Could not load surveys",
+    "unavailableBody": "This phone could not reach the service. There may be questions waiting — try again when you have a connection.",
+    "missingTitle": "That survey is no longer available",
+    "missingBody": "It may have closed or reached its response limit. Nothing you answered has been sent.",
+    "submitFailedTitle": "Could not send your answers",
+    "submitFailedBody": "Your answers are still on this screen. Try again when you have a connection."
   },
   "tabs": {
+    "capture": "Report",
+    "earn": "Earn",
     "home": "Home",
     "map": "Map",
-    "capture": "Report",
     "outbox": "Sending",
-    "profile": "Profile",
-    "earn": "Earn"
+    "profile": "Profile"
   },
   "vetting": {
-    "published": "Published",
     "pending_review": "In review",
+    "published": "Published",
     "rejected": "Rejected",
     "restricted": "Restricted"
   },
@@ -792,7 +892,7 @@
     "previous": "Previous report",
     "tapToAdvance": "Tap to move on"
   },
-  "businesses": {
+  "organisations": {
     "missingBody": "It may have left the platform since this link was made.",
     "missingTitle": "Organisation not found",
     "noMatchBody": "Try the sector instead — assembly, media, utility.",
@@ -813,15 +913,140 @@
     "surveyFilled": "{{percent}}% filled",
     "surveyQuestions": "{{count}} questions",
     "surveyStart": "Answer and earn",
+    "tab": {
+      "reports": "Reports",
+      "surveys": "Surveys",
+      "about": "About"
+    },
     "title": "Organisations",
     "unverified": "Not yet verified",
     "verified": "Verified institution",
     "watches": "What reaches them",
     "watchesHelp": "Reports in these categories are routed here automatically.",
-    "tab": {
-      "reports": "Reports",
-      "surveys": "Surveys",
-      "about": "About"
+    "loadingTitle": "Loading organisations…",
+    "loadingBody": "One moment.",
+    "unavailableTitle": "Could not load organisations",
+    "unavailableBody": "This phone could not reach the service. Try again when you have a connection.",
+    "noneYetTitle": "No organisations have joined yet",
+    "noneYetBody": "Agencies and newsrooms appear here once they sign up. Until then, reports you file go to the public feed."
+  },
+  "section": {
+    "africa": "Africa News",
+    "business": "Business News",
+    "ghana": "Ghana News",
+    "politics": "Politics",
+    "sport": "Sport",
+    "world": "World News"
+  },
+  "outcome": {
+    "action": {
+      "acknowledged": "Acknowledged",
+      "closed_no_action": "Closed without action",
+      "inspecting": "Inspecting",
+      "more_info_requested": "More information needed",
+      "referred": "Referred elsewhere",
+      "resolved": "Resolved"
+    },
+    "awaitingBody": "{{name}} has it. Nobody has opened it so far.",
+    "awaitingBodyMany": "{{count}} organisations have it. None has opened it so far.",
+    "awaitingTitle": "Not opened yet",
+    "editorial": {
+      "review": {
+        "title": "With the editors",
+        "body": "Every report is read by an editor before it goes anywhere. They decide whether it runs on the feed and which organisations it should reach.",
+        "bodyPublic": "Every report is read by an editor before it goes anywhere, and nothing reaches the feed except by an editor putting it there. You chose the public feed, so it is not offered to any organisation."
+      },
+      "published": {
+        "title": "Published to the public feed",
+        "body": "An editor ran it on the feed. Anyone can see it now.",
+        "bodyPublic": "An editor ran it on the feed. Anyone can see it now."
+      },
+      "rejected": {
+        "title": "Not published",
+        "body": "An editor decided not to run this one.",
+        "bodyPublic": "An editor decided not to run this one."
+      },
+      "restricted": {
+        "title": "Held back",
+        "body": "It is on the record but is not being shown publicly.",
+        "bodyPublic": "It is on the record but is not being shown publicly."
+      }
+    },
+    "filed": "You filed this",
+    "notRouted": "Not sent to any organisation",
+    "notRoutedYetBody": "An editor passes it to the organisations it concerns once they have reviewed it.",
+    "notRoutedYetTitle": "Not with an organisation yet",
+    "routedMany": "Sent to {{name}} and {{count}} more",
+    "routedOne": "Sent to {{name}}",
+    "silent": "Has not responded",
+    "stage": {
+      "awaiting": "Awaiting a response",
+      "closed": "Closed",
+      "in_hand": "Being handled",
+      "public_only": "Public feed"
+    },
+    "title": "What happened",
+    "viewOutcome": "See what happened"
+  },
+  "deskOnly": {
+    "approval": "Granting an organisation access to the public’s footage means reading its screening result and its documents. That is desk work, and it is done at dawuro.gh/platform.",
+    "here": "What you can see here",
+    "hereBody": "The queue, and where each item has got to. Enough to know whether something needs attention before you are back at a desk.",
+    "payout": "Releasing a batch moves real money and cannot be undone. It is done at dawuro.gh/platform, where the ledger it reconciles against is visible.",
+    "title": "Decided in the console"
+  },
+  "apiError": {
+    "MAINTENANCE": {
+      "title": "Dawuro is being updated",
+      "body": "The service is briefly down for maintenance. Your reports are safe on this phone and will send once it is back."
+    },
+    "NETWORK_UNAVAILABLE": {
+      "title": "No connection",
+      "body": "Nothing was lost. Anything you have filed stays queued on this phone and sends when you are back online."
+    },
+    "RATE_LIMITED": {
+      "title": "Too many requests",
+      "body": "Give it a moment and try again."
+    },
+    "TOKEN_EXPIRED": {
+      "title": "Signed out",
+      "body": "Your session ended. Sign in again to carry on."
+    },
+    "TOKEN_INVALID": {
+      "title": "Signed out",
+      "body": "Your session is no longer valid. Sign in again to carry on."
+    },
+    "FORBIDDEN": {
+      "title": "Not available on this account",
+      "body": "This account does not have access to that. If you think it should, contact your organisation’s administrator."
+    },
+    "SIGN_IN_REQUIRED": {
+      "title": "Create an account to see this",
+      "body": "Reports you file as a guest still reach the newsroom, but tracking them, and any payment for them, needs an account. It takes a moment and your queued reports stay put."
+    },
+    "GPS_ACCURACY_REJECTED": {
+      "title": "Location not accurate enough",
+      "body": "The report needs a tighter GPS fix than your phone had. Move into the open and try again."
+    },
+    "MEDIA_TOO_LARGE": {
+      "title": "File too large",
+      "body": "This recording is bigger than the service accepts. A shorter clip will send."
+    },
+    "MEDIA_HASH_MISMATCH": {
+      "title": "Upload was corrupted",
+      "body": "The file changed on the way up. It will be sent again automatically."
+    },
+    "UPLOAD_EXPIRED": {
+      "title": "Upload timed out",
+      "body": "This upload took too long and has to start again. Your footage is still on the phone."
+    },
+    "INCIDENT_NOT_FOUND": {
+      "title": "Report not found",
+      "body": "It may have been removed, or the link is wrong."
+    },
+    "INTERNAL": {
+      "title": "Something went wrong at our end",
+      "body": "This is not your connection. Try again shortly."
     }
   }
 }

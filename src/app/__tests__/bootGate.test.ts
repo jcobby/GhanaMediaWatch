@@ -62,17 +62,17 @@ describe('the deadlock guard', () => {
   test('a hung keychain does not strand the app on the logo', () => {
     // `hydrate()` catches a rejection but cannot catch a promise that never
     // settles. Without the deadline this case is a permanent boot screen.
-    expect(
-      showsBootScreen({ ...settled, authHydrated: false, bootDeadlinePassed: true }),
-    ).toBe(false);
+    expect(showsBootScreen({ ...settled, authHydrated: false, bootDeadlinePassed: true })).toBe(
+      false,
+    );
   });
 
   test('the deadline does not override fonts', () => {
     // Fonts settle on their own and are not a hang risk, so the deadline has
-    // no business releasing that gate — it would reintroduce the reflow.
-    expect(
-      showsBootScreen({ ...settled, fontsLoaded: false, bootDeadlinePassed: true }),
-    ).toBe(true);
+    // no organisation releasing that gate — it would reintroduce the reflow.
+    expect(showsBootScreen({ ...settled, fontsLoaded: false, bootDeadlinePassed: true })).toBe(
+      true,
+    );
   });
 });
 

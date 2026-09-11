@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Badge, Pressable, Sheet, Text } from '@/components/ui';
 import { DEMO_LOGINS, DEMO_PASSWORD, type DemoLogin } from '@/api/dawuroData';
+import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 import { useColors } from '@/lib/theme';
 
 interface DemoAccountSheetProps {
@@ -13,13 +14,13 @@ interface DemoAccountSheetProps {
 
 const ICON: Record<DemoLogin['accountType'], keyof typeof Ionicons.glyphMap> = {
   reporter: 'person-outline',
-  business: 'business-outline',
+  organisation: 'business-outline',
   platform_owner: 'shield-checkmark-outline',
 };
 
 const TONE: Record<DemoLogin['accountType'], 'neutral' | 'accent' | 'success'> = {
   reporter: 'neutral',
-  business: 'accent',
+  organisation: 'accent',
   platform_owner: 'success',
 };
 
@@ -31,7 +32,7 @@ const TONE: Record<DemoLogin['accountType'], 'neutral' | 'accent' | 'success'> =
  * friction that people stop checking the other two.
  *
  * Present only while the app runs on fixtures — it disappears with the mock
- * client, since a shortcut into a business or operator account is exactly the
+ * client, since a shortcut into an organisation or operator account is exactly the
  * thing that must not exist against a real backend.
  */
 export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetProps) {
@@ -47,7 +48,9 @@ export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetP
     >
       <ScrollView className="max-h-96" showsVerticalScrollIndicator={false}>
         <View className="gap-2">
-          {DEMO_LOGINS.map((login) => (
+          {DEMO_LOGINS.filter(
+            (login) => ORGANISATION_TIER_ENABLED || login.accountType !== 'organisation',
+          ).map((login) => (
             <Pressable
               key={login.email}
               onPress={() => onPick(login)}

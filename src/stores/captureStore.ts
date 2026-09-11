@@ -31,10 +31,17 @@ interface CaptureState {
   showLocation: boolean;
   showDate: boolean;
   showTime: boolean;
-  /** Where this report goes — public feed, businesses, or both. */
+  /** Where this report goes — public feed, organisations, or both. */
   destination: SubmissionDestination;
   /** Named recipients, for a directed submission. */
   businessIds: string[];
+  /**
+   * Which moment of the clip stands for it, in milliseconds from the start.
+   *
+   * Null means nobody chose, and the app takes its usual frame a second in.
+   * Only meaningful for a video: a photograph is its own thumbnail.
+   */
+  posterAtMs: number | null;
 
   setPending: (capture: PendingCapture) => void;
   setCategory: (category: IncidentCategory) => void;
@@ -42,6 +49,7 @@ interface CaptureState {
   setAnonymous: (value: boolean) => void;
   setSeverity: (value: Severity) => void;
   setLandmark: (value: string) => void;
+  setPosterAtMs: (value: number | null) => void;
   setConsent: (key: keyof ConsentFlags, value: boolean) => void;
   setShowLocation: (value: boolean) => void;
   setShowDate: (value: boolean) => void;
@@ -58,12 +66,13 @@ const DEFAULTS = {
   isAnonymous: false,
   severity: 'concern' as Severity,
   landmark: '',
+  posterAtMs: null,
   consent: EMPTY_CONSENT,
   showLocation: true,
   showDate: true,
   showTime: true,
   /*
-   * Businesses by default.
+   * Organisations by default.
    *
    * The product's purpose is getting information to organisations who can act
    * on it — the public feed is what happens *after* one of them licenses a
@@ -83,14 +92,16 @@ const DEFAULTS = {
  */
 export const useCaptureStore = create<CaptureState>((set) => ({
   ...DEFAULTS,
-  setPending: (pending) => set({ pending }),
+  // A new capture clears the old one's chosen frame. Carried over, it would
+  // point at a moment of a recording that is no longer the one being filed.
+  setPending: (pending) => set({ pending, posterAtMs: null }),
   setCategory: (category) => set({ category }),
   setDescription: (description) => set({ description }),
   setAnonymous: (isAnonymous) => set({ isAnonymous }),
   setSeverity: (severity) => set({ severity }),
   setLandmark: (landmark) => set({ landmark }),
-  setConsent: (key, value) =>
-    set((state) => ({ consent: { ...state.consent, [key]: value } })),
+  setPosterAtMs: (posterAtMs) => set({ posterAtMs }),
+  setConsent: (key, value) => set((state) => ({ consent: { ...state.consent, [key]: value } })),
   setShowLocation: (showLocation) =>
     set((state) => ({
       showLocation,

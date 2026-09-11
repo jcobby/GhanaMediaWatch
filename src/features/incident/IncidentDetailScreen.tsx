@@ -1,24 +1,15 @@
-import { useCallback, useRef, useState } from 'react';
-import { Alert, Dimensions, Linking, ScrollView, View } from 'react-native';
-import { Image } from 'expo-image';
+import { useCallback, useState } from 'react';
+import { Alert, Linking, ScrollView, useWindowDimensions, View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, Polyline, PROVIDER_DEFAULT } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StatusBar } from 'expo-status-bar';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import {
-  Badge,
-  Button,
-  ErrorState,
-  Glass,
-  Pressable,
-  Sheet,
-  Skeleton,
-  Text,
-} from '@/components/ui';
+import { Button, ErrorState, Glass, Pressable, Sheet, Skeleton, Text } from '@/components/ui';
 import { useIncident, useToggleReaction } from '@/hooks/useIncidents';
-import { categoryColor, useColors } from '@/lib/theme';
+import { categoryHue, useColors } from '@/lib/theme';
 import { haversineMetres, regionContaining } from '@/lib/geo';
 import { useViewerLocation } from '@/hooks/useViewerLocation';
 import { formatCount, formatDistance } from '@/lib/format';
@@ -26,6 +17,8 @@ import { toast } from '@/stores/toastStore';
 import { openDirections } from '@/lib/navigation';
 import { shareIncident } from '@/lib/share';
 import { CaptureStamp } from '@/components/CaptureStamp';
+import { GnaHorizontal } from '@/components/Brand';
+import { IncidentStage } from './IncidentStage';
 import { CommentList } from '@/features/comments/CommentList';
 import { CommentComposer } from '@/features/comments/CommentComposer';
 import { useComments, useCommentsStore } from '@/stores/commentsStore';
@@ -50,7 +43,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { width } = Dimensions.get('window');
+  const { height: screenH } = useWindowDimensions();
   const viewer = useViewerLocation();
   const comments = useComments(incidentId);
   const addComment = useCommentsStore((s) => s.add);
@@ -61,18 +54,47 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
    * to read the discussion, so jump them to it rather than making them scroll
    * the whole report first.
    */
-  const { focus } = useLocalSearchParams<{ focus?: string }>();
-  const scrollRef = useRef<ScrollView>(null);
-  const commentsY = useRef(0);
-  const jumped = useRef(false);
 
   const [mapOpen, setMapOpen] = useState(false);
+  // Arriving from the feed's comment icon opens straight onto them.
+  const { focus } = useLocalSearchParams<{ focus?: string }>();
+  const [commentsOpen, setCommentsOpen] = useState(focus === 'comments');
+  const [actionsOpen, setActionsOpen] = useState(false);
+  const [captionOpen, setCaptionOpen] = useState(false);
+  /*
+   * Whether the caption is actually longer than the space it gets.
+   *
+   * Measured rather than guessed from string length: the same character count
+   * wraps to two lines or four depending on the device, and a "More" button
+   * that opens nothing is worse than no button at all.
+   */
+  const [captionOverflows, setCaptionOverflows] = useState(false);
+  /*
+   * Whether the media failed to load.
+   *
+   * `expo-image` fails silently, so without this a report whose file the
+   * server no longer holds is a black screen — indistinguishable from one still
+   * loading, and from a report that genuinely has nothing to show.
+   */
+  const [mediaFailed, setMediaFailed] = useState(false);
 
   const { data: incident, isPending, isError, refetch } = useIncident(incidentId);
   const toggleReaction = useToggleReaction();
-  const hue = incident ? categoryColor[incident.category] : c.textFaint;
+  const hue = incident ? categoryHue(incident.category) : c.textFaint;
   const { latitude, longitude } = incident?.location ?? { latitude: null, longitude: null };
   const hasCoords = latitude !== null && longitude !== null;
+
+  /*
+   * Narrowed on the discriminant itself.
+   *
+   * A derived boolean does not narrow a union, so `publisher.displayName`
+   * would not typecheck through one — the anonymous variant has no such
+   * field.
+   */
+  const publisherName =
+    incident?.publisher.kind === 'anonymous'
+      ? t('common.anonymous')
+      : (incident?.publisher.displayName ?? '');
 
   const handleShare = useCallback(async () => {
     if (!incident) return;
@@ -154,113 +176,208 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
   }
 
   return (
-    <View className="flex-1 bg-canvas">
-      <ScrollView
-        ref={scrollRef}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+    <View className="flex-1 bg-black">
+      <StatusBar style="light" />
+
+      {/* ── Header ──────────────────────────────────────────────────────── */}
+      {/*
+        A real bar, so the report has a top edge.
+
+        The footage used to run under the status bar with the back arrow
+        floating on whatever frame happened to be behind it — dark on a night
+        shot, invisible on a bright one, and never in a predictable place. Its
+        own black band fixes all three, and matches the feed's masthead so
+        opening a report does not feel like leaving the app.
+
+        The duration sits here too rather than on the picture: it is a fact
+        about the file, which is what a header is for.
+      */}
+      {/* A spacer does the distribution, so `justify-between` would fight it:
+          with both, the gap lands in two places and the lockup drifts. */}
+      <View
+        className="flex-row items-center gap-2 bg-masthead px-2 py-1.5"
+        style={{ paddingTop: insets.top + 6 }}
       >
-        {/* Media */}
-        <View style={{ height: width * 1.15 }} className="bg-canvas-raise">
-          <Image
-            source={{ uri: incident.media.url }}
-            style={{ position: 'absolute', inset: 0 }}
-            contentFit="cover"
-            transition={220}
-            accessibilityLabel={incident.description}
-          />
-          <LinearGradient
-            colors={['rgba(0,0,0,0.5)', 'rgba(0,0,0,0)']}
-            style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 140 }}
-            pointerEvents="none"
-          />
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityLabel={t('common.back')}
+          hitSlop={10}
+          className="h-10 w-10 items-center justify-center rounded-pill"
+        >
+          <Ionicons name="chevron-back" size={24} color={c.textOnDark} />
+        </Pressable>
 
-          {/* Provenance, stamped on the frame rather than captioned beside it —
-              this footage is meant to travel, and the claim has to travel with
-              it. */}
-          <LinearGradient
-            colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.72)']}
-            style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 130 }}
-            pointerEvents="none"
-          />
-          <View className="absolute bottom-3 left-4 right-4">
-            <CaptureStamp incident={incident} />
+        <GnaHorizontal height={20} reversed />
+
+        <View className="flex-1" />
+
+        {incident.media.kind === 'video' ? (
+          <View className="flex-row items-center gap-1.5 rounded-pill bg-white/10 px-2.5 py-1">
+            <Ionicons name="play" size={10} color={c.textOnDark} />
+            <Text variant="caption" onMedia className="font-sans-semibold">
+              {incident.media.durationMs
+                ? `${Math.round(incident.media.durationMs / 1000)}s`
+                : t('feed.video')}
+            </Text>
           </View>
+        ) : null}
+      </View>
 
-          <View
-            className="absolute left-4 right-4 flex-row items-center justify-between"
-            style={{ top: insets.top + 8 }}
-          >
-            <Pressable
-              onPress={() => router.back()}
-              accessibilityLabel={t('common.back')}
-              className="h-10 w-10 items-center justify-center rounded-pill"
-            >
-              <Glass
-                context="media"
-                elevation="mid"
-                className="h-10 w-10 items-center justify-center rounded-pill"
-              >
-                <Ionicons name="chevron-back" size={20} color={c.textOnDark} />
-              </Glass>
-            </Pressable>
+      {/* ── Stage ───────────────────────────────────────────────────────── */}
+      {/*
+        The footage, and everything that overlays it.
 
-            {incident.media.kind === 'video' ? (
-              <Glass
-                context="media"
-                elevation="low"
-                className="flex-row items-center gap-1.5 rounded-pill px-3 py-1.5"
-              >
-                <Ionicons name="play" size={11} color={c.textOnDark} />
-                <Text variant="caption" onMedia className="font-sans-semibold">
-                  {incident.media.durationMs
-                    ? `${Math.round(incident.media.durationMs / 1000)}s`
-                    : t('feed.video')}
-                </Text>
-              </Glass>
-            ) : null}
-          </View>
+        `flex-1` rather than an absolute fill, so the media starts where the
+        header ends. Category, publisher and comments are controls here rather
+        than a column of text underneath — a report is a piece of footage
+        first, and making the reader scroll past it to reach anything meant the
+        thing they came for occupied a third of the screen.
+      */}
+      <View className="flex-1">
+        {/*
+          A missing file is said out loud, not left as a black screen.
 
-          {incident.media.kind === 'video' ? (
-            <View className="absolute inset-0 items-center justify-center" pointerEvents="none">
-              <Glass
-                context="media"
-                elevation="high"
-                className="h-16 w-16 items-center justify-center rounded-pill"
-              >
-                <Ionicons name="play" size={26} color={c.textOnDark} />
-              </Glass>
-            </View>
+          `expo-image` fails silently, so a report whose media the server no
+          longer has looked identical to one still loading — a black rectangle
+          with the caption sitting over it. That happens for a real reason worth
+          distinguishing: on hosting with an ephemeral filesystem the database
+          row survives a restart and the uploaded file does not, so `/media/{id}`
+          answers 404 while every other detail of the report is intact.
+        */}
+        <IncidentStage incident={incident} failed={mediaFailed} onFailed={setMediaFailed} />
+
+        <LinearGradient
+          colors={['rgba(0,0,0,0.35)', 'rgba(0,0,0,0)']}
+          style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 110 }}
+          pointerEvents="none"
+        />
+        <LinearGradient
+          colors={['rgba(0,0,0,0)', 'rgba(0,0,0,0.85)']}
+          style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: 340 }}
+          pointerEvents="none"
+        />
+
+        {/*
+          The decorative play button is gone.
+
+          It was drawn over the stage with `pointerEvents="none"` — a control
+          that looked like the way to start the video and could not be pressed,
+          on top of a frame that never rendered because `expo-image` cannot
+          decode an MP4. A reader tapped it, nothing happened, and there was
+          nothing else to try. The player now has real transport controls.
+        */}
+
+        {/* ── Action rail ─────────────────────────────────────────────────── */}
+        {/*
+        Collapsed to a single control until asked for.
+
+        Five stacked buttons down the right edge is the most furniture on the
+        screen, and it sits on top of the one thing the reader opened the page
+        to watch. Folding it away leaves the footage clear; the actions are one
+        tap behind a button that stays in the same place, so nothing is lost
+        except the clutter.
+      */}
+        <View
+          className="absolute right-3 items-center gap-5"
+          style={{ bottom: insets.bottom + 200 }}
+        >
+          {actionsOpen ? (
+            <>
+              <RailAction
+                icon={incident.viewerHasReacted ? 'heart' : 'heart-outline'}
+                tint={incident.viewerHasReacted ? c.live : c.textOnDark}
+                label={formatCount(incident.counts.reactions)}
+                onPress={() => toggleReaction(incident)}
+                accessibilityLabel={t('feed.react')}
+              />
+              <RailAction
+                icon="chatbubble-outline"
+                tint={c.textOnDark}
+                label={formatCount(comments.length)}
+                onPress={() => setCommentsOpen(true)}
+                accessibilityLabel={t('feed.comments')}
+              />
+              <RailAction
+                icon="arrow-redo-outline"
+                tint={c.textOnDark}
+                label={t('feed.share')}
+                onPress={() => void handleShare()}
+                accessibilityLabel={t('feed.share')}
+              />
+              {hasCoords ? (
+                <RailAction
+                  icon="navigate"
+                  tint={c.textOnDark}
+                  label={t('detail.navigate')}
+                  onPress={() => void handleNavigate()}
+                  accessibilityLabel={t('detail.navigate')}
+                />
+              ) : null}
+              <RailAction
+                icon="flag-outline"
+                tint={c.textOnDark}
+                label={t('feed.reportAbuse')}
+                onPress={handleReportAbuse}
+                accessibilityLabel={t('feed.reportAbuse')}
+              />
+            </>
           ) : null}
+
+          {/* The toggle keeps its position whether open or closed, so the thumb
+            returns to the same place instead of hunting for a moved control. */}
+          <Pressable
+            onPress={() => setActionsOpen((open) => !open)}
+            accessibilityLabel={t(actionsOpen ? 'detail.hideActions' : 'detail.actions')}
+            accessibilityState={{ expanded: actionsOpen }}
+          >
+            <Glass
+              context="media"
+              elevation="mid"
+              className="h-12 w-12 items-center justify-center rounded-pill"
+            >
+              <Ionicons
+                name={actionsOpen ? 'close' : 'ellipsis-horizontal'}
+                size={22}
+                color={c.textOnDark}
+              />
+            </Glass>
+          </Pressable>
         </View>
 
-        {/* Body */}
-        <View className="gap-4 px-4 pt-4">
-          <View className="flex-row flex-wrap items-center gap-2">
-            <View
-              className="flex-row items-center gap-2 rounded-pill px-3 py-1.5"
-              style={{ backgroundColor: `${hue}1A` }}
-            >
-              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: hue }} />
-              <Text
-                variant="caption"
-                className="font-sans-semibold uppercase"
-                style={{ color: hue }}
-              >
-                {t(`category.${incident.category}`)}
-              </Text>
-            </View>
-            <Badge label={t(`vetting.${incident.vettingState}`)} tone="success" />
-            {incident.location.confidence === 'low' ? (
-              <Badge label={t('capture.reducedAccuracyBadge')} tone="warning" />
-            ) : null}
-          </View>
+        {/* ── Caption ─────────────────────────────────────────────────────── */}
+        {/*
+          Lifted clear of the transport on a video.
 
-          <Text variant="title-lg">{incident.description}</Text>
+          The native controls sit across the bottom of the player, which is
+          exactly where this block was — and it is interactive, so it takes the
+          taps meant for play, pause and the scrubber. It cannot simply be made
+          non-interactive: the publisher's name opens their page.
 
-          {/* Reporter + engagement */}
-          <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
-            <View className="h-9 w-9 items-center justify-center rounded-pill bg-accent-wash">
+          Moving it up is the fix that keeps both. A photo has no controls to
+          clear, so it stays where it was and the frame is not wasted.
+        */}
+        <View
+          className="absolute left-4 gap-2"
+          style={{ bottom: insets.bottom + (incident.media.kind === 'video' ? 92 : 20), right: 76 }}
+        >
+          <Pressable
+            onPress={() =>
+              /*
+               * Only a licensing institution has a directory page.
+               *
+               * The agency publishes its own copy under its own name, but it
+               * is not a subscribing organisation and has no entry to open — a
+               * tap would land on "not found".
+               */
+              incident.publisher.kind === 'organisation' && incident.origin === 'citizen_report'
+                ? router.push(`/organisations/${incident.publisher.id}`)
+                : undefined
+            }
+            haptic={false}
+            accessibilityLabel={publisherName}
+            className="flex-row items-center gap-2"
+          >
+            <View className="h-7 w-7 items-center justify-center rounded-pill bg-white/15">
               <Ionicons
                 name={
                   incident.publisher.kind === 'anonymous'
@@ -269,114 +386,107 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
                       ? 'business'
                       : 'person'
                 }
-                size={16}
-                color={c.accent}
+                size={13}
+                color={c.textOnDark}
               />
             </View>
-            <View className="flex-1">
-              <Text variant="body-sm" className="font-sans-semibold">
-                {incident.publisher.kind === 'anonymous'
-                  ? t('common.anonymous')
-                  : incident.publisher.displayName}
-              </Text>
-              <Text variant="caption" tone="muted">
-                {formatCount(incident.counts.reactions)} {t('feed.react').toLowerCase()} ·{' '}
-                {formatCount(incident.counts.comments)} {t('feed.comments').toLowerCase()}
-              </Text>
-            </View>
-            {/* The route lives behind this button rather than inline. A map is
-                the tallest thing on the screen and almost nobody needs it, but
-                everybody scrolls past it to reach the discussion. */}
-            {hasCoords ? (
-              <Pressable
-                onPress={() => setMapOpen(true)}
-                accessibilityLabel={t('detail.getDirections')}
-                className="h-10 flex-row items-center gap-1.5 rounded-pill bg-accent px-3"
-              >
-                <Ionicons name="navigate" size={14} color={c.textOnDark} />
-                <Text variant="caption" className="font-sans-semibold text-white">
-                  {t('detail.navigate')}
-                </Text>
-              </Pressable>
+            <Text variant="body-sm" onMedia className="font-sans-semibold">
+              {publisherName}
+            </Text>
+            {incident.publisher.kind === 'organisation' && incident.origin === 'citizen_report' ? (
+              <Ionicons name="chevron-forward" size={13} color="rgba(255,255,255,0.7)" />
             ) : null}
-          </Glass>
+          </Pressable>
 
-          {/* Location suppressed — say so plainly rather than leaving a gap */}
-          {!hasCoords ? (
-            <Glass elevation="low" className="flex-row items-start gap-3 rounded-lg p-3.5">
-              <Ionicons name="eye-off-outline" size={17} color={c.textMuted} />
-              <Text variant="body-sm" tone="muted" className="flex-1">
-                {t('detail.locationHidden')}
-              </Text>
-            </Glass>
+          {/*
+          Who filed it, when that is not who published it.
+
+          An institution's name alone on a citizen's footage reads as though
+          the institution shot it. The person who stood there keeps the credit
+          — and this is the only place in the interface it can appear, because
+          `publisher` is a union and has already dropped the name by the time
+          an organisation is on it.
+        */}
+          {incident.publisher.kind === 'organisation' ? (
+            <Text variant="caption" onMedia style={{ opacity: 0.75, marginTop: -2 }}>
+              {t('detail.filedBy', {
+                name:
+                  incident.reporter.kind === 'anonymous'
+                    ? t('common.anonymous')
+                    : incident.reporter.displayName,
+              })}
+            </Text>
           ) : null}
 
-          <View className="flex-row gap-3">
-            <Button
-              label={t('feed.react')}
-              variant="glass"
-              className="flex-1"
-              onPress={() => toggleReaction(incident)}
-              accessibilityState={{ selected: incident.viewerHasReacted }}
-              leading={
-                <Ionicons
-                  name={incident.viewerHasReacted ? 'heart' : 'heart-outline'}
-                  size={15}
-                  color={incident.viewerHasReacted ? c.live : c.textPrimary}
-                />
-              }
-            />
-            <Button
-              label={t('feed.share')}
-              variant="glass"
-              className="flex-1"
-              onPress={() => void handleShare()}
-              leading={<Ionicons name="share-outline" size={15} color={c.textPrimary} />}
-            />
-            <Button
-              label={t('feed.reportAbuse')}
-              variant="glass"
-              className="flex-1"
-              onPress={handleReportAbuse}
-              leading={<Ionicons name="flag-outline" size={15} color={c.textPrimary} />}
-            />
-          </View>
+          {/*
+          Expanded, the caption scrolls inside a bounded box.
 
-          {/* Discussion */}
-          <View
-            className="gap-3 border-t border-hairline/[0.07] pt-5"
-            onLayout={(e) => {
-              commentsY.current = e.nativeEvent.layout.y;
-              if (focus === 'comments' && !jumped.current) {
-                jumped.current = true;
-                // Without the frame delay the ScrollView has not yet sized its
-                // content and the scroll is clamped to the current height.
-                requestAnimationFrame(() =>
-                  scrollRef.current?.scrollTo({ y: commentsY.current, animated: false }),
-                );
-              }
-            }}
+          A long eyewitness account runs to fifteen lines or more, and letting
+          it grow freely would push it up over the footage until the report had
+          covered the thing it describes. Capped at just over a third of the
+          screen it stays a caption: the video is still visible behind it, and
+          the rest of the words are a scroll away rather than a takeover.
+        */}
+          <ScrollView
+            scrollEnabled={captionOpen}
+            showsVerticalScrollIndicator={captionOpen}
+            style={{ maxHeight: captionOpen ? screenH * 0.36 : undefined }}
+            contentContainerStyle={{ flexGrow: 0 }}
           >
-            <View className="flex-row items-baseline justify-between">
-              <Text variant="title-sm">{t('comments.title')}</Text>
-              {contributions > 0 ? (
-                <Text variant="caption" tone="accent" className="font-sans-semibold">
-                  {t('comments.contributionsHelp', { count: contributions })}
-                </Text>
-              ) : null}
-            </View>
-
-            <CommentComposer
-              onSubmit={(draft) => {
-                addComment(incidentId, draft, profile?.displayName ?? 'You');
-                toast.success(t('comments.posted'), t('comments.postedBody'));
+            <Text
+              variant="body-sm"
+              onMedia
+              numberOfLines={captionOpen ? undefined : 3}
+              onTextLayout={(e) => {
+                // Fires with the real line boxes. Only meaningful while collapsed
+                // — once expanded the count is the full text and would latch true.
+                if (!captionOpen) setCaptionOverflows(e.nativeEvent.lines.length > 3);
               }}
-            />
+              style={{ lineHeight: 20 }}
+            >
+              {incident.description}
+            </Text>
+          </ScrollView>
 
-            <CommentList comments={comments} onOpenMedia={handleOpenCommentMedia} />
-          </View>
+          {captionOverflows ? (
+            <Pressable
+              onPress={() => setCaptionOpen((open) => !open)}
+              haptic={false}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: captionOpen }}
+              accessibilityLabel={t(captionOpen ? 'detail.showLess' : 'detail.showMore')}
+              hitSlop={8}
+              className="self-start"
+            >
+              <Text variant="caption" onMedia className="font-sans-semibold uppercase">
+                {t(captionOpen ? 'detail.showLess' : 'detail.showMore')}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          <CaptureStamp incident={incident} compact />
         </View>
-      </ScrollView>
+      </View>
+
+      {/* ── Comments ────────────────────────────────────────────────────── */}
+      <Sheet
+        visible={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        title={t('detail.comments')}
+        subtitle={
+          contributions > 0 ? t('detail.contributions', { count: contributions }) : undefined
+        }
+      >
+        <View className="gap-3">
+          <CommentComposer
+            onSubmit={(draft) => {
+              addComment(incidentId, draft, profile?.displayName ?? 'You');
+              toast.success(t('comments.posted'), t('comments.postedBody'));
+            }}
+          />
+          <CommentList comments={comments} onOpenMedia={handleOpenCommentMedia} />
+        </View>
+      </Sheet>
 
       {/* Route, on demand. Guarded on the coordinates rather than on `mapOpen`
           alone so the map body can narrow them — the sheet is only reachable
@@ -453,5 +563,38 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
         </Sheet>
       ) : null}
     </View>
+  );
+}
+
+/**
+ * One control on the right-hand rail.
+ *
+ * Icon over a count, the arrangement every video app has settled on — it puts
+ * the number where the thumb already is and costs almost no frame. The label
+ * is not decoration: an unlabelled icon rail is unreadable to anyone who has
+ * not used one before, and a flag icon in particular means nothing on its own.
+ */
+function RailAction({
+  icon,
+  tint,
+  label,
+  onPress,
+  accessibilityLabel,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  tint: string;
+  label: string;
+  onPress: () => void;
+  accessibilityLabel: string;
+}) {
+  return (
+    <Pressable onPress={onPress} accessibilityLabel={accessibilityLabel} className="items-center">
+      <View className="h-11 w-11 items-center justify-center rounded-pill bg-black/35">
+        <Ionicons name={icon} size={22} color={tint} />
+      </View>
+      <Text variant="caption" onMedia className="mt-1 font-sans-medium">
+        {label}
+      </Text>
+    </Pressable>
   );
 }

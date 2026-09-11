@@ -3,7 +3,8 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { colors } from '@/lib/theme';
-import { formatExactCapture } from '@/lib/format';
+import { formatCoordinates, formatExactCapture } from '@/lib/format';
+import { usePlaceName } from '@/hooks/usePlaceName';
 import type { Incident } from '@/types/api';
 
 /**
@@ -35,8 +36,54 @@ export function CaptureStamp({
 }) {
   const { t } = useTranslation();
 
+  /*
+   * A name for the fix, asked of the phone's own geocoder.
+   *
+   * Before the early return below, because it is a hook. Null until it answers,
+   * and null forever where it cannot — the fallback chain below covers both.
+   */
+  const resolved = usePlaceName(incident.location.latitude, incident.location.longitude);
+
+  /*
+   * Agency copy gets a dateline, never a capture stamp.
+   *
+   * "Captured" is a claim about a specific act: a person, at that place, at
+   * that moment, with the GPS gate satisfied. A wire story about a summit in
+   * Abuja has none of that behind it, and printing the word on one borrows the
+   * credibility the platform builds for footage that does.
+   */
+  if (incident.origin === 'newsroom') {
+    const dateline = incident.location.label;
+    if (!dateline) return null;
+    return (
+      <View className="flex-row items-center gap-1.5" pointerEvents="none">
+        <Ionicons name="newspaper-outline" size={compact ? 11 : 13} color={colors.textOnDark} />
+        <Text variant="caption" onMedia className="font-sans-medium">
+          {dateline}
+        </Text>
+      </View>
+    );
+  }
+
   const when = formatExactCapture(incident.capturedAtIso, incident.capturedAtPrecision);
-  const where = incident.location.label;
+
+  /*
+   * The name of the place, or the fix that stands in for it.
+   *
+   * `location.label` is null on everything the service holds — it resolves no
+   * place names — while the coordinates it was derived from are right there on
+   * the same object. So the stamp printed a time and nothing else on footage
+   * whose entire claim is that it was taken *here*, and the reader had no way
+   * to tell that from a reporter who had withheld the location.
+   *
+   * Those two must not look alike, and this is what keeps them apart: a
+   * suppressed location arrives with no coordinates either, so it still falls
+   * through to nothing and the withholding stays unadvertised.
+   */
+  const where =
+    incident.location.label ??
+    resolved ??
+    formatCoordinates(incident.location.latitude, incident.location.longitude);
 
   if (!when && !where) return null;
 

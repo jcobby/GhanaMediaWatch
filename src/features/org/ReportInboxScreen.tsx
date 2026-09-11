@@ -7,7 +7,7 @@ import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Chip, Glass, Pressable, Text } from '@/components/ui';
 import { SAMPLE_INCIDENTS } from '@/api/fixtures';
-import { categoryColor, useColors } from '@/lib/theme';
+import { categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { toast } from '@/stores/toastStore';
 import { RequireRole } from './RequireRole';
@@ -167,7 +167,7 @@ export function ReportInboxScreen() {
                         width: 6,
                         height: 6,
                         borderRadius: 3,
-                        backgroundColor: categoryColor[incident.category],
+                        backgroundColor: categoryHue(incident.category),
                       }}
                     />
                     <Text variant="caption" tone="muted" className="uppercase">

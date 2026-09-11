@@ -1,5 +1,5 @@
 import { type ReactNode } from 'react';
-import { Platform, StyleSheet, View, type ViewProps } from 'react-native';
+import { Platform, View, type ViewProps } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { cn } from '@/lib/cn';
 import { shadow } from '@/lib/theme';
@@ -65,6 +65,16 @@ export interface GlassProps extends ViewProps {
  * the children were not in — segmented controls stacked vertically and pill
  * labels vanished. Keep children as siblings of the backdrop, never inside it.
  */
+/**
+ * Fill the parent.
+ *
+ * `StyleSheet.absoluteFillObject` was removed in React Native 0.86. The object
+ * it returned is four properties, so it is written out rather than replaced
+ * with `absoluteFill` — that one is a registered style id, and passing it where
+ * a plain object is expected type-checks in some positions and not others.
+ */
+const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
+
 export function Glass({
   elevation = 'mid',
   context = 'surface',
@@ -86,16 +96,12 @@ export function Glass({
       {Platform.OS === 'android' ? (
         // Android's blur costs enough frames to be visible in a scrolling feed;
         // a near-opaque fill reads almost identically and stays smooth.
-        <View
-          className={cn('absolute', SOLID[context])}
-          style={StyleSheet.absoluteFillObject}
-          pointerEvents="none"
-        />
+        <View className={cn('absolute', SOLID[context])} style={FILL} pointerEvents="none" />
       ) : (
         <BlurView
           intensity={INTENSITY[elevation]}
           tint={context === 'media' ? 'dark' : 'light'}
-          style={StyleSheet.absoluteFillObject}
+          style={FILL}
           pointerEvents="none"
         >
           <View className={cn('flex-1', TINT[context][elevation])} />

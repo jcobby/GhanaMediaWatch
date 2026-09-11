@@ -1,6 +1,3 @@
-import { useThemeStore } from '@/stores/themeStore';
-import { useColorScheme } from 'nativewind';
-
 /**
  * TypeScript mirror of the design tokens in global.css / tailwind.config.js.
  *
@@ -9,12 +6,14 @@ import { useColorScheme } from 'nativewind';
  * Anything that *can* be a className must use one — this is the escape hatch,
  * not an alternative styling system.
  *
- * Both palettes are mirrored here because a className cannot reach an icon's
- * `color` prop. **Read them through `useColors()`, not directly** — a component
- * importing `lightColors` will not repaint when the theme changes.
+ * There is one palette. A dark/light switch lived here and was removed — see
+ * global.css for why. `useColors()` remains the way to read it, so a call site
+ * asks for the palette rather than hard-coding one, but it now has a single
+ * answer for every caller.
  */
 
 export const lightColors = {
+  masthead: '#1A1A1D',
   canvas: '#F4F5FA',
   canvasSoft: '#FFFFFF',
   canvasRaise: '#E9ECF4',
@@ -111,65 +110,39 @@ export const categoryColor = {
 export type CategoryColorKey = keyof typeof categoryColor;
 
 /**
- * The dark palette, mirroring the `.dark` block in global.css.
+ * A category's hue, for a category that came off the wire.
  *
- * Kept in step by hand, which is the cost of RN needing colours as props. The
- * palette test asserts both sets carry the same keys, so a token added to one
- * and forgotten in the other fails rather than rendering as `undefined`.
+ * `categoryHue(incident.category)` is an object lookup typed against the
+ * categories this build ships. The category on a report is whatever the service
+ * sent — including one added after this build — and the lookup then yields
+ * `undefined`, which React Native renders as *no colour at all*: a chip with no
+ * hue, a map pin that vanishes, a category rule that is simply absent.
+ *
+ * Quieter than the console's version of this bug, which crashed a whole route,
+ * and the same cause. `other` is the honest fallback: the app genuinely does not
+ * know what this is.
  */
-export const darkColors: ThemeColors = {
-  canvas: '#0E101A',
-  canvasSoft: '#161926',
-  canvasRaise: '#202434',
-
-  glass: '#1E2232',
-  glassMedia: '#10111A',
-  hairline: '#FFFFFF',
-
-  textPrimary: '#F0F2FA',
-  textSecondary: '#C7CCDC',
-  textMuted: '#A0A7BD',
-  textFaint: '#767E96',
-  textOnDark: '#FFFFFF',
-
-  accent: '#8B74FF',
-  accentAlt: '#6096FF',
-  accentBright: '#A795FF',
-  accentWash: '#2C264E',
-
-  success: '#4ADE80',
-  warning: '#FBBF24',
-  danger: '#F87171',
-  info: '#7DAAFF',
-  live: '#FB7185',
-};
+export function categoryHue(category: string): string {
+  return categoryColor[category as CategoryColorKey] ?? categoryColor.other;
+}
 
 /**
- * The palette for the theme currently in force.
+ * The app's palette.
  *
- * A hook rather than a mutable export, because RN has to re-render to repaint
- * an icon — mutating a shared object would change the value and leave the
- * screen showing the old one.
+ * A hook rather than a bare export so every call site stays a component
+ * concern, and so a second palette could return here without touching the
+ * forty-six files that read it.
+ *
+ * There is one theme: a black masthead over a white page. Switching was built
+ * and then removed — it produced an app that could be dark when nobody had
+ * asked for it, because a stored choice, an OS setting and an in-app default
+ * were three sources of truth for one question.
  */
 export function useColors(): ThemeColors {
-  const choice = useThemeStore((s) => s.choice);
-  const { colorScheme } = useColorScheme();
-
-  const resolved = choice === 'system' ? (colorScheme ?? 'dark') : choice;
-  return resolved === 'light' ? lightColors : darkColors;
-}
-
-/** True when the app is currently wearing the dark palette. */
-export function useIsDark(): boolean {
-  const choice = useThemeStore((s) => s.choice);
-  const { colorScheme } = useColorScheme();
-  return (choice === 'system' ? (colorScheme ?? 'dark') : choice) === 'dark';
+  return lightColors;
 }
 
 /**
- * The light palette under its old name.
- *
- * Kept so non-component code and tests can still reach a concrete set. Any
- * component using this will not follow the theme — use `useColors()`.
+ * The palette under its old name, for non-component code and tests.
  */
 export const colors = lightColors;

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { useAuthStore } from '@/stores/authStore';
+import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 
 /**
  * Launch router.
@@ -30,8 +31,10 @@ export default function IndexRoute() {
       router.replace('/platform/(tabs)');
       return;
     }
-    if (accountType === 'business') {
-      router.replace('/business/(tabs)');
+    // The institution tier is console work; on the phone an organisation account is
+    // still a person who can read the feed and file a report.
+    if (ORGANISATION_TIER_ENABLED && accountType === 'organisation') {
+      router.replace('/organisation/(tabs)');
       return;
     }
     router.replace('/(tabs)');

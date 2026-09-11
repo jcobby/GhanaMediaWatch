@@ -68,6 +68,38 @@ export function formatExactCapture(iso: string | null, precision: TimePrecision)
 }
 
 /**
+ * Where it was taken, when nobody has given the place a name.
+ *
+ * The service resolves `location.label` for nothing it holds — every published
+ * report comes back `"label": null` — while carrying the fix that produced it:
+ * `5.602735, -0.218041` on the report the reporter asked about. So the app had
+ * the location, was allowed to show it, and printed nothing, on a screen whose
+ * whole claim is that this footage was taken *here*.
+ *
+ * Coordinates are a worse label than "Kaneshie, Accra" and a far better one
+ * than silence: they can be read out, pasted into Maps, and checked. Four
+ * decimal places is about eleven metres — the accuracy the capture actually
+ * has, and no more precision than it can support.
+ *
+ * Null when there is no fix, which is how a suppressed location arrives. That
+ * absence is the reporter's decision and must stay unlabelled — see
+ * `CaptureStamp`.
+ */
+export function formatCoordinates(
+  latitude: number | null | undefined,
+  longitude: number | null | undefined,
+): string | null {
+  if (typeof latitude !== 'number' || typeof longitude !== 'number') return null;
+  if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return null;
+
+  // Hemisphere letters rather than a minus sign: Ghana sits either side of the
+  // prime meridian, and "-0.218" reads as a typo where "0.2180° W" does not.
+  const ns = latitude >= 0 ? 'N' : 'S';
+  const ew = longitude >= 0 ? 'E' : 'W';
+  return `${Math.abs(latitude).toFixed(4)}° ${ns}, ${Math.abs(longitude).toFixed(4)}° ${ew}`;
+}
+
+/**
  * Full timestamp for the detail view and any evidence context — seconds and
  * timezone included, because a report used to dispatch a patrol needs to be
  * unambiguous about when it was taken.

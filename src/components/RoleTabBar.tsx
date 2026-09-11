@@ -47,6 +47,8 @@ export function useTabScreenOptions() {
         // almost identically and stays smooth.
         <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.97)' }} />
       ) : (
+        // Light tint over the white page, so the bar reads as frosted glass
+        // rather than as a panel dropped on top of the list.
         <BlurView intensity={70} tint="light" style={{ flex: 1 }}>
           <View style={{ flex: 1, backgroundColor: 'rgba(255,255,255,0.55)' }} />
         </BlurView>

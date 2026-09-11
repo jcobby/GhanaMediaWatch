@@ -27,7 +27,16 @@ export function useGpsGate(active: boolean): UseGpsGateResult {
   const [reducedAccepted, setReducedAccepted] = useState(false);
   const [permissionAttempt, setPermissionAttempt] = useState(0);
 
-  const startedAt = useRef<number>(Date.now());
+  /*
+   * When the current fix attempt began.
+   *
+   * A ref because it is reset each time the position subscription restarts, and
+   * initialised to zero rather than to `Date.now()`: `useRef(Date.now())` calls
+   * the clock on every render and discards the result on all but the first,
+   * which the React Compiler rejects as an impure call during render. It is
+   * only ever read inside effects, where a ref is safe.
+   */
+  const startedAt = useRef(0);
   const wasUnlocked = useRef(false);
 
   // Permission and service availability.

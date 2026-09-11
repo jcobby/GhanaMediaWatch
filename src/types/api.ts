@@ -1,3 +1,5 @@
+import type { NewsSection } from './sections';
+import type { SubmissionDestination } from './dawuro';
 /**
  * The API contract as TypeScript.
  *
@@ -29,7 +31,22 @@ export const INCIDENT_CATEGORIES = [
 
 export type IncidentCategory = (typeof INCIDENT_CATEGORIES)[number];
 
+/**
+ * Where a report has got to on the editorial desk.
+ *
+ * Not a property of the reporter's choice: a report bound for the public feed
+ * is `pending_review` until an editor or the platform owner runs it, and only
+ * a transition from that desk makes it `published`.
+ */
 export type VettingState = 'pending_review' | 'published' | 'rejected' | 'restricted';
+
+/** Enumerated so every state can be checked for words, an icon and a colour. */
+export const VETTING_STATES: readonly VettingState[] = [
+  'pending_review',
+  'published',
+  'rejected',
+  'restricted',
+];
 
 /**
  * What was captured.
@@ -61,10 +78,27 @@ export interface IncidentMedia {
   url: string;
   /** Still frame for video; the client shows it while the player warms up. */
   posterUrl: string;
-  width: number;
-  height: number;
+  /**
+   * Pixel dimensions, when the server worked them out.
+   *
+   * Nullable because they are null in practice — verified against the live
+   * service, a freshly uploaded clip comes back `"width":null,"height":null`
+   * while older ones carry 1080×1920. Declared as required numbers, that made
+   * every consumer believe in a number that was not there.
+   */
+  width: number | null;
+  height: number | null;
   durationMs?: number;
   byteSize?: number;
+  /**
+   * The container the server holds, as it describes it.
+   *
+   * On the wire and previously undeclared. It decides the extension a
+   * downloaded copy is saved under, which is how a player picks its parser —
+   * the signed media URL has no extension of its own. `video/quicktime` is the
+   * common case here: this app records QuickTime on iOS.
+   */
+  mimeType?: string;
 }
 
 // ─── location ──────────────────────────────────────────────────────────────
@@ -99,14 +133,23 @@ export interface PreciseLocation extends PublicLocation {
  * institution licenses a report and may then release it publicly under its own
  * name. That is the difference between a feed of strangers' clips and a feed a
  * newsroom stands behind — and it is why a report can be traced back to a
- * business at all.
+ * organisation at all.
  *
  * The reporter is still the author; the organisation is the publisher. Those
  * are different roles and the model keeps them apart.
  */
-export type Publisher =
+/**
+ * The person who filed the report.
+ *
+ * Two cases only — a named account or an anonymous one. An organisation is
+ * never a reporter: institutions publish, people film.
+ */
+export type Reporter =
   | { kind: 'anonymous' }
-  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null }
+  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null };
+
+export type Publisher =
+  | Reporter
   | {
       kind: 'organisation';
       id: string;
@@ -140,6 +183,19 @@ export interface IncidentCounts {
   comments: number;
 }
 
+/**
+ * Where a feed item came from.
+ *
+ * `citizen_report` is the product: someone filmed it, the GPS gate passed, the
+ * trust model applies and the reporter earns if an institution licenses it.
+ *
+ * `newsroom` is the agency's own copy — wire and desk-written stories. It fills
+ * the desks a citizen cannot, and it is deliberately outside the trust model
+ * rather than exempted from it: there is no capture to assure, no location to
+ * verify, and nobody to pay.
+ */
+export type ItemOrigin = 'citizen_report' | 'newsroom';
+
 /** What the feed, map and public detail endpoints return. */
 export interface Incident {
   id: string;
@@ -151,7 +207,36 @@ export interface Incident {
    * page to check the claim.
    */
   reportId: string;
+  /**
+   * Whether a person filmed this, or a newsroom wrote it.
+   *
+   * The feed carries both. Six desks — Ghana, Africa, World, Business,
+   * Politics, Sport — and only one of them can be filled by citizens standing
+   * in front of something in Accra. The other five are the agency's own copy,
+   * which is a different kind of thing and has to say so.
+   *
+   * Before this field existed the wire stories were dressed as incident
+   * reports: an ECOWAS summit carried a GPS fix in Abuja, a named citizen
+   * reporter who had supposedly filmed it, and a "Captured 11:17 AM" stamp.
+   * That is not a cosmetic problem. The whole product rests on a reader being
+   * able to believe a report was captured where and when it says, and on a
+   * reporter being paid when their footage is used — and the disguise quietly
+   * broke both.
+   *
+   * A `newsroom` item therefore claims none of it: no capture stamp, no
+   * assurance class, no reporter credit, and no commission. See §14.
+   */
+  origin: ItemOrigin;
   category: IncidentCategory;
+  /**
+   * The news desk this ran on.
+   *
+   * Separate from `category`: the category is what was filed and what routing,
+   * commission and the editorial queue all key off. The desk is where an
+   * editor published it. A burst main in Kaneshie is a `flood` on the Ghana
+   * desk.
+   */
+  section: NewsSection;
   description: string;
   vettingState: VettingState;
   publishedAt: string;
@@ -162,6 +247,18 @@ export interface Incident {
   /** What the client is allowed to render from `capturedAtIso`. See TimePrecision. */
   capturedAtPrecision: TimePrecision;
   publisher: Publisher;
+  /**
+   * Who filed it, always — even when an organisation is the publisher.
+   *
+   * `publisher` alone cannot carry this. It is a union, so the moment an
+   * institution releases a report the reporter's name is gone from the payload,
+   * and the feed reads as though the institution filmed it. The credit belongs
+   * to the person who stood there.
+   *
+   * When `publisher.kind` is `user` or `anonymous` this is the same party, and
+   * the interface shows it once.
+   */
+  reporter: Reporter;
   counts: IncidentCounts;
   viewerHasReacted: boolean;
   /** Metres from the viewer. Present only when the query passed `near`. */
@@ -169,13 +266,42 @@ export interface Incident {
 }
 
 /** The author's own view — adds everything the public must not see. */
-export interface AuthoredIncident extends Omit<Incident, 'location'> {
+export interface AuthoredIncident extends Omit<Incident, 'location' | 'publishedAt'> {
   location: PreciseLocation;
   displayFlags: DisplayFlags;
   isAnonymous: boolean;
   rejectionReason: string | null;
   /** Mirrors the client's local row id so the outbox can reconcile. */
   clientId: string;
+  /**
+   * Where the reporter asked for it to go.
+   *
+   * The one field that decides what the app may promise them. A `public`
+   * submission is reviewed by an editor and released to the feed; it is never
+   * offered to an institution. A `directed` one is the opposite. The app used
+   * to infer this from an empty recipients list, which reads "public" for a
+   * directed report the desk has not routed yet and for one whose outcome
+   * simply has not loaded — so it told reporters their report had gone to the
+   * public feed when it had gone nowhere.
+   *
+   * Verified present on `GET /me/incidents`.
+   */
+  destination: SubmissionDestination;
+  /** Institutions named on a `directed` submission. Empty otherwise. */
+  requestedBusinessIds: string[];
+  /** When it was filed. */
+  createdAt: string;
+  /**
+   * When an editor released it, or null.
+   *
+   * Narrowed from `Incident`, where it is a plain string because the public
+   * feed only ever carries published reports. On the author's own list — the
+   * one screen that shows reports *before* they are published — it is null for
+   * every report still in review, which is most of them. Declared as a string
+   * it rendered as a blank timestamp on the report tile and an undated "You
+   * filed this" at the top of the outcome timeline.
+   */
+  publishedAt: string | null;
 }
 
 // ─── pagination ────────────────────────────────────────────────────────────
@@ -191,6 +317,8 @@ export interface FeedQuery {
   limit?: number;
   cursor?: string;
   category?: IncidentCategory[];
+  /** Repeatable. OR within, AND with `category`. */
+  section?: NewsSection[];
   near?: { latitude: number; longitude: number };
   radiusM?: number;
   since?: string;
@@ -205,6 +333,15 @@ export type ApiErrorCode =
   | 'TOKEN_EXPIRED'
   | 'TOKEN_INVALID'
   | 'FORBIDDEN'
+  /**
+   * Client-side only: a guest reached something that needs an account.
+   *
+   * The server says FORBIDDEN, which is true but unhelpful — it is the same
+   * code it returns to a signed-in reporter who lacks a permission, and those
+   * two people need opposite advice. Narrowed in the HTTP client so the copy
+   * can say "make an account" rather than "ask your administrator".
+   */
+  | 'SIGN_IN_REQUIRED'
   | 'INCIDENT_NOT_FOUND'
   | 'IDEMPOTENCY_CONFLICT'
   | 'UPLOAD_EXPIRED'
