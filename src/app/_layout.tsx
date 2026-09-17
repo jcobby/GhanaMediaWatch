@@ -23,6 +23,7 @@ import { registerUploader } from '@/services/uploader';
 import { ensureMediaDirectory } from '@/services/media';
 import { useOutboxStore } from '@/stores/outboxStore';
 import { useAuthStore } from '@/stores/authStore';
+import { registerForPushNotifications } from '@/services/pushNotifications';
 import { ToastHost } from '@/components/ui';
 import { BootScreen } from '@/components/BootScreen';
 import { useColors } from '@/lib/theme';
@@ -48,6 +49,19 @@ const BOOT_MINIMUM_MS = 1500;
 export default function RootLayout() {
   const c = useColors();
   const authHydrated = useAuthStore((s) => s.hydrated);
+  const accountId = useAuthStore((s) => s.profile?.id ?? null);
+
+  /*
+   * Push notifications, for whoever is signed in.
+   *
+   * Registered when an account appears — at sign-in, or on launch for somebody
+   * already signed in — and again if a different account signs in on the same
+   * phone. A guest is never registered: the token belongs to an account, and
+   * the service refuses it for a device alone.
+   */
+  useEffect(() => {
+    if (accountId) void registerForPushNotifications(accountId);
+  }, [accountId]);
   /*
    * A deadline on the boot screen.
    *
@@ -150,19 +164,19 @@ export default function RootLayout() {
                 behind it and returns to the same scroll position. */}
               <Stack.Screen name="incident/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="capture/review" options={{ presentation: 'card' }} />
-              <Stack.Screen name="org" />
-              <Stack.Screen name="platform" />
               {/*
                 A folder is only a single screen when it has its own `_layout`.
-                `business`, `org`, `platform` and `surveys` do; `organisations` and
-                `earnings` do not, so their routes are named file by file.
+                `surveys` does; `organisations` and `earnings` do not, so their
+                routes are named file by file.
 
                 Getting this wrong is a warning at startup and nothing else —
                 the screen still opens, because the router falls back to its own
                 inferred route. It stays wrong until somebody reads the log.
+
+                No organisation or platform shells: that work is done in the web
+                console, and the phone no longer has screens for it.
               */}
               <Stack.Screen name="earnings/index" />
-              <Stack.Screen name="organisation" />
               <Stack.Screen name="organisations/index" />
               <Stack.Screen name="organisations/[id]" />
               <Stack.Screen name="surveys" />

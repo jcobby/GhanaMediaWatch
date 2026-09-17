@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import {
   acquisitionProgress,
   canOfferReducedAccuracy,
@@ -168,5 +170,91 @@ describe('locking the fix', () => {
     const at = new Date('2026-08-19T11:21:04.000Z');
     const locked = lockFix(fixAt(7), at);
     expect(locked.capturedAtUtcOffsetMinutes).toBe(-at.getTimezoneOffset());
+  });
+});
+
+describe('the gate is a door, not a turnstile', () => {
+  /*
+   * Reported as `CameraUnmountedException: Camera unmounted during taking photo
+   * process` on a recording that had been running fine, with the GPS screen
+   * behind the message reading ±72 m against a ±20 m threshold.
+   *
+   * The capture screen mounted the camera only while the *current* reading
+   * passed, and the gate re-evaluates on every reading. GPS accuracy is not
+   * stable — indoors it swings from ±9 m to ±70 m and back in the same room — so
+   * one poor reading unmounted the camera and killed the recording in flight. A
+   * reporter filming something they may not get a second chance at lost the
+   * footage to a satellite.
+   *
+   * Nothing was gained by it either: the coordinate is locked at the shutter, so
+   * the report's fix was already decided when recording began. Re-closing the
+   * gate cannot improve what gets filed — only destroy it.
+   */
+  const SRC = path.resolve(__dirname, '..');
+  const read = (name: string) => fs.readFileSync(path.join(SRC, name), 'utf8');
+  const code = (name: string) =>
+    read(name)
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+
+  test('a reading that cleared the threshold is remembered', () => {
+    const hook = code('useGpsGate.ts');
+    expect(hook).toMatch(
+      /if \(next\.accuracyM <= GPS_ACCURACY_THRESHOLD_M\) setLastPassingFix\(next\)/,
+    );
+  });
+
+  test('it is remembered from the subscription, not from an effect', () => {
+    /*
+     * Setting state as an effect fires a second render pass before paint, which
+     * the React Compiler rejects as a cascading render. The position callback is
+     * an event and the natural home for it.
+     */
+    const hook = code('useGpsGate.ts');
+    const callback = hook.slice(
+      hook.indexOf('(reading) =>'),
+      hook.indexOf('return {', hook.indexOf('(reading) =>')),
+    );
+    expect(callback).toMatch(/setLastPassingFix/);
+    expect(hook).not.toMatch(/useEffect\([^)]*setLastPassingFix/s);
+  });
+
+  test('the freshest passing reading wins', () => {
+    // Waiting for a better fix has to actually improve the one the shutter
+    // locks, or the gate is teaching reporters that waiting is pointless.
+    expect(code('useGpsGate.ts')).toMatch(/setFix\(next\);/);
+  });
+
+  test('the camera stays open across a wobble', () => {
+    const screen = code('CaptureScreen.tsx');
+    expect(screen).toMatch(
+      /lastPassingFix\s*\?\s*\{ fix: lastPassingFix, confidence: 'high' as const \}/,
+    );
+  });
+
+  test('permission and services still close it', () => {
+    /*
+     * Those are states where continuing is genuinely wrong rather than merely
+     * noisy, and neither can happen without the reporter leaving the app to
+     * change a setting — so neither takes a recording by surprise.
+     */
+    const screen = code('CaptureScreen.tsx');
+    const permission = screen.indexOf("status.kind === 'permission_denied'");
+    const services = screen.indexOf("status.kind === 'services_disabled'");
+    const camera = screen.indexOf('if (open)');
+    expect(permission).toBeGreaterThan(-1);
+    expect(permission).toBeLessThan(camera);
+    expect(services).toBeLessThan(camera);
+  });
+
+  test('only the strict threshold latches', () => {
+    /*
+     * The reduced-accuracy hatch is already sticky, because accepting it is —
+     * `reducedAccuracyAccepted` is state the reporter set. Latching those too
+     * would hold a 150 m fix open on a screen whose whole purpose is a
+     * coordinate somebody can be dispatched to.
+     */
+    expect(code('useGpsGate.ts')).not.toMatch(/GPS_ABSOLUTE_MAX_ACCURACY_M/);
   });
 });

@@ -32,7 +32,7 @@ test('the top stories are the top of the feed, not a score this client invented'
    * newsroom with a number it computed on its own.
    */
   const screen = code('features/feed/FeedScreen.tsx');
-  expect(screen).toMatch(/visible\.slice\(0, topStorySettings\(\)\.count\)/);
+  expect(screen).toMatch(/visible\.slice\(0, topStoryCount\)/);
   expect(screen).toMatch(/rows = useMemo\(\(\) => visible\.slice\(leading\.length\)/);
 });
 
@@ -41,7 +41,9 @@ test('a search has a first result, not a lead', () => {
    * Stamping "Top story" on whatever happened to match is the interface
    * asserting an editorial judgement nobody made.
    */
-  expect(code('features/feed/FeedScreen.tsx')).toMatch(/query\.trim\(\) \? \[\] :/);
+  const overlay = code('features/feed/SearchOverlay.tsx');
+  expect(overlay).toMatch(/<FeedRow/);
+  expect(overlay).not.toMatch(/TopStories|feed\.topStory/);
 });
 
 test('a top story never renders twice', () => {
@@ -97,7 +99,7 @@ test('the skeleton has a lead in it', () => {
    * reloading rather than filling in, on the first thing anybody sees.
    */
   const skeleton = code('features/feed/FeedSkeleton.tsx');
-  expect(skeleton).toMatch(/Math\.round\(\(width \* 9\) \/ 16\)/);
+  expect(skeleton).toMatch(/Math\.round\(width \* LEAD_IMAGE_RATIO\)/);
 });
 
 test('the eyebrow has words behind it', () => {
@@ -168,7 +170,7 @@ describe('the feed shows the footage, not a drawing of the category', () => {
      * saturate the connection and leave the list stuttering.
      */
     expect(poster()).toMatch(/const MAX_ACTIVE = 1/);
-    expect(poster()).toMatch(/while \(active < MAX_ACTIVE/);
+    expect(poster()).toMatch(/while \(!isCameraActive\(\) && active < MAX_ACTIVE/);
   });
 
   test('a re-render does not queue the same report twice', () => {
@@ -256,7 +258,7 @@ describe('the top of the feed rotates', () => {
     expect(carousel()).toMatch(/const timer = setTimeout\(/);
     expect(carousel()).toMatch(/return \(\) => clearTimeout\(timer\)/);
     expect(carousel()).toMatch(
-      /\}, \[count, held, focused, reduceMotion, index, width, dwellMs\]\)/,
+      /\}, \[count, held, focused, reduceMotion, index, width, dwell, started\]\)/,
     );
   });
 
@@ -296,7 +298,7 @@ describe('the top of the feed rotates', () => {
   test('the reader can tell how many there are and which this is', () => {
     // Not knowing that anything is rotating, or how much has been missed, is
     // the complaint the dots exist to answer.
-    expect(carousel()).toMatch(/position === index \? 16 : 6/);
+    expect(carousel()).toMatch(/position === index \? 14 : 6/);
   });
 });
 
@@ -311,7 +313,7 @@ describe('how many stories lead, and for how long', () => {
      */
     expect(settings()).toMatch(/export function sanitise\(/);
     expect(settings()).toMatch(/DWELL_MS_RANGE = \{ min: 3000, max: 20_000 \}/);
-    expect(settings()).toMatch(/COUNT_RANGE = \{ min: 1, max: 10 \}/);
+    expect(settings()).toMatch(/COUNT_RANGE = \{ min: 1, max: 5 \}/);
   });
 
   test('a non-number falls back rather than rendering NaN', () => {
@@ -320,14 +322,287 @@ describe('how many stories lead, and for how long', () => {
     expect(settings()).toMatch(/typeof value !== 'number' \|\| !Number\.isFinite\(value\)/);
   });
 
-  test('there is exactly one place to wire the desk value in', () => {
+  test("the desk's value comes from the service, through one hook", () => {
     /*
-     * The desk owns this decision and the service cannot carry it yet. One
-     * accessor means that arrives as a function body rather than a hunt.
+     * `GET /v1/settings` carries the count and dwell now. Both screens read
+     * them through the same hook, so the served value reaches the rotation and
+     * the split between leads and rows together.
      */
-    expect(settings()).toMatch(/export function topStorySettings\(\): TopStorySettings/);
+    expect(settings()).toMatch(/fetch\(`\$\{origin\}\/v1\/settings`/);
+    expect(settings()).toMatch(/served = sanitise\(\{/);
     for (const rel of ['features/feed/FeedScreen.tsx', 'features/feed/TopStories.tsx']) {
-      expect([rel, /topStorySettings\(\)/.test(code(rel))]).toEqual([rel, true]);
+      expect([rel, /useTopStorySettings\(\)/.test(code(rel))]).toEqual([rel, true]);
     }
+  });
+
+  test('the defaults stand until the service answers, and if it never does', () => {
+    // A stable object, or `useSyncExternalStore` re-renders the feed forever.
+    expect(settings()).toMatch(/return served \?\? DEFAULTS;/);
+    expect(settings()).toMatch(/process\.env\.EXPO_PUBLIC_API_MODE !== 'http'/);
+  });
+});
+
+describe("the service's own image copies are used", () => {
+  test('rows and grid tiles draw the 320px thumb, falling back to the poster', () => {
+    expect(code('features/feed/FeedRow.tsx')).toMatch(
+      /const still = incident\.media\.thumbUrl \|\| incident\.media\.posterUrl/,
+    );
+    expect(code('features/profile/ReportGrid.tsx')).toMatch(
+      /const still = report\.media\.thumbUrl \|\| report\.media\.posterUrl/,
+    );
+  });
+
+  test('a full-width slide draws the 1280px view', () => {
+    expect(code('features/feed/FeedLead.tsx')).toMatch(
+      /const still = incident\.media\.viewUrl \|\| incident\.media\.posterUrl/,
+    );
+  });
+
+  test('the copies are made absolute at the boundary, and null stays null', () => {
+    const http = code('api/http.ts');
+    expect(http).toMatch(/thumbUrl: raw\.media\.thumbUrl \? absoluteMedia\(raw\.media\.thumbUrl\) : null/);
+    expect(http).toMatch(/viewUrl: raw\.media\.viewUrl \? absoluteMedia\(raw\.media\.viewUrl\) : null/);
+  });
+});
+
+describe('a video top story plays before it slides', () => {
+  const carousel = () => code('features/feed/TopStories.tsx');
+  const lead = () => code('features/feed/FeedLead.tsx');
+
+  test('only the slide on screen has a source', () => {
+    /*
+     * Five leads are mounted so the rotation can slide without a blank frame.
+     * Five players pulling five clips at once would cost a reader several
+     * megabytes for four stories they never saw — on bundles people ration.
+     * A null source is the documented way to have a player do nothing.
+     */
+    expect(lead()).toMatch(
+      /!cameraActive && \(playing \|\| preload\) && isVideo && incident\.media\.url\s*\?\s*incident\.media\.url\s*:\s*null/,
+    );
+    expect(carousel()).toMatch(/playing=\{motion && position === index\}/);
+  });
+
+  test('playback is driven by an effect, not the setup callback', () => {
+    /*
+     * The bug that made this feature do nothing at all.
+     *
+     * `useVideoPlayer(source, setup)` runs the setup **once, at creation**. All
+     * five slides mount together with `playing` false, so every player is built
+     * against a null source and its setup fires then — and when a slide later
+     * becomes the one on screen, the source is replaced and the setup is never
+     * called again. `play()` in there meant only the first slide ever moved,
+     * and even that raced the file loading. Nothing errored; the rotation
+     * showed five still frames.
+     */
+    const source = lead();
+    expect(source).toMatch(/if \(!source\) \{\s*setWaiting\(false\);\s*return;/);
+    expect(source).toMatch(/player\.play\(\);/);
+    const setup = source.slice(source.indexOf('useVideoPlayer('), source.indexOf('useEffect('));
+    expect(setup).not.toMatch(/\.play\(\)/);
+  });
+
+  test('a story that comes round again starts from the beginning', () => {
+    // Not the last second of the clip, frozen where the previous turn stopped.
+    expect(lead()).toMatch(/player\.currentTime = 0/);
+  });
+
+  test('leaving a slide stops its clip', () => {
+    // Four paused players behind the one on screen, not four running ones.
+    // Guarded: the native player may already be released when the slide unmounts.
+    expect(lead()).toMatch(
+      /safely\(\(\) => player\.pause\(\)\);\s*\}\;\s*\}, \[source, player, playing\]\)/,
+    );
+  });
+
+  test('it never makes a sound', () => {
+    /*
+     * Sound starting on its own in a feed is hostile — a reader in a lorry, a
+     * clinic or a meeting did not ask for it, and on a report about a
+     * confrontation it is worse than hostile.
+     */
+    expect(lead()).toMatch(/instance\.muted = true/);
+  });
+
+  test('it does not loop', () => {
+    // The rotation moves on when the preview ends. A clip restarting under a
+    // slide that is about to leave is motion for its own sake.
+    expect(lead()).toMatch(/instance\.loop = false/);
+  });
+
+  test('the preview is the slide dwell, not an addition to it', () => {
+    // Otherwise the rotation sits on a clip that has stopped playing, which is
+    // the deadest thing a moving lead can do.
+    expect(carousel()).toMatch(
+      /!isVideoSlide \? dwellMs : started \? VIDEO_PREVIEW_MS : VIDEO_START_TIMEOUT_MS/,
+    );
+    expect(carousel()).toMatch(/\}, dwell\)/);
+  });
+
+  test('footage stops for a reader who asked for less motion', () => {
+    /*
+     * A carousel that has stopped advancing but is still playing video
+     * underneath honours the letter of that setting and none of its point.
+     */
+    expect(carousel()).toMatch(/const motion = !reduceMotion && focused;/);
+  });
+
+  test('the still stays underneath rather than being replaced', () => {
+    // Something to show for the moment before the first frame arrives, and
+    // something to fall back to if the file will not play at all.
+    const source = lead();
+    expect(source.indexOf('<Thumbnail')).toBeLessThan(source.indexOf('<VideoView'));
+  });
+
+  test('the clip does not take the tap that opens the report', () => {
+    // The whole slide is one target. A scrubber here would sit between the
+    // reader and the story.
+    expect(lead()).toMatch(/nativeControls=\{false\}/);
+    expect(lead()).toMatch(/pointerEvents="none"/);
+  });
+
+  test('the rest of the feed still autoplays nothing', () => {
+    // The lead is one item and the strongest thing a news app can put at the
+    // top of a feed. Forty rows doing it is a different product.
+    expect(code('features/feed/FeedRow.tsx')).not.toMatch(/useVideoPlayer|VideoView/);
+  });
+});
+
+describe('the feed is shaped like the news apps people already read', () => {
+  /*
+   * Asked for by pointing at one: a dark bar with a menu and a title, uppercase
+   * section tabs with an underline, a full-bleed lead with a large headline and
+   * a timestamp beneath it, then rows with the picture on the left and one line
+   * of when and where.
+   */
+  const bar = () => code('features/feed/FeedBar.tsx');
+  const row = () => code('features/feed/FeedRow.tsx');
+  const lead = () => code('features/feed/FeedLead.tsx');
+
+  test('the bar is a menu, the GNA mark and a title', () => {
+    expect(bar()).toMatch(/name="menu"/);
+    // The supplied lockup, on its own white tile: its lettering is dark and the
+    // bar is black, so laid straight on it the agency's name would vanish.
+    expect(bar()).toMatch(/<GnaHomeLogo height=\{24\}/);
+    /*
+     * No tile: the mark's lettering is recoloured for a dark ground, so it sits
+     * straight on the black bar. A white badge on a black masthead was the
+     * supplied file's dark lettering showing through the workaround.
+     */
+    expect(bar()).not.toMatch(/bg-white/);
+    // And it is the supplied wordmark, not the older lockup with the drums.
+    expect(code('components/Brand.tsx')).toMatch(
+      /GnaHomeLogo[\s\S]{0,600}assets\/brand\/gna-home\.png/,
+    );
+    // The mark alone: no word beside it naming the screen.
+    expect(bar()).not.toMatch(/feedsTitle/);
+  });
+
+  test('nothing the bar used to carry has been lost', () => {
+    // Slides, the organisation directory and the map moved into the menu rather
+    // than disappearing.
+    const source = bar();
+    for (const handler of ['onOpenSlides', 'onOpenBusinesses', 'onOpenMap']) {
+      expect([handler, source.includes(`choose(${handler})`)]).toEqual([handler, true]);
+    }
+    // Search is the one that did not: it is its own control in the bar, which is
+    // where every app people already read puts it.
+    expect(source).toMatch(/onPress=\{onOpenSearch\}/);
+  });
+
+  test('the menu closes before it opens anything', () => {
+    // Otherwise the next screen opens underneath a sheet still on screen.
+    expect(bar()).toMatch(/setMenuOpen\(false\);\s*action\(\);/);
+  });
+
+  test('the lead has no badge over its picture', () => {
+    expect(lead()).not.toMatch(/feed\.topStory/);
+    expect(lead()).not.toMatch(/OVERLAY_TOP_LEFT/);
+  });
+
+  test('the lead headline is large, but not so large it crowds the slide', () => {
+    // Reduced from 22/29: the slide was taking most of a small screen.
+    expect(lead()).toMatch(/fontSize: 18, lineHeight: 24/);
+    expect(lead()).toMatch(/Math\.round\(width \* LEAD_IMAGE_RATIO\)/);
+  });
+
+  test('slide footage is cached on the phone', () => {
+    // Otherwise every pass of the rotation downloads the clip from the start.
+    expect(lead()).toMatch(/\{ uri: source, useCaching: true \}/);
+    expect(code('lib/videoPoster.ts')).toMatch(/createVideoPlayer\(\{ uri: url, useCaching: true \}\)/);
+  });
+
+  test('a row picture is a share of the screen, not a fixed size', () => {
+    // So it keeps its proportion on a small phone and a large one.
+    expect(row()).toMatch(/Math\.round\(width \* 0\.4\)/);
+  });
+
+  test('a row says when, then where', () => {
+    expect(row()).toMatch(/`\$\{when\}  •  \$\{where\}`/);
+  });
+
+  test('where falls back to what it is, never to a placeholder', () => {
+    // A reporter who withheld a location is not advertised as having done so.
+    expect(row()).toMatch(/placeOf\(incident\) \?\? t\(`category\.\$\{incident\.category\}`\)/);
+    expect(row()).not.toMatch(/Location hidden|Unknown location/i);
+  });
+
+  test('rows are separated by space, not rules', () => {
+    expect(code('features/feed/FeedScreen.tsx')).not.toMatch(/ItemSeparatorComponent/);
+  });
+});
+
+describe('a video top story gets five seconds of actual footage', () => {
+  /*
+   * Reported as the rotation showing thumbnails that never moved. The preview
+   * was timed from when a slide appeared, and a clip only began loading once
+   * its slide was on screen — so over mobile data the slide moved on before
+   * the first frame had even arrived.
+   */
+  const carousel = () => code('features/feed/TopStories.tsx');
+  const lead = () => code('features/feed/FeedLead.tsx');
+  const settings = () => code('features/feed/topStorySettings.ts');
+
+  test('five seconds', () => {
+    expect(settings()).toMatch(/VIDEO_PREVIEW_MS = 5000/);
+  });
+
+  test('timed from when the footage moves, not from when the slide appears', () => {
+    expect(lead()).toMatch(/addListener\('playingChange'/);
+    expect(lead()).toMatch(/if \(isPlaying\) \{\s*setWaiting\(false\);\s*startedRef\.current\?\.\(\);/);
+    expect(carousel()).toMatch(/startedId === showing\?\.id/);
+  });
+
+  test('a clip that is already moving still announces it', () => {
+    // Preloaded to readiness, it can be playing before the listener exists.
+    expect(lead()).toMatch(
+      /if \(safely\(\(\) => player\.playing\)\) \{\s*setWaiting\(false\);\s*startedRef\.current\?\.\(\);/,
+    );
+  });
+
+  test('the next slide buffers while this one plays, and only the next', () => {
+    expect(carousel()).toMatch(
+      /preload=\{motion && count > 1 && position === \(index \+ 1\) % count\}/,
+    );
+  });
+
+  test('a buffering slide is held still, not played', () => {
+    expect(lead()).toMatch(
+      /if \(!playing\) \{\s*setWaiting\(false\);\s*safely\(\(\) => player\.pause\(\)\);\s*return;/,
+    );
+  });
+
+  test('a clip that never starts cannot stall the rotation', () => {
+    expect(settings()).toMatch(/VIDEO_START_TIMEOUT_MS = 8000/);
+  });
+
+  test('a changing callback does not restart the clip', () => {
+    // The rotation re-renders on every scroll event; depending on the callback
+    // would seek the footage back to zero each time.
+    expect(lead()).toMatch(/const startedRef = useRef\(onPlaybackStarted\)/);
+    expect(lead()).not.toMatch(/\[source, player, playing, onPlaybackStarted\]/);
+  });
+
+  test('coming round again starts the count afresh', () => {
+    expect(carousel()).toMatch(/setStartedId\(null\);\s*setIndex\(next\)/);
   });
 });

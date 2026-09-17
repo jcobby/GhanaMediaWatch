@@ -1,5 +1,6 @@
 import { createVideoPlayer, type VideoPlayer, type VideoThumbnail } from 'expo-video';
 import { Image, type ImageRef } from 'expo-image';
+import { isCameraActive, subscribeToCameraActive } from './mediaSession';
 
 /**
  * Still frames for a service that generates none.
@@ -174,8 +175,17 @@ export async function adoptLocalPoster(
   atMs: number | null,
 ): Promise<void> {
   if (atMs === null) return;
+  /*
+   * Skipped while the camera is up. This runs when an upload finishes, which
+   * happens in the background — often while the reporter is already filming the
+   * next thing — and opening a player then would cut their camera off mid-take.
+   * The report falls back to the ordinary frame a second in.
+   */
+  if (isCameraActive()) return;
 
   const player = createVideoPlayer(localUri);
+  player.audioMixingMode = 'mixWithOthers';
+  player.muted = true;
   try {
     await playable(player);
     const [frame] = await player.generateThumbnailsAsync([atMs / 1000], {
@@ -194,8 +204,20 @@ export async function adoptLocalPoster(
   }
 }
 
+/*
+ * Held while the camera is up, resumed when it is not.
+ *
+ * Every job opens a video player, and a player appearing or disappearing while
+ * the camera records resets the audio session and cuts the camera off. Frames
+ * can wait a few seconds; somebody's footage cannot.
+ */
+subscribeToCameraActive(() => {
+  if (!isCameraActive()) pump();
+});
+
 function pump(): void {
-  while (active < MAX_ACTIVE && queue.length > 0) {
+  // Not while the camera owns the media session. Resumed by the subscription above.
+  while (!isCameraActive() && active < MAX_ACTIVE && queue.length > 0) {
     const job = queue.shift();
     if (!job) return;
 
@@ -226,7 +248,13 @@ function pump(): void {
 }
 
 async function capture(incidentId: string, url: string): Promise<Poster | null> {
-  const player = createVideoPlayer(url);
+  // The same cache the slides play from, so the bytes read to cut this frame
+  // are not downloaded a second time when the clip plays.
+  const player = createVideoPlayer({ uri: url, useCaching: true });
+  // Only ever cutting a still frame: it must never claim the phone's audio, or
+  // the camera on the capture tab loses its session while this runs.
+  player.audioMixingMode = 'mixWithOthers';
+  player.muted = true;
   try {
     /*
      * Wait for the clip to be playable before asking for a frame.

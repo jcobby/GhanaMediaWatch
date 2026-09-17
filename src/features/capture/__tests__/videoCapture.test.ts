@@ -362,3 +362,180 @@ test('the caption does not swallow the player controls', () => {
    */
   expect(code('ReviewScreen.tsx')).toMatch(/pointerEvents="none"/);
 });
+
+describe('footage a desk can actually open', () => {
+  /*
+   * Reported as videos not playing on the verification desk — a black frame and
+   * "The file could not be opened", about clips the reporter had filmed
+   * perfectly well and could watch on their own phone.
+   *
+   * **The container was never the whole problem.** An iPhone writes `.mov`, and
+   * Chrome refuses `video/quicktime` outright, which the console fixes by
+   * relabelling. But left to itself an iPhone on "High Efficiency" — the default
+   * on every recent model — records **HEVC**, and no desktop browser can decode
+   * that however it is labelled. Relabelling only moves the failure from an
+   * immediate "unsupported source" to a decode error several seconds later.
+   *
+   * `recordAsync` takes a codec on iOS. Asking for H.264 at the point of
+   * recording is the only fix that needs nothing from anybody else.
+   */
+  const stage = () => code('CameraStage.tsx');
+
+  test('iOS is asked for H.264 rather than whatever the phone prefers', () => {
+    expect(stage()).toMatch(/codec: 'avc1' as const/);
+  });
+
+  test('the request is iOS-only', () => {
+    // Android's `expo-camera` writes H.264 in MP4 already, which is why this
+    // was only ever an iPhone problem — and `codec` is an iOS-only option.
+    expect(stage()).toMatch(/Platform\.OS === 'ios' \? \{ codec: 'avc1' as const \} : \{\}/);
+  });
+
+  test('the report says what was recorded, not what was asked for', () => {
+    /*
+     * `recordAsync` resolves with the codec it used. A device that ignored the
+     * request would otherwise be filed as though it had honoured it, and the
+     * report would reach the desk described as something it is not — which is
+     * how this class of bug stays invisible.
+     */
+    expect(stage()).toMatch(
+      /videoMimeType\(video\.uri, \(video as \{ codec\?: string \}\)\.codec\)/,
+    );
+  });
+
+  test('the codec travels in the type, where a player reads it', () => {
+    // A `.mov` of H.264 and a `.mov` of HEVC are indistinguishable from the
+    // filename, and only one of them will open anywhere.
+    const source = stage();
+    expect(source).toMatch(/codec === 'avc1'/);
+    expect(source).toMatch(/codec === 'hvc1'/);
+    expect(source).toMatch(/codecs=avc1/);
+  });
+
+  test('a codec the recorder did not report is not invented', () => {
+    // A guessed codec is worse than none: it would have the desk state a
+    // reason for a failure that is not the real one.
+    const source = stage();
+    const fn = source.slice(source.indexOf('function videoMimeType'));
+    expect(fn.slice(0, 900)).toMatch(/return container;/);
+  });
+});
+
+describe('the camera only runs while its tab is on screen', () => {
+  /*
+   * Capture is a tab, and tabs stay mounted when you leave them. The SDK says
+   * plainly a hidden camera is not supported: "Only one Camera preview can be
+   * active at any given time. If you have multiple screens in your app, you
+   * should unmount Camera components whenever a screen is unfocused."
+   */
+  const stage = () => code('CameraStage.tsx');
+
+  test('focus decides whether the camera is mounted', () => {
+    expect(stage()).toMatch(/useFocusEffect\(/);
+    expect(stage()).toMatch(/\{focused \? \(\s*<CameraView/);
+  });
+
+  test('no debugging aids ship in the capture screen', () => {
+    expect(stage()).not.toMatch(/__DEV__/);
+    expect(stage()).not.toMatch(/camera-test/);
+  });
+
+  test('leaving the tab ends a recording rather than pretending it survives', () => {
+    /*
+     * An earlier version claimed a recording survived a tab switch. It did not:
+     * the hidden screen's camera view is detached and the take died with
+     * CameraUnmountedException. The honest behaviour is to stop it on the way out.
+     */
+    // Through the single guarded stop — a second native stop throws on iOS.
+    expect(stage()).toMatch(/if \(recordingRef\.current\) stopRecordingRef\.current\(\)/);
+  });
+
+  test('a remounted camera must become ready again before the shutter fires', () => {
+    const src = stage();
+    const focus = src.slice(src.indexOf('useFocusEffect('), src.indexOf('const [session'));
+    expect(focus).toMatch(/setFocused\(false\);[\s\S]*setCameraReady\(false\)/);
+  });
+
+  test('a camera that will not start says why', () => {
+    // It failed in silence: a black screen indistinguishable from a covered lens.
+    expect(stage()).toMatch(/onMountError=\{\(event\) => setMountError\(event\.message\)\}/);
+    expect(stage()).toMatch(/capture\.cameraFailedTitle/);
+  });
+
+  test('retrying starts a genuinely new session', () => {
+    const src = stage();
+    expect(src).toMatch(/key=\{session\}/);
+    expect(src).toMatch(/setSession\(\(s\) => s \+ 1\)/);
+  });
+});
+
+describe('video players never run while the camera does', () => {
+  /*
+   * expo-video resets the iOS audio session whenever a player is created,
+   * released, played or muted (VideoManager.swift, setAudioSession), and a
+   * camera recording video holds the microphone. Nothing in the feed needs to
+   * be decoding footage while somebody is filming, so it does not.
+   */
+  const SRC = path.resolve(CAPTURE, '..', '..');
+  const src = (rel: string) =>
+    fs
+      .readFileSync(path.join(SRC, rel), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, ' ')
+      .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+
+  test('the camera claims the media session while its tab is on screen', () => {
+    const stage = code('CameraStage.tsx');
+    expect(stage).toMatch(/setCameraActive\(true\)/);
+    expect(stage).toMatch(/setCameraActive\(false\)/);
+  });
+
+  test('the thumbnail queue holds its jobs while the camera is up', () => {
+    const poster = src('lib/videoPoster.ts');
+    expect(poster).toMatch(/while \(!isCameraActive\(\) && active < MAX_ACTIVE/);
+    // And resumes the moment the camera lets go.
+    expect(poster).toMatch(
+      /subscribeToCameraActive\(\(\) => \{\s*if \(!isCameraActive\(\)\) pump\(\);/,
+    );
+  });
+
+  test('a background upload does not open a player under the camera', () => {
+    const poster = src('lib/videoPoster.ts');
+    const adopt = poster.slice(poster.indexOf('export async function adoptLocalPoster'));
+    expect(adopt).toMatch(/if \(isCameraActive\(\)\) return;/);
+  });
+
+  test('the top story has no footage while the camera is up', () => {
+    expect(src('features/feed/FeedLead.tsx')).toMatch(/!cameraActive && \(playing \|\| preload\)/);
+  });
+});
+
+describe('"Saving…" cannot last forever', () => {
+  // A stop against a capture session iOS already cut off never resolves, and the
+  // screen sat on "Saving…" with nothing the reporter could do.
+  const stage = () => code('CameraStage.tsx');
+
+  test('a stop has a deadline', () => {
+    expect(stage()).toMatch(/const SAVE_TIMEOUT_MS = 6000/);
+    expect(stage()).toMatch(/saveWatchRef\.current = setTimeout\(/);
+  });
+
+  test('giving up says so and restarts the camera', () => {
+    const src = stage();
+    expect(src).toMatch(
+      /toast\.error\(t\('capture\.saveStuckTitle'\), t\('capture\.saveStuckBody'\)\)/,
+    );
+    expect(src).toMatch(/setSession\(\(n\) => n \+ 1\)/);
+  });
+
+  test('the abandoned take does not raise a second message', () => {
+    expect(stage()).toMatch(
+      /if \(abandonedRef\.current\) \{\s*abandonedRef\.current = false;\s*return;/,
+    );
+  });
+
+  test('a normal save clears the deadline', () => {
+    expect(stage()).toMatch(
+      /clearTimeout\(saveWatchRef\.current\);\s*saveWatchRef\.current = null;/,
+    );
+  });
+});

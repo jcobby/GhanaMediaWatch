@@ -24,13 +24,22 @@ const MAX_LENGTH = 500;
  * path runs through the capture gate. Conflating the two would let anyone
  * bypass the provenance rules the whole product rests on, so the composer says
  * plainly which one is happening.
+ *
+ * **Attaching and posting anonymously are optional.** The service's comment is
+ * text only — `{ body }` — so against it there is nowhere for an attachment or
+ * an anonymity choice to go, and offering either would drop it on the floor.
  */
 export function CommentComposer({
   onSubmit,
   canPostAnonymously = true,
+  canAttach = true,
+  sending = false,
 }: {
   onSubmit: (draft: DraftComment) => void;
   canPostAnonymously?: boolean;
+  canAttach?: boolean;
+  /** A post is on its way; the send button waits for it. */
+  sending?: boolean;
 }) {
   const c = useColors();
   const { t } = useTranslation();
@@ -39,7 +48,7 @@ export function CommentComposer({
   const [anonymous, setAnonymous] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  const canSend = (body.trim().length > 0 || media !== null) && !busy;
+  const canSend = (body.trim().length > 0 || media !== null) && !busy && !sending;
 
   const attach = async () => {
     hapticSelect();
@@ -81,7 +90,7 @@ export function CommentComposer({
 
   return (
     <Glass elevation="low" className="gap-2.5 rounded-lg p-3">
-      {media ? (
+      {canAttach && media ? (
         <View className="flex-row items-center gap-2.5 rounded-sm bg-canvas-raise p-2">
           <View className="overflow-hidden rounded-xs">
             <Image
@@ -113,11 +122,11 @@ export function CommentComposer({
       <TextInput
         value={body}
         onChangeText={setBody}
-        placeholder={t('comments.placeholder')}
+        placeholder={canAttach ? t('comments.placeholder') : t('comments.placeholderText')}
         placeholderTextColor={c.textFaint}
         multiline
         maxLength={MAX_LENGTH}
-        accessibilityLabel={t('comments.placeholder')}
+        accessibilityLabel={canAttach ? t('comments.placeholder') : t('comments.placeholderText')}
         style={{
           minHeight: 40,
           maxHeight: 120,
@@ -130,17 +139,19 @@ export function CommentComposer({
       />
 
       <View className="flex-row items-center gap-2">
-        <Pressable
-          onPress={() => void attach()}
-          disabled={busy}
-          accessibilityLabel={t('comments.attach')}
-          className="h-9 flex-row items-center gap-1.5 rounded-pill bg-canvas-raise px-3"
-        >
-          <Ionicons name="videocam-outline" size={16} color={c.accent} />
-          <Text variant="caption" tone="accent" className="font-sans-semibold">
-            {t('comments.attach')}
-          </Text>
-        </Pressable>
+        {canAttach ? (
+          <Pressable
+            onPress={() => void attach()}
+            disabled={busy}
+            accessibilityLabel={t('comments.attach')}
+            className="h-9 flex-row items-center gap-1.5 rounded-pill bg-canvas-raise px-3"
+          >
+            <Ionicons name="videocam-outline" size={16} color={c.accent} />
+            <Text variant="caption" tone="accent" className="font-sans-semibold">
+              {t('comments.attach')}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {canPostAnonymously ? (
           <Pressable

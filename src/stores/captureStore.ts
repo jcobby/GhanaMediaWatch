@@ -28,7 +28,26 @@ interface CaptureState {
   landmark: string;
   /** What the footage contains, which decides how it must be handled. */
   consent: ConsentFlags;
+  /**
+   * What the public sees of where and when — no longer a choice.
+   *
+   * These were four switches on the review screen. They are now fixed: every
+   * report publishes its place, address, date and time, and the reporter sees
+   * those values on the camera while filming rather than deciding afterwards
+   * what to withhold.
+   *
+   * Kept as state rather than deleted because they still travel in
+   * `displayFlags` on the create request and still occupy columns in the local
+   * database — the payload and the schema are unchanged, only the controls are
+   * gone. Restoring the choice is a matter of rendering switches again.
+   *
+   * **Worth being clear about what this changed:** a reporter could previously
+   * withhold their location, and suppressing it also suppressed the exact time,
+   * because publishing one without the other narrows somebody's whereabouts
+   * more than most people expect. Nobody can withhold either now.
+   */
   showLocation: boolean;
+  showAddress: boolean;
   showDate: boolean;
   showTime: boolean;
   /** Where this report goes — public feed, organisations, or both. */
@@ -51,9 +70,6 @@ interface CaptureState {
   setLandmark: (value: string) => void;
   setPosterAtMs: (value: number | null) => void;
   setConsent: (key: keyof ConsentFlags, value: boolean) => void;
-  setShowLocation: (value: boolean) => void;
-  setShowDate: (value: boolean) => void;
-  setShowTime: (value: boolean) => void;
   setDestination: (destination: SubmissionDestination) => void;
   setBusinessIds: (ids: string[]) => void;
   reset: () => void;
@@ -69,17 +85,18 @@ const DEFAULTS = {
   posterAtMs: null,
   consent: EMPTY_CONSENT,
   showLocation: true,
+  showAddress: true,
   showDate: true,
   showTime: true,
   /*
-   * Organisations by default.
+   * GNA, and open to licensing.
    *
-   * The product's purpose is getting information to organisations who can act
-   * on it — the public feed is what happens *after* one of them licenses a
-   * report, not the primary destination. Defaulting to public buried the main
-   * flow behind an opt-in most people would never find.
+   * Every report reaches the feed now, so `marketplace` — offered to
+   * organisations but *not* published — no longer describes anything a reporter
+   * can choose. `both` is the base case: on the feed, and licensable. The other
+   * choice adds named recipients to it rather than replacing it.
    */
-  destination: 'marketplace' as SubmissionDestination,
+  destination: 'both' as SubmissionDestination,
   businessIds: [] as string[],
 };
 
@@ -102,19 +119,6 @@ export const useCaptureStore = create<CaptureState>((set) => ({
   setLandmark: (landmark) => set({ landmark }),
   setPosterAtMs: (posterAtMs) => set({ posterAtMs }),
   setConsent: (key, value) => set((state) => ({ consent: { ...state.consent, [key]: value } })),
-  setShowLocation: (showLocation) =>
-    set((state) => ({
-      showLocation,
-      // Hiding the place while still publishing an exact time narrows a
-      // reporter's whereabouts more than most people expect, so the two move
-      // together rather than leaving a misleading half-private state.
-      showTime: showLocation ? state.showTime : false,
-    })),
-  setShowDate: (showDate) =>
-    // A bare time with no date is meaningless and still narrows the window,
-    // so suppressing the date suppresses the time with it.
-    set((state) => ({ showDate, showTime: showDate ? state.showTime : false })),
-  setShowTime: (showTime) => set({ showTime }),
   setDestination: (destination) =>
     set((state) => ({
       destination,

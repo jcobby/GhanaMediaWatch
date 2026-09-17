@@ -187,6 +187,16 @@ export interface DirectoryOrganisation {
   /** Reports published under this organisation's name. */
   publishedCount?: number;
   openSurveyCount?: number;
+  /**
+   * Higher commission rates this organisation offers for reports sent directly
+   * to it, in pesewas per category.
+   *
+   * Served on the public directory since 17 September. Still optional, because
+   * most organisations set no offer and the field is then absent rather than
+   * empty — `sanitiseOffer` treats both the same way, and an offer can only ever
+   * raise what a reporter earns, never lower it below the platform rate.
+   */
+  commissionOffer?: { categoryPesewas?: Record<string, number> } | null;
 }
 
 // ─── earnings ──────────────────────────────────────────────────────────────
@@ -201,6 +211,31 @@ export type CommissionStatus =
   /** Report rejected or withdrawn — nothing owed. */
   | 'void';
 
+/**
+ * Where the money itself has got to, as distinct from whether it is owed.
+ *
+ * `status` says the commission was earned; this says whether it has actually
+ * reached a phone. A reporter who has been paid and a reporter whose payment is
+ * sitting on hold because they never saved a payout number both read "Earned"
+ * without it, and the second one has something to do about it.
+ */
+export type PayoutStatus = 'held' | 'pending' | 'sent' | 'failed' | 'paid';
+
+/**
+ * The values this app knows how to explain.
+ *
+ * Used to check what the service sent before it reaches a wallet screen. A
+ * status nobody here can put into words is dropped rather than printed raw —
+ * `partially_settled` on a row of somebody's earnings is worse than no badge.
+ */
+export const PAYOUT_STATUSES: readonly PayoutStatus[] = [
+  'held',
+  'pending',
+  'sent',
+  'failed',
+  'paid',
+];
+
 export interface CommissionEntry {
   id: string;
   incidentId: string;
@@ -214,6 +249,10 @@ export interface CommissionEntry {
   amountPesewas: number;
   createdAtIso: string;
   paidAtIso: string | null;
+  /** Null until the commission has been put into a payout batch. */
+  payoutStatus: PayoutStatus | null;
+  /** Why it is held or why it failed, in the service's words. */
+  heldReason: string | null;
 }
 
 export interface EarningsSummary {

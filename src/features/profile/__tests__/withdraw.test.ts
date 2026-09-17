@@ -51,7 +51,6 @@ test('it is offered on the reporter’s own sheet and nowhere else', () => {
   const elsewhere = [
     'features/incident/IncidentDetailScreen.tsx',
     'features/feed/FeedScreen.tsx',
-    'features/organisation/OrganisationInboxScreen.tsx',
   ].filter((rel) => code(rel).includes('useDeleteIncident'));
   expect(elsewhere).toEqual([]);
 });

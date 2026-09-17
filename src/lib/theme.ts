@@ -99,6 +99,7 @@ export const categoryColor = {
   infrastructure: '#A06800',
   utility: '#0E7C88',
   corruption: '#8A6D1F',
+  whistleblower: '#3F5A8C',
   environment: '#127A3E',
   wildlife: '#4F7A16',
   flood: '#1D68D6',

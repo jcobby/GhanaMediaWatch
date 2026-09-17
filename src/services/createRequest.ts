@@ -10,7 +10,12 @@ import type { OutboxRecord } from '@/features/outbox/outboxMachine';
  * it has existed, and nothing that touches a real SQLite file would have run
  * in a test to notice.
  */
-export function buildCreateRequest(record: OutboxRecord, meta: CaptureMetadata) {
+export function buildCreateRequest(
+  record: OutboxRecord,
+  meta: CaptureMetadata,
+  /** The frame the reporter picked for a video, in milliseconds. */
+  posterAtMs: number | null = null,
+) {
   return {
     clientId: record.clientId,
     category: record.category,
@@ -20,6 +25,13 @@ export function buildCreateRequest(record: OutboxRecord, meta: CaptureMetadata) 
       showLocation: meta.showLocation,
       showDate: meta.showDate,
       showTime: meta.showTime,
+      /*
+       * Not in the published `DisplayFlags` yet, and neither are `address` and
+       * `plusCode` below. The service drops keys it does not know rather than
+       * refusing the report, so these are sent now and start working the day it
+       * stores them — see BACKEND-REQUESTS.md, item S.
+       */
+      showAddress: meta.showAddress,
     },
     /*
      * An unknown reading is an absent field, never an explicit null.
@@ -43,6 +55,9 @@ export function buildCreateRequest(record: OutboxRecord, meta: CaptureMetadata) 
       ...(meta.speed !== null ? { speed: meta.speed } : {}),
       confidence: meta.locationConfidence,
       isMocked: meta.isMocked,
+      // Absent rather than null when unknown, like every optional field here.
+      ...(meta.address ? { address: meta.address } : {}),
+      ...(meta.plusCode ? { plusCode: meta.plusCode } : {}),
     },
     /*
      * The reporter's own answers, which the server routes and pays on.
@@ -78,6 +93,8 @@ export function buildCreateRequest(record: OutboxRecord, meta: CaptureMetadata) 
       ...(meta.durationMs !== null ? { durationMs: meta.durationMs } : {}),
       ...(meta.width !== null ? { width: meta.width } : {}),
       ...(meta.height !== null ? { height: meta.height } : {}),
+      // Only for a clip, and only when the reporter chose; the service defaults to 1s.
+      ...(meta.mediaKind === 'video' && posterAtMs !== null ? { posterAtMs } : {}),
       sha256: meta.sha256 ?? '',
     },
   };

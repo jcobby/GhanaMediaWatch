@@ -35,14 +35,11 @@ interface AuthState {
   signIn: (email: string, password: string) => Promise<void>;
   /** Creates the account, then signs it in. */
   register: (email: string, password: string, displayName: string) => Promise<void>;
-  /** Signs in as an organisation account. Registration is a separate flow. */
-  signInAsOrganisation: (
-    businessId: string,
-    businessName: string,
-    email: string,
-    password: string,
-  ) => Promise<void>;
   signOut: () => Promise<void>;
+  /** Rename the account on the service, then on this phone. Throws on refusal. */
+  updateDisplayName: (displayName: string) => Promise<void>;
+  /** Delete the account on the service, then clear this phone. Throws on refusal. */
+  deleteAccount: () => Promise<void>;
   /** Called by the API client when a signed-in session cannot be refreshed. */
   forceSignedOut: () => Promise<void>;
   completeOnboarding: () => Promise<void>;
@@ -135,10 +132,40 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   hydrate: async () => {
     try {
-      const [rawProfile, onboarded] = await Promise.all([
+      const [rawProfile, onboarded, stored] = await Promise.all([
         SecureStore.getItemAsync(PROFILE_KEY),
         SecureStore.getItemAsync(ONBOARDED_KEY),
+        session.read(),
       ]);
+
+      /*
+       * A profile is only real if a session supports it.
+       *
+       * **This is the "Create an account to see this" bug, and it came back.**
+       * The token and the profile are two stores, and the code that keeps them
+       * in step is a set of callbacks that fire at the moment an account is
+       * demoted to a guest. Every one of them has to run, in order, before the
+       * app is killed — and if any does not, a device session and somebody's
+       * name and email survive together into the next launch. What the reporter
+       * sees is their own account at the top of the screen above an invitation
+       * to create one, with every count at zero, because `/me/*` correctly
+       * refuses a device token.
+       *
+       * So this stops relying on the callbacks having fired and checks the
+       * thing that is actually true: only a `user` session means an account.
+       * Ordering makes that safe to assert — signing in writes the session
+       * before the profile, so a profile without a user session behind it is
+       * always the stale one.
+       *
+       * Cleared from the keychain as well as from memory, or the same screen
+       * comes back on the next launch.
+       */
+      if (rawProfile && stored?.kind !== 'user') {
+        await SecureStore.deleteItemAsync(PROFILE_KEY);
+        set({ profile: null, onboarded: onboarded === 'true', hydrated: true });
+        return;
+      }
+
       set({
         profile: rawProfile ? migrateProfile(JSON.parse(rawProfile) as Profile) : null,
         onboarded: onboarded === 'true',
@@ -214,30 +241,6 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ profile });
   },
 
-  signInAsOrganisation: async (businessId, businessName, email, password) => {
-    /*
-     * A real password, checked by the server.
-     *
-     * This signed in with a seeded constant, so the tier was reachable by
-     * anybody who knew a demo address — the phone supplied the credential on
-     * their behalf. An organisation account is not something this app can mint.
-     */
-    const tokens = await api.signIn({ email, password });
-    await session.save(tokens);
-    const profile: Profile = {
-      id: email,
-      email,
-      displayName: email.split('@')[0]!,
-      accountType: 'organisation',
-      orgId: businessId,
-      orgName: businessName,
-      role: 'admin',
-      handle: null,
-    };
-    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
-    set({ profile });
-  },
-
   /**
    * Drop the profile when the session can no longer be recovered.
    *
@@ -253,10 +256,47 @@ export const useAuthStore = create<AuthState>((set) => ({
   },
 
   signOut: async () => {
+    /*
+     * Revoke the refresh token on the service first.
+     *
+     * Clearing the phone alone left that token valid on the server, so a
+     * session somebody believed they had ended on a shared phone could still be
+     * refreshed by anyone holding the token. A failure to reach the service does
+     * not keep them signed in: the phone is cleared either way, because the
+     * person asked to leave.
+     */
+    const stored = await session.read();
+    if (stored?.kind === 'user' && stored.refreshToken) {
+      await api.logout(stored.refreshToken).catch(() => undefined);
+    }
+
     await SecureStore.deleteItemAsync(PROFILE_KEY);
     // The session is cleared too, so the next request re-registers a device
     // identity. Queued reports survive — they belong to the device, not the
     // account.
+    await session.clear();
+    set({ profile: null });
+  },
+
+  updateDisplayName: async (displayName) => {
+    const name = displayName.trim();
+    // Throws on refusal, so the screen can say why and keep what was typed.
+    await api.updateProfile({ displayName: name });
+    const current = useAuthStore.getState().profile;
+    if (!current) return;
+    const profile: Profile = { ...current, displayName: name };
+    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+    set({ profile });
+  },
+
+  deleteAccount: async () => {
+    // Throws on refusal — outstanding commission, for one — and nothing is cleared.
+    await api.deleteAccount();
+    /*
+     * The account is gone, so there is no refresh token left to revoke: clear the
+     * phone directly rather than through `signOut`, which would try.
+     */
+    await SecureStore.deleteItemAsync(PROFILE_KEY);
     await session.clear();
     set({ profile: null });
   },

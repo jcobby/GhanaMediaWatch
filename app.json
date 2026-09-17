@@ -122,7 +122,9 @@
           "cameraPermission": "Dawuro needs the camera so you can record footage to attach to a comment."
         }
       ],
-      "expo-audio"
+      "expo-audio",
+      "expo-image",
+      "expo-sharing"
     ],
     "experiments": {
       "typedRoutes": true,

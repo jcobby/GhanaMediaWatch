@@ -19,6 +19,15 @@ import { receiving } from '@/hooks/useOrganisations';
 
 const PICKER = fs.readFileSync(path.resolve(__dirname, '..', 'DestinationPicker.tsx'), 'utf8');
 
+/*
+ * The figure itself now lives here, one file over.
+ *
+ * The picker still decides which choices are inert, because that is about the
+ * options it draws. What a report could earn is a separate question asked in a
+ * separate place — and, for a directed report, on a separate step.
+ */
+const ESTIMATE = fs.readFileSync(path.resolve(__dirname, '..', 'EarningsEstimate.tsx'), 'utf8');
+
 test('the picker knows when nobody can license a report', () => {
   expect(PICKER).toMatch(/const nobodyIsBuying =/);
   // Derived from the live directory, not assumed.
@@ -36,18 +45,24 @@ test('an empty directory is not mistaken for a failed one', () => {
 });
 
 test('no commission is quoted when nothing can be licensed', () => {
-  const estimate = PICKER.slice(PICKER.indexOf('{/* Earnings estimate */}'));
+  const estimate = ESTIMATE.slice(ESTIMATE.indexOf('{/* Earnings estimate */}'));
   expect(estimate).toMatch(/nobodyIsBuying\s*\?\s*t\('destination\.nobodyBuyingTitle'\)/);
   // The quote is still reachable for when organisations exist.
   expect(estimate).toMatch(/destination\.estimatedEarning/);
+
+  // Derived where the figure is drawn, and from the live directory — an empty
+  // platform and a failed fetch still must not be confused for one another.
+  expect(ESTIMATE).toMatch(/!directoryPending && !directoryFailed && available\.length === 0/);
 
   /*
    * And the condition has to mean something.
    *
    * A probe that hardcoded `nobodyIsBuying = false` left the branch above
    * intact and this test passing — the shape was right and the behaviour was
-   * back to promising money unconditionally.
+   * back to promising money unconditionally. Both files are checked: the picker
+   * still computes it for the inert badges, and the estimate for the figure.
    */
+  expect(ESTIMATE).not.toMatch(/const nobodyIsBuying = (false|true);/);
   expect(PICKER).not.toMatch(/const nobodyIsBuying = (false|true);/);
 });
 

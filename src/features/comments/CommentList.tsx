@@ -5,7 +5,6 @@ import { useTranslation } from 'react-i18next';
 import { Badge, Glass, Pressable, Text } from '@/components/ui';
 import { useColors } from '@/lib/theme';
 import { formatCount, formatRelativeTime } from '@/lib/format';
-import { useCommentsStore } from '@/stores/commentsStore';
 import type { IncidentComment } from '@/types/comments';
 
 /**
@@ -58,7 +57,6 @@ function CommentRow({
 }) {
   const c = useColors();
   const { t } = useTranslation();
-  const toggleReaction = useCommentsStore((s) => s.toggleReaction);
 
   const initials = comment.author.isAnonymous
     ? '?'
@@ -141,29 +139,22 @@ function CommentRow({
           </Pressable>
         ) : null}
 
-        <View className="flex-row items-center gap-4 pt-0.5">
-          <Pressable
-            onPress={() => toggleReaction(comment.id)}
-            haptic
-            accessibilityLabel={t('feed.react')}
-            className="flex-row items-center gap-1.5"
-          >
-            <Ionicons
-              name={comment.viewerHasReacted ? 'heart' : 'heart-outline'}
-              size={14}
-              color={comment.viewerHasReacted ? c.live : c.textMuted}
-            />
-            {comment.reactions > 0 ? (
-              <Text
-                variant="caption"
-                tone={comment.viewerHasReacted ? 'danger' : 'muted'}
-                className="font-sans-medium"
-              >
-                {formatCount(comment.reactions)}
-              </Text>
-            ) : null}
-          </Pressable>
-        </View>
+        {/*
+          The count, where the service sends one — not a button.
+
+          There was a heart here that toggled a store on the phone. The service
+          reacts to reports, not to individual comments, so the tap recorded
+          nothing and the heart forgot itself on the next load. A control that
+          does nothing is worse than no control.
+        */}
+        {comment.reactions > 0 ? (
+          <View className="flex-row items-center gap-1.5 pt-0.5">
+            <Ionicons name="heart-outline" size={14} color={c.textMuted} />
+            <Text variant="caption" tone="muted" className="font-sans-medium">
+              {formatCount(comment.reactions)}
+            </Text>
+          </View>
+        ) : null}
       </View>
     </View>
   );

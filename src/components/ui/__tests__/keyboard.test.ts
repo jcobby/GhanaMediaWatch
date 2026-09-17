@@ -24,13 +24,10 @@ const read = (rel: string) => fs.readFileSync(path.join(SRC, rel), 'utf8');
 /** Every file that takes typed input and owns its own scroll container. */
 const FORMS = [
   'features/capture/ReviewScreen.tsx',
-  'features/surveys/SurveyBuilderScreen.tsx',
-  'features/org/QueryEditorScreen.tsx',
   'features/earnings/EarningsScreen.tsx',
   'features/auth/SignInScreen.tsx',
   'features/auth/SignUpScreen.tsx',
   'features/auth/ForgotPasswordScreen.tsx',
-  'features/organisation/OrganisationSignUpScreen.tsx',
 ];
 
 test('the files under review exist', () => {

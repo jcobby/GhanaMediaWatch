@@ -42,7 +42,8 @@ test('the candidate frames come from the local file', () => {
    * request and a wait; here it is a seek against storage.
    */
   const picker = code('features/capture/PosterPicker.tsx');
-  expect(picker).toMatch(/useVideoPlayer\(uri\)/);
+  // The local file, with a setup that keeps the player silent.
+  expect(picker).toMatch(/useVideoPlayer\(uri, \(instance\) =>/);
   expect(picker).toMatch(/generateThumbnailsAsync\(/);
 });
 

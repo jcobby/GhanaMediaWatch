@@ -25,7 +25,10 @@ const read = (rel: string) => fs.readFileSync(path.join(CAPTURE, rel), 'utf8');
 
 test('the submit button is disabled while something blocks it', () => {
   const src = read('ReviewScreen.tsx');
-  expect(src).toMatch(/disabled=\{blocker !== null\}/);
+  // Everything that has to be true before a report can be sent: a description,
+  // and — for a directed report — somebody to send it to.
+  expect(src).toMatch(/disabled=\{sendBlocker !== null\}/);
+  expect(src).toMatch(/const sendBlocker = blocker \?\? recipientsBlocker;/);
 });
 
 test('an empty description is what blocks it', () => {
@@ -44,8 +47,9 @@ test('the reason is shown, not just the button greyed out', () => {
    */
   const src = read('ReviewScreen.tsx');
   const gate = src.slice(src.indexOf('{/* Submit */}'));
-  expect(gate).toMatch(/\{blocker \? \(/);
-  expect(gate).toMatch(/\{blocker\}/);
+  // From step 2 on, where the description is asked for — not over the capture step.
+  expect(gate).toMatch(/\{current >= 1 && \(blocker \?\? \(current === 3 \? recipientsBlocker : null\)\) \? \(/);
+  expect(gate).toMatch(/\{blocker \?\? recipientsBlocker\}/);
 });
 
 test('an empty capture never reaches the queue', () => {
@@ -122,4 +126,63 @@ test('the empty-row guard runs before any network call', () => {
   expect(uploader.indexOf('if (record.byteSize === 0)')).toBeLessThan(
     uploader.indexOf('api.createIncident'),
   );
+});
+
+describe('filing without an account is a choice, made once, in front of you', () => {
+  /*
+   * Reporting anonymously is a first-class way to use this app — in a country
+   * where the subject of the footage is sometimes the person who would come
+   * looking, it is the whole reason some people file at all. So this is not a
+   * blocker and not a nag.
+   *
+   * What a guest is owed is the consequence, before the irreversible step
+   * rather than after it: the report reaches the newsroom either way, but
+   * nothing can be tracked and nothing can be paid. And the one fact that makes
+   * the prompt worth reading — it is still reversible while the report sits in
+   * the outbox, because the upload carries whatever identity the phone holds at
+   * the moment it goes.
+   */
+  const review = () => read('ReviewScreen.tsx');
+
+  test('a guest is asked, and somebody signed in is not', () => {
+    expect(review()).toMatch(/profile \? void handleSubmit\(\) : setGuestSheet\(true\)/);
+  });
+
+  test('the question comes before the report is queued', () => {
+    // Afterwards it is an announcement, not a choice: there is no account to
+    // attach a report to once it has uploaded under a device identity.
+    const source = review();
+    expect(source.indexOf('setGuestSheet(true)')).toBeLessThan(
+      source.indexOf('void handleSubmit();', source.indexOf('guestSheetSend')),
+    );
+  });
+
+  test('sending as a guest is offered, not hidden', () => {
+    /*
+     * Signing in leads because it keeps their options open, but sending stays a
+     * full-width control rather than a link underneath. A legitimate decision
+     * must not be styled as the wrong answer.
+     */
+    expect(review()).toMatch(/label=\{t\('review\.guestSheetSend'\)\}/);
+    expect(review()).toMatch(/label=\{t\('review\.guestSheetSignIn'\)\}/);
+  });
+
+  test('going to sign in does not throw the capture away', () => {
+    // Nothing resets until a submission has actually succeeded, so coming back
+    // finds the description, the destination and the chosen frame intact.
+    const source = review();
+    const branch = source.slice(source.indexOf('guestSheetSignIn'));
+    expect(branch.slice(0, 400)).not.toMatch(/reset\(\)/);
+  });
+
+  test('the words say what is lost and what is still recoverable', () => {
+    // `review` also holds a nested `handling` block, so the cast goes
+    // through `unknown` rather than claiming every value is a string.
+    const copy = en.review as unknown as Record<string, string>;
+    expect(copy.guestSheetBody).toBeTruthy();
+    expect(copy.guestSheetKeep).toBeTruthy();
+    // The two consequences a reporter cannot discover for themselves.
+    expect(`${copy.guestSheetBody}`).toMatch(/track|follow/i);
+    expect(`${copy.guestSheetBody}`).toMatch(/paid|payment/i);
+  });
 });

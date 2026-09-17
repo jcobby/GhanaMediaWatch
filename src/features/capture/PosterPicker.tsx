@@ -58,7 +58,11 @@ export function PosterPicker({
    * matters here, because a reporter can reach this screen and leave it several
    * times before deciding to send.
    */
-  const player = useVideoPlayer(uri);
+  const player = useVideoPlayer(uri, (instance) => {
+    // Seeking for stills, not playing: never claim the phone's audio.
+    instance.muted = true;
+    instance.audioMixingMode = 'mixWithOthers';
+  });
   const [frames, setFrames] = useState<VideoThumbnail[] | null>(null);
 
   useEffect(() => {

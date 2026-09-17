@@ -3,7 +3,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Badge, Pressable, Sheet, Text } from '@/components/ui';
 import { DEMO_LOGINS, DEMO_PASSWORD, type DemoLogin } from '@/api/dawuroData';
-import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 import { useColors } from '@/lib/theme';
 
 interface DemoAccountSheetProps {
@@ -12,28 +11,15 @@ interface DemoAccountSheetProps {
   onPick: (login: DemoLogin) => void;
 }
 
-const ICON: Record<DemoLogin['accountType'], keyof typeof Ionicons.glyphMap> = {
-  reporter: 'person-outline',
-  organisation: 'business-outline',
-  platform_owner: 'shield-checkmark-outline',
-};
-
-const TONE: Record<DemoLogin['accountType'], 'neutral' | 'accent' | 'success'> = {
-  reporter: 'neutral',
-  organisation: 'accent',
-  platform_owner: 'success',
-};
-
 /**
  * Demo account picker.
  *
- * The platform has three genuinely different experiences, and evaluating it
- * means moving between them repeatedly. Typing credentials each time is enough
- * friction that people stop checking the other two.
- *
  * Present only while the app runs on fixtures — it disappears with the mock
- * client, since a shortcut into an organisation or operator account is exactly the
- * thing that must not exist against a real backend.
+ * client, since a one-tap shortcut into an account must not exist against a
+ * real backend.
+ *
+ * Reporter accounts only. Organisation and platform work is done in the web
+ * console, and the phone no longer has screens for either.
  */
 export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetProps) {
   const c = useColors();
@@ -48,9 +34,7 @@ export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetP
     >
       <ScrollView className="max-h-96" showsVerticalScrollIndicator={false}>
         <View className="gap-2">
-          {DEMO_LOGINS.filter(
-            (login) => ORGANISATION_TIER_ENABLED || login.accountType !== 'organisation',
-          ).map((login) => (
+          {DEMO_LOGINS.filter((login) => login.accountType === 'reporter').map((login) => (
             <Pressable
               key={login.email}
               onPress={() => onPick(login)}
@@ -58,23 +42,20 @@ export function DemoAccountSheet({ visible, onClose, onPick }: DemoAccountSheetP
               className="flex-row items-center gap-3 rounded-lg border border-hairline/[0.10] p-3.5"
             >
               <View className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise">
-                <Ionicons name={ICON[login.accountType]} size={17} color={c.textMuted} />
+                <Ionicons name="person-outline" size={17} color={c.textMuted} />
               </View>
               <View className="flex-1 gap-0.5">
                 <View className="flex-row items-center gap-2">
                   <Text variant="body-sm" className="font-sans-semibold">
                     {login.displayName}
                   </Text>
-                  <Badge
-                    label={t(`auth.accountType.${login.accountType}`)}
-                    tone={TONE[login.accountType]}
-                  />
+                  <Badge label={t(`auth.accountType.${login.accountType}`)} tone="neutral" />
                 </View>
                 <Text variant="caption" tone="muted" numberOfLines={1}>
                   {login.email}
                 </Text>
                 {/* What each account is actually good for demonstrating —
-                    otherwise picking between five is guesswork. */}
+                    otherwise picking between them is guesswork. */}
                 <Text variant="caption" tone="faint" numberOfLines={1}>
                   {login.showcases}
                 </Text>

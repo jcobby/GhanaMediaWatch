@@ -17,25 +17,30 @@ import { useGpsGate } from './useGpsGate';
  * The capture route — the GPS gate, then the camera.
  *
  * The gate is a hard precondition, not a warning: `CameraStage` is not rendered
- * at all until `status.kind === 'ready'`, so the preview cannot mount without a
- * coordinate good enough to dispatch someone to.
+ * at all until the fix is good enough to dispatch someone to, so the preview
+ * cannot mount without a coordinate worth pinning an incident on.
+ *
+ * **It is a precondition for getting in, not a condition for staying.** The gate
+ * re-evaluates on every reading, and GPS accuracy is not stable — indoors it
+ * swings from ±9 m to ±70 m and back in the same room. While the camera was
+ * mounted only during `ready`, one poor reading unmounted it mid-recording and
+ * the in-flight `recordAsync` died with `CameraUnmountedException: Camera
+ * unmounted during taking photo process`. A reporter filming something they may
+ * not get a second chance at lost the footage to a satellite.
+ *
+ * Nothing is gained by tearing it down, either: the coordinate is locked at the
+ * shutter, so the report's fix was already decided the moment recording began.
+ * Re-closing the gate cannot improve it — it can only destroy the thing being
+ * filed.
+ *
+ * Permission and services are different and still close the camera. Those are
+ * states in which continuing is genuinely wrong rather than merely noisy, and
+ * neither can happen without the reporter leaving the app to change a setting.
  */
 export function CaptureScreen() {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
-  const { status, fix, acceptReducedAccuracy, retryPermission } = useGpsGate(true);
-
-  if (status.kind === 'ready') {
-    return (
-      <Animated.View entering={FadeIn.duration(260)} className="flex-1">
-        <CameraStage
-          fix={status.fix}
-          confidence={status.confidence}
-          accuracyM={status.fix.accuracyM}
-        />
-      </Animated.View>
-    );
-  }
+  const { status, fix, lastPassingFix, acceptReducedAccuracy, retryPermission } = useGpsGate(true);
 
   if (status.kind === 'permission_denied') {
     return (
@@ -64,6 +69,38 @@ export function CaptureScreen() {
     );
   }
 
+  /*
+   * Checked after permission and services, so those still take the reporter out
+   * of the camera — and before the acquiring screen, so a wobble does not.
+   */
+  const open =
+    status.kind === 'ready'
+      ? { fix: status.fix, confidence: status.confidence }
+      : /*
+         * A wobble, not a closure. The reading in hand is poor, but one good
+         * enough to dispatch on has already been taken and the shutter locks
+         * whatever is freshest — so there is nothing to gain by throwing the
+         * camera away, and a recording in progress to lose.
+         */
+        lastPassingFix
+        ? { fix: lastPassingFix, confidence: 'high' as const }
+        : null;
+
+  if (open) {
+    return (
+      <Animated.View entering={FadeIn.duration(260)} className="flex-1">
+        <CameraStage fix={open.fix} confidence={open.confidence} accuracyM={open.fix.accuracyM} />
+      </Animated.View>
+    );
+  }
+
+  /*
+   * Still looking. `ready` cannot reach here — the camera returned above — but
+   * the compiler cannot see that through the `open` check, and reading
+   * `accuracyM` off a union that includes `ready` would be a lie about the
+   * shape rather than a cast worth writing.
+   */
+  const searching = status.kind === 'acquiring' || status.kind === 'stalled' ? status : null;
   const stalled = status.kind === 'stalled';
 
   return (
@@ -76,7 +113,7 @@ export function CaptureScreen() {
       contentContainerStyle={{ paddingTop: insets.top + 16, paddingBottom: 32 }}
       showsVerticalScrollIndicator={false}
     >
-      <AcquisitionRing accuracyM={status.accuracyM} />
+      <AcquisitionRing accuracyM={searching?.accuracyM ?? null} />
 
       <View className="mt-9 items-center gap-3">
         <Text variant="title-lg" className="text-center">

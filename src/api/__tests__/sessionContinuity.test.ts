@@ -154,3 +154,53 @@ test('a saved session never inherits a refresh token', () => {
   const src = fs.readFileSync(path.resolve(__dirname, '../../services/session.ts'), 'utf8');
   expect(src).toMatch(/else await SecureStore\.deleteItemAsync\(REFRESH_KEY\)/);
 });
+
+describe('a profile no session supports is not a signed-in reporter', () => {
+  /*
+   * "Create an account to see this", under the reporter's own name and email,
+   * with every count at zero. Reported twice now, which is the point of this
+   * block.
+   *
+   * The token and the profile live in two stores, and what used to keep them in
+   * step was a set of callbacks firing at the moment an account is demoted to a
+   * guest. Every one of them has to run, in order, before the app is killed. If
+   * any does not — a crash, a force-quit, a keychain write that did not land —
+   * a device session and somebody's identity survive together into the next
+   * launch, and `/me/*` correctly refuses the device token underneath.
+   *
+   * The callbacks are still there and still right. What is new is that launch no
+   * longer *depends* on them having run: it checks the thing that is actually
+   * true instead.
+   */
+  const store = fs.readFileSync(path.resolve(SRC, 'stores/authStore.ts'), 'utf8');
+
+  test('launch reads the session, not only the keychain', () => {
+    const hydrate = store.slice(store.indexOf('hydrate: async'), store.indexOf('signIn: async'));
+    expect(hydrate).toMatch(/session\.read\(\)/);
+  });
+
+  test('a profile without a user session is dropped', () => {
+    /*
+     * Ordering is what makes this safe to assert rather than a guess: signing in
+     * writes the session before the profile, so a profile with no user session
+     * behind it is always the stale one of the two.
+     */
+    const hydrate = store.slice(store.indexOf('hydrate: async'), store.indexOf('signIn: async'));
+    expect(hydrate).toMatch(/if \(rawProfile && stored\?\.kind !== 'user'\)/);
+  });
+
+  test('it is dropped from the keychain, not just from memory', () => {
+    // In memory only, the same screen returns on the next launch.
+    const hydrate = store.slice(store.indexOf('hydrate: async'), store.indexOf('signIn: async'));
+    expect(hydrate).toMatch(/deleteItemAsync\(PROFILE_KEY\)/);
+  });
+
+  test('onboarding is not lost along with the profile', () => {
+    // Being demoted to a guest is not being a new install. Replaying the
+    // onboarding tour at somebody who has used the app for a month reads as
+    // the app having forgotten them entirely.
+    const hydrate = store.slice(store.indexOf('hydrate: async'), store.indexOf('signIn: async'));
+    const branch = hydrate.slice(hydrate.indexOf("stored?.kind !== 'user'"));
+    expect(branch).toMatch(/onboarded: onboarded === 'true'/);
+  });
+});

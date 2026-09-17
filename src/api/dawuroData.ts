@@ -222,6 +222,9 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 2_625,
     createdAtIso: hoursAgo(3),
     paidAtIso: null,
+    // Earned, not yet in a batch: nothing has been attempted, so no payout state.
+    payoutStatus: null,
+    heldReason: null,
   },
   {
     id: 'cm_2',
@@ -233,6 +236,13 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 2_100,
     createdAtIso: hoursAgo(9),
     paidAtIso: null,
+    /*
+     * Held, so the mock exercises the one payout state a reporter can act on.
+     * Without a row like this the "add a payout number" path is never seen
+     * without a live backend and a real unpaid batch.
+     */
+    payoutStatus: 'held',
+    heldReason: 'No payout number on file',
   },
   {
     id: 'cm_3',
@@ -244,6 +254,8 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 1_575,
     createdAtIso: hoursAgo(26),
     paidAtIso: null,
+    payoutStatus: null,
+    heldReason: null,
   },
   {
     id: 'cm_4',
@@ -255,6 +267,9 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 2_150,
     createdAtIso: hoursAgo(1),
     paidAtIso: null,
+    // Nobody has licensed it, so there is nothing to pay out yet.
+    payoutStatus: null,
+    heldReason: null,
   },
   {
     id: 'cm_5',
@@ -266,6 +281,8 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 2_310,
     createdAtIso: hoursAgo(180),
     paidAtIso: hoursAgo(120),
+    payoutStatus: 'paid',
+    heldReason: null,
   },
   {
     id: 'cm_6',
@@ -277,6 +294,8 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 1_400,
     createdAtIso: hoursAgo(320),
     paidAtIso: hoursAgo(120),
+    payoutStatus: 'paid',
+    heldReason: null,
   },
   {
     id: 'cm_7',
@@ -288,6 +307,9 @@ export const COMMISSION_LEDGER: CommissionEntry[] = [
     amountPesewas: 0,
     createdAtIso: hoursAgo(400),
     paidAtIso: null,
+    // Nothing owed, so nothing to pay: a void row carries no payout state.
+    payoutStatus: null,
+    heldReason: null,
   },
 ];
 

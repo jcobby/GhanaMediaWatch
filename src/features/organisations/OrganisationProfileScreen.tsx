@@ -251,7 +251,7 @@ function ReportList({
   );
 }
 
-function SurveyList({ surveys, onOpen }: { surveys: Survey[]; onOpen: (survey: Survey) => void }) {
+export function SurveyList({ surveys, onOpen }: { surveys: Survey[]; onOpen: (survey: Survey) => void }) {
   const { t } = useTranslation();
   const c = useColors();
 
@@ -331,7 +331,7 @@ function SurveyList({ surveys, onOpen }: { surveys: Survey[]; onOpen: (survey: S
  * see `OrganisationAccount`, where every billing and preference field is optional
  * for the same reason.
  */
-function About({
+export function About({
   organisation,
 }: {
   organisation: { name: string; sector: string; interests?: string[] };

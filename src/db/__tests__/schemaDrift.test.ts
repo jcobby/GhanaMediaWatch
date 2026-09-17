@@ -69,6 +69,10 @@ test('every column added after the first release has an upgrade path', () => {
     'consent_json',
     'destination',
     'directed_business_ids',
+    'poster_at_ms',
+    'show_address',
+    'address',
+    'plus_code',
   ];
   const unupgradable = afterFirstRelease.filter((c) => !upgraded.includes(c));
   expect(unupgradable).toEqual([]);

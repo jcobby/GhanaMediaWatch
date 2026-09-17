@@ -39,8 +39,16 @@ export interface MapData {
 }
 
 export interface MapQuery {
-  /** `west,south,east,north` */
-  bbox?: string;
+  /**
+   * `west,south,east,north` — **required by the service.**
+   *
+   * Optional here once, which made it possible to build a request the service
+   * refuses: `GET /incidents/map` declares `bbox` required and answers 400
+   * without it. Nothing called this, so it never surfaced — but an optional
+   * field for a mandatory parameter is a trap set for whoever wires the
+   * clustered map, and the type is the cheapest place to close it.
+   */
+  bbox: string;
   zoom?: number;
   category?: IncidentCategory[];
 }
@@ -115,13 +123,6 @@ export interface Caller {
   memberships: { orgId: string; role?: string; name?: string }[];
 }
 
-export interface OrgDashboard {
-  byCategory: { category: IncidentCategory; count: number }[];
-  byState: { state: string; count: number }[];
-  trend: { date: string; count: number }[];
-  highPriority: Incident[];
-}
-
 export interface CreateIncidentRequest {
   clientId: string;
   category: IncidentCategory;
@@ -158,6 +159,13 @@ export interface CreateIncidentRequest {
     width?: number;
     height?: number;
     sha256: string;
+    /**
+     * The millisecond of the clip the reporter picked as its thumbnail.
+     *
+     * The service cuts `posterUrl` at this point; absent means one second, which
+     * often catches the phone still being raised. Only ever sent for video.
+     */
+    posterAtMs?: number;
   };
 }
 
@@ -220,8 +228,14 @@ export interface ApiClient {
 
   getIncident(id: string): Promise<Incident>;
 
-  /** Clustered server-side; returning raw points would not hold 60fps. */
-  getMapData(query?: MapQuery): Promise<MapData>;
+  /**
+   * Clustered server-side; returning raw points would not hold 60fps.
+   *
+   * Unused today — the map screen plots the published feed instead, because the
+   * card that opens on tap needs a description and a capture time that clustered
+   * points do not carry. Kept for the density problem it exists to solve.
+   */
+  getMapData(query: MapQuery): Promise<MapData>;
 
   /** The caller's own reports, across every vetting state. */
   getMyIncidents(): Promise<Page<AuthoredIncident>>;
@@ -277,6 +291,12 @@ export interface ApiClient {
    */
   getOrganisations(): Promise<DirectoryOrganisation[]>;
 
+  /** Published reports credited to one organisation — its own homepage feed. */
+  getOrganisationIncidents(organisationId: string): Promise<Incident[]>;
+
+  /** Surveys an organisation is running, for its homepage. Public. */
+  getOrganisationSurveys(organisationId: string): Promise<Survey[]>;
+
   /** Paid questions this reporter is eligible to answer. */
   getSurveys(): Promise<Survey[]>;
 
@@ -292,6 +312,70 @@ export interface ApiClient {
   /** Who the caller is, and which organisation they belong to. */
   getCaller(): Promise<Caller>;
 
-  /** Scoped by `orgId`, which the service requires as a header on org routes. */
-  getOrgDashboard(orgId: string): Promise<OrgDashboard>;
+  /**
+   * Comments under a report, oldest first.
+   *
+   * Read from the server so everyone sees the same discussion. They were a
+   * store on the phone seeded from fixtures, so a comment was visible only to
+   * the person who wrote it, on the phone they wrote it on.
+   */
+  getComments(incidentId: string): Promise<import('@/types/comments').IncidentComment[]>;
+
+  /**
+   * Post a comment, optionally without your name on it.
+   *
+   * `isAnonymous` is sent to the service, which decides what the author looks
+   * like to everybody else — the phone never draws that conclusion itself.
+   *
+   * Attachments are still not offered. The service takes `media` as an
+   * `uploadId`, which means putting the file through the chunked upload flow
+   * first; until that is wired, offering the control would drop the footage.
+   */
+  postComment(
+    incidentId: string,
+    body: string,
+    isAnonymous?: boolean,
+  ): Promise<import('@/types/comments').IncidentComment>;
+
+  /** React to a report, or take the reaction back. */
+  setReaction(incidentId: string, reacted: boolean): Promise<void>;
+
+  /** Flag a report for a moderator. Persisted as a safety report on the service. */
+  reportAbuse(input: { incidentId: string; reason: string }): Promise<void>;
+
+  /**
+   * Ask for a password reset email.
+   *
+   * The service answers the same way whether or not the address has an account,
+   * so this cannot be used to find out who is registered.
+   */
+  requestPasswordReset(email: string): Promise<void>;
+
+  /** The mobile money number commission is paid to, in international form. */
+  setPayoutNumber(msisdn: string): Promise<void>;
+
+  /** Register this phone's push token for the signed-in account. */
+  registerPushToken(pushToken: string): Promise<void>;
+
+  /**
+   * Revoke a refresh token on the service.
+   *
+   * Clearing the phone alone left the token valid: anyone who had copied it could
+   * go on refreshing a session the person believed they had ended.
+   */
+  logout(refreshToken: string): Promise<void>;
+
+  /** Change the display name shown on the account and on reports filed under it. */
+  updateProfile(input: { displayName: string }): Promise<void>;
+
+  /** Change the password, proving the current one. */
+  changePassword(input: { currentPassword: string; newPassword: string }): Promise<void>;
+
+  /**
+   * Delete the signed-in account.
+   *
+   * Reports already filed stay published but become anonymous; the service
+   * refuses while commissions are outstanding.
+   */
+  deleteAccount(): Promise<void>;
 }

@@ -21,9 +21,32 @@ import { GnaHorizontal } from '@/components/Brand';
 import { IncidentStage } from './IncidentStage';
 import { CommentList } from '@/features/comments/CommentList';
 import { CommentComposer } from '@/features/comments/CommentComposer';
-import { useComments, useCommentsStore } from '@/stores/commentsStore';
-import { useAuthStore } from '@/stores/authStore';
+import { useComments, usePostComment } from '@/hooks/useComments';
+import { api } from '@/api';
+import { describeApiError } from '@/lib/apiErrorCopy';
 import type { IncidentComment } from '@/types/comments';
+
+/**
+ * Whether a comment can carry footage yet. It cannot.
+ *
+ * **The service is ready; the phone is not.** `POST /incidents/{id}/comments`
+ * accepts `media.uploadId`, so the file must go through `/uploads/*` and come
+ * back with an id before it can be attached — and no such path exists for a
+ * comment. `uploader.ts` is a queue-driven state machine bound to an outbox row
+ * and its capture metadata; it turns a *queued report* into an upload, and there
+ * is nothing in it that takes an arbitrary picked file and returns a bare id.
+ * Building that is a second upload path — a feature, not a flag.
+ *
+ * This was `!isLiveBackend`, which gated the right thing for the wrong reason
+ * and produced an absurd result: the control appeared **only** against fixtures.
+ * Every shipped build sets an API URL, so no reporter ever saw it, while anyone
+ * running the app without a server saw an attach button that led nowhere — a
+ * feature that existed exclusively in the one configuration nobody ships.
+ *
+ * The composer's attach code is deliberately kept rather than deleted. It works;
+ * what is missing sits underneath it. Flip this the day a comment upload lands.
+ */
+const COMMENT_ATTACHMENTS_WIRED = false;
 
 interface IncidentDetailScreenProps {
   incidentId: string;
@@ -32,7 +55,7 @@ interface IncidentDetailScreenProps {
 /**
  * Full incident view — media, metadata, mini-map, and the navigation handoff.
  *
- * PHASE 5. Resolves from fixtures; moves behind the ApiClient with Phase 2.
+ * Read from the server through the ApiClient, comments and all.
  *
  * Every metadata row here is conditional on the value being present, because
  * the server nulls whatever the reporter suppressed. There is no "hidden" flag
@@ -45,9 +68,14 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
   const viewer = useViewerLocation();
-  const comments = useComments(incidentId);
-  const addComment = useCommentsStore((s) => s.add);
-  const profile = useAuthStore((s) => s.profile);
+  /*
+   * The discussion, from the server — so everyone reading this report sees the
+   * same comments. It was a store on the phone seeded from fixtures, and a
+   * comment was only ever visible to the person who wrote it.
+   */
+  const { data: commentData } = useComments(incidentId);
+  const comments = commentData ?? [];
+  const postComment = usePostComment(incidentId);
 
   /*
    * Arriving from the feed's comment icon means the reader has already decided
@@ -126,6 +154,15 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
     [t],
   );
 
+  /*
+   * Flagging a report sends it to a moderator now.
+   *
+   * The confirmation used to say "a moderator will review this" and send
+   * nothing, so a report somebody flagged as unsafe to show stayed up with
+   * nobody told. `POST /abuse` stores it as a safety report. "Thank you" is
+   * shown only once the service has it; a failure says so, so the reader knows
+   * to try again rather than believing it was handled.
+   */
   const handleReportAbuse = useCallback(() => {
     if (!incident) return;
     Alert.alert(t('detail.reportTitle'), t('detail.reportBody'), [
@@ -133,7 +170,18 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
       {
         text: t('detail.reportConfirm'),
         style: 'destructive',
-        onPress: () => toast.success(t('detail.reportedTitle'), t('detail.reportedBody')),
+        onPress: () => {
+          api
+            .reportAbuse({ incidentId: incident.id, reason: 'Flagged from the mobile app' })
+            .then(() => toast.success(t('detail.reportedTitle'), t('detail.reportedBody')))
+            .catch((cause: unknown) => {
+              const failure = describeApiError(cause, t, {
+                title: t('detail.reportFailedTitle'),
+                body: t('detail.reportFailedBody'),
+              });
+              toast.error(failure.title, failure.body);
+            });
+        },
       },
     ]);
   }, [incident, t]);
@@ -479,9 +527,29 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
       >
         <View className="gap-3">
           <CommentComposer
+            /*
+              Anonymity is offered; attaching is not, and the two are gated
+              separately because the service treats them differently.
+
+              `isAnonymous` is a flag on the comment body, so it goes with the
+              post. `media` is an `uploadId` — the file has to go through
+              `/uploads/*` first — so offering the control before that is wired
+              would take somebody's footage and drop it.
+            */
+            canAttach={COMMENT_ATTACHMENTS_WIRED}
+            canPostAnonymously
+            sending={postComment.isPending}
             onSubmit={(draft) => {
-              addComment(incidentId, draft, profile?.displayName ?? 'You');
-              toast.success(t('comments.posted'), t('comments.postedBody'));
+              postComment.mutate({ body: draft.body, isAnonymous: draft.postAnonymously }, {
+                onSuccess: () => toast.success(t('comments.posted'), t('comments.postedBody')),
+                onError: (cause) => {
+                  const failure = describeApiError(cause, t, {
+                    title: t('comments.postFailedTitle'),
+                    body: t('comments.postFailedBody'),
+                  });
+                  toast.error(failure.title, failure.body);
+                },
+              });
             }}
           />
           <CommentList comments={comments} onOpenMedia={handleOpenCommentMedia} />

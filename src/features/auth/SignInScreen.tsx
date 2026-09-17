@@ -10,7 +10,6 @@ import { useTranslation } from 'react-i18next';
 import { Button, Pressable, Text } from '@/components/ui';
 import { accentGradient, colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
-import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 import { toast } from '@/stores/toastStore';
 import { hapticUnlock } from '@/lib/haptics';
 import { AuthField } from './AuthField';
@@ -50,16 +49,9 @@ export function SignInScreen() {
         t('auth.welcomeBackTitle'),
         t('auth.welcomeBackBody', { name: profile?.displayName ?? values.email }),
       );
-      router.replace(
-        profile?.accountType === 'platform_owner'
-          ? '/platform/(tabs)'
-          : // An organisation login lands in the reporter app while the institution
-            // tier is off. Sending it to a hidden shell would be a dead end
-            // with no way back.
-            ORGANISATION_TIER_ENABLED && profile?.accountType === 'organisation'
-            ? '/organisation/(tabs)'
-            : '/(tabs)',
-      );
+      // Every account lands in the reporter app. Organisation and platform work
+      // is done in the web console.
+      router.replace('/(tabs)');
     } catch (cause) {
       toast.error(
         t('auth.signInFailed'),

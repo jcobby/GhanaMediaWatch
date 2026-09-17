@@ -3,8 +3,9 @@ import { ApiError } from '@/types/api';
 import { UPLOAD_CHUNK_SIZE_BYTES } from '@/lib/constants';
 import { chunkCount } from '@/services/chunkPlan';
 import { SAMPLE_INCIDENTS } from './fixtures';
-import { MY_REPORTS, ORG_STATS, ORG_TREND } from './mockData';
+import { MY_REPORTS } from './mockData';
 import { outcomeFor } from './outcomeData';
+import { commentsFor } from './commentsData';
 import { ORGANISATIONS, COMMISSION_LEDGER, EARNINGS_SUMMARY, SURVEYS } from './dawuroData';
 import type {
   CommissionEntry,
@@ -12,6 +13,7 @@ import type {
   EarningsSummary,
   Survey,
 } from '@/types/dawuro';
+import type { IncidentComment } from '@/types/comments';
 import type { ReportOutcome } from '@/types/outcome';
 import type {
   ApiClient,
@@ -22,7 +24,6 @@ import type {
   DeviceRegistration,
   MapData,
   MapQuery,
-  OrgDashboard,
   RegisterRequest,
   SignInRequest,
   UploadStatus,
@@ -59,6 +60,9 @@ export class MockApiClient implements ApiClient {
    * succeeds first time.
    */
   private readonly uploads = new Map<string, { received: Set<number>; chunkCount: number }>();
+
+  /** Comments posted this session, served after the seeded ones. */
+  private readonly postedComments = new Map<string, IncidentComment[]>();
 
   createIncident(
     input: CreateIncidentRequest,
@@ -131,7 +135,7 @@ export class MockApiClient implements ApiClient {
     return this.simulate(found);
   }
 
-  getMapData(query: MapQuery = {}): Promise<MapData> {
+  getMapData(query: MapQuery): Promise<MapData> {
     // Incidents whose reporter suppressed location never reach the map — a pin
     // is a location disclosure, so they are filtered before they are plotted.
     const plottable = SAMPLE_INCIDENTS.filter(
@@ -189,6 +193,18 @@ export class MockApiClient implements ApiClient {
     return this.simulate(ORGANISATIONS);
   }
 
+  getOrganisationSurveys(organisationId: string): Promise<Survey[]> {
+    return this.simulate(SURVEYS.filter((s) => s.businessId === organisationId));
+  }
+
+  getOrganisationIncidents(organisationId: string): Promise<Incident[]> {
+    return this.simulate(
+      SAMPLE_INCIDENTS.filter(
+        (i) => i.publisher.kind === 'organisation' && i.publisher.id === organisationId,
+      ),
+    );
+  }
+
   refresh(): Promise<AuthTokens> {
     return this.simulate({
       accessToken: 'mock-user-token',
@@ -216,19 +232,62 @@ export class MockApiClient implements ApiClient {
     });
   }
 
-  getOrgDashboard(): Promise<OrgDashboard> {
-    return this.simulate({
-      byCategory: ORG_STATS.map((s) => ({ category: s.category, count: s.count })),
-      byState: [
-        { state: 'pending_review', count: 12 },
-        { state: 'published', count: 287 },
-        { state: 'rejected', count: 24 },
-      ],
-      trend: ORG_TREND.map((count, i) => ({
-        date: new Date(Date.now() - (ORG_TREND.length - i) * 86_400_000).toISOString().slice(0, 10),
-        count,
-      })),
-      highPriority: SAMPLE_INCIDENTS.slice(0, 3),
-    });
+  getComments(incidentId: string): Promise<IncidentComment[]> {
+    return this.simulate([
+      ...commentsFor(incidentId),
+      ...(this.postedComments.get(incidentId) ?? []),
+    ]);
+  }
+
+  postComment(incidentId: string, body: string, isAnonymous = false): Promise<IncidentComment> {
+    const comment: IncidentComment = {
+      id: `cmt_mock_${Date.now()}`,
+      incidentId,
+      author: { handle: isAnonymous ? 'Anonymous' : 'You', avatarUrl: null, isAnonymous },
+      body,
+      media: null,
+      createdAtIso: new Date().toISOString(),
+      isContribution: false,
+      reactions: 0,
+      viewerHasReacted: false,
+    };
+    this.postedComments.set(incidentId, [...(this.postedComments.get(incidentId) ?? []), comment]);
+    return this.simulate(comment);
+  }
+
+  setReaction(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  reportAbuse(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  requestPasswordReset(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  setPayoutNumber(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  registerPushToken(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  logout(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  updateProfile(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  changePassword(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  deleteAccount(): Promise<void> {
+    return this.simulate(undefined);
   }
 }

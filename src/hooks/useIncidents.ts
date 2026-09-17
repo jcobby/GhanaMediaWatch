@@ -21,7 +21,6 @@ export const queryKeys = {
   incident: (id: string) => ['incident', id] as const,
   map: (categories: IncidentCategory[]) => ['map', categories] as const,
   myIncidents: () => ['me', 'incidents'] as const,
-  orgDashboard: () => ['org', 'dashboard'] as const,
 };
 
 export function useFeed(query: FeedQuery = {}): UseQueryResult<Page<Incident>> {
@@ -34,6 +33,21 @@ export function useFeed(query: FeedQuery = {}): UseQueryResult<Page<Incident>> {
   });
 }
 
+/**
+ * One organisation's published reports, for its homepage feed.
+ *
+ * Idle until an organisation is chosen, so the GNA homepage costs no extra
+ * request.
+ */
+export function useOrganisationFeed(organisationId: string | null): UseQueryResult<Incident[]> {
+  return useQuery({
+    queryKey: ['organisationFeed', organisationId] as const,
+    queryFn: () => api.getOrganisationIncidents(organisationId!),
+    enabled: Boolean(organisationId),
+    staleTime: 30_000,
+  });
+}
+
 export function useIncident(id: string): UseQueryResult<Incident> {
   return useQuery({
     queryKey: queryKeys.incident(id),
@@ -42,10 +56,26 @@ export function useIncident(id: string): UseQueryResult<Incident> {
   });
 }
 
-export function useMapData(categories: IncidentCategory[] = []): UseQueryResult<MapData> {
+/**
+ * The clustered map endpoint.
+ *
+ * **Bounds are not optional.** `GET /incidents/map` requires `bbox` and answers
+ * 400 without one, so this takes the visible region rather than defaulting to
+ * the whole world — a map query with no bounds is a request the service refuses,
+ * and it used to be possible to write one.
+ *
+ * Not called yet: the map screen plots the published feed, because a tapped pin
+ * opens a card needing the description and capture time that clustered points
+ * leave out. This is here for when density makes that trade the wrong way round.
+ */
+export function useMapData(
+  bbox: string,
+  categories: IncidentCategory[] = [],
+): UseQueryResult<MapData> {
   return useQuery({
-    queryKey: queryKeys.map(categories),
-    queryFn: () => api.getMapData(categories.length ? { category: categories } : {}),
+    queryKey: [...queryKeys.map(categories), bbox],
+    queryFn: () => api.getMapData({ bbox, ...(categories.length ? { category: categories } : {}) }),
+    enabled: Boolean(bbox),
     staleTime: 60_000,
   });
 }
@@ -90,13 +120,12 @@ export function useDeleteIncident() {
 }
 
 /**
- * Reacting to a report.
+ * Reacting to a report, on screen.
  *
- * Written straight into the cache rather than sent anywhere. There is no
- * reactions endpoint yet, and a heart that animates but forgets on the next
- * refresh would be worse than one that does nothing — this at least keeps the
- * count and the filled state consistent with what the person just tapped, for
- * as long as the cache lives.
+ * Written into the cache first so the heart fills the instant it is tapped;
+ * `useToggleReaction` below then tells the service and puts it back if the
+ * service refuses. The count was kept only in the cache before, and forgot the
+ * reaction on the next refresh.
  *
  * Every cached feed page is updated, not just the one on screen: the same
  * report appears in the unfiltered feed and under whatever category filter is
@@ -132,5 +161,27 @@ export function toggleReactionIn(client: QueryClient, incident: Incident): void 
 
 export function useToggleReaction(): (incident: Incident) => void {
   const client = useQueryClient();
-  return useCallback((incident: Incident) => toggleReactionIn(client, incident), [client]);
+  return useCallback(
+    (incident: Incident) => {
+      // On screen first, so the heart answers the tap at once.
+      toggleReactionIn(client, incident);
+      /*
+       * Then the service. If it refuses — a guest the service will not let
+       * react, or no connection — the tap is put back, so the heart never shows
+       * a reaction nobody recorded. Undone by toggling the state it moved to.
+       */
+      const reacted = !incident.viewerHasReacted;
+      api.setReaction(incident.id, reacted).catch(() => {
+        toggleReactionIn(client, {
+          ...incident,
+          viewerHasReacted: reacted,
+          counts: {
+            ...incident.counts,
+            reactions: Math.max(0, incident.counts.reactions + (reacted ? 1 : -1)),
+          },
+        });
+      });
+    },
+    [client],
+  );
 }

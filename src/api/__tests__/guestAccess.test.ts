@@ -106,7 +106,7 @@ test('a 403 outside /me keeps the real permissions message', async () => {
    * to a screen that changes nothing.
    */
   const api = client();
-  await expect(api.getOrgDashboard('org_x')).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  await expect(api.getComments('inc_x')).rejects.toMatchObject({ code: 'FORBIDDEN' });
 });
 
 test('a guest is not offered sign-in for a network failure', async () => {

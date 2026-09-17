@@ -68,7 +68,16 @@ async function uploadRecord(record: OutboxRecord): Promise<void> {
     if (!current.uploadId) {
       const meta = incidentsRepository.findCaptureMetadata(current.id);
       if (!meta) throw new Error(`No capture metadata for ${current.id}`);
-      const init = await api.createIncident(buildCreateRequest(current, meta), current.clientId);
+      /*
+       * The reporter's chosen thumbnail travels with the report now, so the
+       * service cuts every reader's poster at the second they picked rather
+       * than at one second in.
+       */
+      const posterAtMs = incidentsRepository.findPosterChoice(current.id)?.posterAtMs ?? null;
+      const init = await api.createIncident(
+        buildCreateRequest(current, meta, posterAtMs),
+        current.clientId,
+      );
       current = applyEvent(current, {
         type: 'UPLOAD_INIT',
         uploadId: init.uploadId,

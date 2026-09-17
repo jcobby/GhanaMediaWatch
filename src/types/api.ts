@@ -21,6 +21,12 @@ export const INCIDENT_CATEGORIES = [
   'infrastructure',
   'utility',
   'corruption',
+  /*
+   * Wrongdoing reported from inside an organisation. Its own category rather
+   * than corruption, because the person filing is usually an insider who can
+   * be identified by what they know — see the review screen's anonymity step.
+   */
+  'whistleblower',
   'environment',
   'wildlife',
   'flood',
@@ -99,6 +105,20 @@ export interface IncidentMedia {
    * common case here: this app records QuickTime on iOS.
    */
   mimeType?: string;
+  /*
+   * The copies the service makes when an upload completes. Each is null while
+   * `status` is `processing`, and absent on reports stored before the pipeline
+   * existed, so every reader keeps a fallback.
+   */
+  /** H.264 MP4 web copy of a video (faststart). Always null for a photo. */
+  playbackUrl?: string | null;
+  /** The untouched original, served with its stored type. */
+  originalUrl?: string | null;
+  /** JPEG about 320px on the long edge — what a feed row or grid tile needs. */
+  thumbUrl?: string | null;
+  /** JPEG about 1280px on the long edge — what a full-width image needs. */
+  viewUrl?: string | null;
+  status?: 'processing' | 'ready' | 'failed';
 }
 
 // ─── location ──────────────────────────────────────────────────────────────

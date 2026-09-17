@@ -38,6 +38,9 @@ export function initialiseDatabase(): void {
       show_location INTEGER NOT NULL DEFAULT 1,
       show_date INTEGER NOT NULL DEFAULT 1,
       show_time INTEGER NOT NULL DEFAULT 1,
+      show_address INTEGER NOT NULL DEFAULT 0,
+      address TEXT,
+      plus_code TEXT,
       severity TEXT NOT NULL DEFAULT 'concern',
       landmark TEXT,
       consent_json TEXT NOT NULL DEFAULT '{}',
@@ -117,6 +120,9 @@ function addMissingColumns(): void {
     ['destination', "TEXT NOT NULL DEFAULT 'marketplace'"],
     ['directed_business_ids', "TEXT NOT NULL DEFAULT '[]'"],
     ['poster_at_ms', 'INTEGER'],
+    ['show_address', 'INTEGER NOT NULL DEFAULT 0'],
+    ['address', 'TEXT'],
+    ['plus_code', 'TEXT'],
   ];
 
   for (const [name, definition] of later) {

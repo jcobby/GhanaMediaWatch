@@ -6,11 +6,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Sheet, Text } from '@/components/ui';
+import { api } from '@/api';
+import { describeApiError } from '@/lib/apiErrorCopy';
 import { useCommissions, useEarnings } from '@/hooks/useEarnings';
 import { accentGradient, categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
-import { formatCedis, type CommissionStatus } from '@/types/dawuro';
+import { formatCedis, type CommissionStatus, type PayoutStatus } from '@/types/dawuro';
 import { payoutProgress, sumPesewas } from './commission';
+import { toGhanaMsisdn } from './momo';
 import { toast } from '@/stores/toastStore';
 
 const STATUS_TONE: Record<CommissionStatus, 'neutral' | 'success' | 'accent' | 'danger'> = {
@@ -20,8 +23,20 @@ const STATUS_TONE: Record<CommissionStatus, 'neutral' | 'success' | 'accent' | '
   void: 'danger',
 };
 
-/** Ghana's mobile money networks. */
-const MOMO_NETWORKS = ['MTN MoMo', 'Telecel Cash', 'AT Money'] as const;
+/**
+ * How far the payment itself has got.
+ *
+ * `held` is amber rather than red: nothing has gone wrong, the reporter just has
+ * no payout number yet, and that is a thing they can fix in about ten seconds
+ * from this very screen.
+ */
+const PAYOUT_TONE: Record<PayoutStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  held: 'warning',
+  pending: 'neutral',
+  sent: 'neutral',
+  failed: 'danger',
+  paid: 'success',
+};
 
 /**
  * The reporter's wallet.
@@ -38,9 +53,8 @@ export function EarningsScreen() {
   const insets = useSafeAreaInsets();
 
   const [payoutOpen, setPayoutOpen] = useState(false);
-  const [network, setNetwork] = useState<string>(MOMO_NETWORKS[0]);
   const [momoNumber, setMomoNumber] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [saving, setSaving] = useState(false);
 
   const { data: earnings } = useEarnings();
   const { data: commissions } = useCommissions();
@@ -59,7 +73,8 @@ export function EarningsScreen() {
   // would invalidate the reconciliation on every render.
   const ledger = useMemo(() => commissions ?? [], [commissions]);
   const progress = payoutProgress(summary.pendingPesewas, summary.payoutThresholdPesewas);
-  const canWithdraw = summary.pendingPesewas >= summary.payoutThresholdPesewas;
+  const thresholdMet = summary.pendingPesewas >= summary.payoutThresholdPesewas;
+  const msisdn = toGhanaMsisdn(momoNumber);
 
   /*
    * The headline balance is checked against the ledger rather than trusted.
@@ -78,20 +93,31 @@ export function EarningsScreen() {
     return earnedTotal !== summary.pendingPesewas;
   }, [earnings, commissions, ledger, summary.pendingPesewas]);
 
-  const handleWithdraw = async () => {
-    setProcessing(true);
+  /*
+   * The number commission is paid to, saved to the service.
+   *
+   * This was a "Withdraw" button that waited 1.4 seconds and announced money
+   * "on its way" to a network — while no number was stored anywhere and nothing
+   * was sent. A reporter could believe they had been paid. Payouts are run in
+   * batches by the platform, not pulled by the reporter, so what the reporter
+   * actually needs to do is give the number the batch pays into: that is
+   * `PUT /me/payout-msisdn`, and it is what this now does.
+   */
+  const handleSaveNumber = async () => {
+    if (!msisdn) return;
+    setSaving(true);
     try {
-      // SIMULATION ONLY. No payment rail is connected — a real integration
-      // means a mobile-money provider, KYC on the reporter, and a settlement
-      // account. Flagged in API_CONTRACT.md.
-      await new Promise((resolve) => setTimeout(resolve, 1400));
+      await api.setPayoutNumber(msisdn);
       setPayoutOpen(false);
-      toast.success(
-        t('earnings.payoutSentTitle', { amount: formatCedis(summary.pendingPesewas) }),
-        t('earnings.payoutSentBody', { network }),
-      );
+      toast.success(t('earnings.numberSavedTitle'), t('earnings.numberSavedBody', { number: msisdn }));
+    } catch (cause) {
+      const failure = describeApiError(cause, t, {
+        title: t('earnings.numberFailedTitle'),
+        body: t('earnings.numberFailedBody'),
+      });
+      toast.error(failure.title, failure.body);
     } finally {
-      setProcessing(false);
+      setSaving(false);
     }
   };
 
@@ -143,7 +169,7 @@ export function EarningsScreen() {
         >
           <View className="gap-1">
             <Text variant="caption" className="uppercase text-white/70">
-              {t('earnings.available')}
+              {t('earnings.owed')}
             </Text>
             <Text variant="display-lg" className="font-display text-white">
               {formatCedis(summary.pendingPesewas)}
@@ -158,8 +184,8 @@ export function EarningsScreen() {
               })}
             />
             <Text variant="caption" className="text-white/80">
-              {canWithdraw
-                ? t('earnings.thresholdMet')
+              {thresholdMet
+                ? t('earnings.thresholdMetNextRun')
                 : t('earnings.thresholdRemaining', {
                     amount: formatCedis(summary.payoutThresholdPesewas - summary.pendingPesewas),
                   })}
@@ -167,10 +193,9 @@ export function EarningsScreen() {
           </View>
 
           <Button
-            label={t('earnings.withdraw')}
+            label={t('earnings.setPayoutNumber')}
             variant="glass"
             fullWidth
-            disabled={!canWithdraw}
             onPress={() => setPayoutOpen(true)}
           />
         </LinearGradient>
@@ -213,11 +238,38 @@ export function EarningsScreen() {
                       label={t(`earnings.status.${entry.status}`)}
                       tone={STATUS_TONE[entry.status]}
                     />
+                    {/*
+                      Whether the money actually moved, which `status` does not
+                      say. "Earned" covers a commission already in somebody's
+                      MoMo wallet and one sitting on hold because they never
+                      saved a payout number — and only the second one is
+                      something the reporter can do anything about.
+                    */}
+                    {entry.payoutStatus ? (
+                      <Badge
+                        label={t(`earnings.payout.${entry.payoutStatus}`)}
+                        tone={PAYOUT_TONE[entry.payoutStatus]}
+                      />
+                    ) : null}
                     <Text variant="caption" tone="muted" numberOfLines={1}>
                       {entry.businessName ?? t('earnings.notYetLicensed')} ·{' '}
                       {formatRelativeTime(entry.createdAtIso)}
                     </Text>
                   </View>
+
+                  {/*
+                    What to do about it, where there is something to do. The
+                    service's own reason first — it knows why it held this one —
+                    and our sentence only as a fallback.
+                  */}
+                  {entry.payoutStatus === 'held' || entry.payoutStatus === 'failed' ? (
+                    <Text variant="caption" tone="warning" numberOfLines={2}>
+                      {entry.heldReason ??
+                        (entry.payoutStatus === 'held'
+                          ? t('earnings.payoutHeldNoNumber')
+                          : t('earnings.payoutFailedHelp'))}
+                    </Text>
+                  ) : null}
                 </View>
                 <Text
                   variant="body"
@@ -251,43 +303,14 @@ export function EarningsScreen() {
         </Glass>
       </ScrollView>
 
-      {/* Simulated mobile money payout */}
+      {/* The mobile money number commission is paid to */}
       <Sheet
         visible={payoutOpen}
         onClose={() => setPayoutOpen(false)}
-        title={t('earnings.withdrawTitle')}
-        subtitle={t('earnings.withdrawSubtitle', { amount: formatCedis(summary.pendingPesewas) })}
+        title={t('earnings.payoutNumberTitle')}
+        subtitle={t('earnings.payoutNumberSubtitle')}
       >
         <View className="gap-4">
-          <View className="gap-2">
-            <Text variant="label" tone="muted">
-              {t('earnings.network')}
-            </Text>
-            <View className="flex-row gap-2">
-              {MOMO_NETWORKS.map((n) => (
-                <Pressable
-                  key={n}
-                  onPress={() => setNetwork(n)}
-                  accessibilityState={{ selected: network === n }}
-                  accessibilityLabel={n}
-                  className={
-                    network === n
-                      ? 'flex-1 items-center rounded-lg border border-accent bg-accent-wash py-3'
-                      : 'flex-1 items-center rounded-lg border border-hairline/[0.10] py-3'
-                  }
-                >
-                  <Text
-                    variant="caption"
-                    tone={network === n ? 'accent' : 'muted'}
-                    className="font-sans-semibold"
-                  >
-                    {n}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-
           <View className="gap-2">
             <Text variant="label" tone="muted">
               {t('earnings.momoNumber')}
@@ -299,6 +322,7 @@ export function EarningsScreen() {
                 placeholder="024 000 0000"
                 placeholderTextColor={c.textFaint}
                 keyboardType="phone-pad"
+                autoComplete="tel"
                 accessibilityLabel={t('earnings.momoNumber')}
                 style={{
                   height: 52,
@@ -308,24 +332,25 @@ export function EarningsScreen() {
                 }}
               />
             </Glass>
-          </View>
-
-          {/* Said plainly, because a fake payment that looks real is worse than
-              an obvious placeholder. */}
-          <View className="flex-row items-start gap-2 rounded-lg bg-warning-wash p-3">
-            <Ionicons name="information-circle-outline" size={15} color={c.warning} />
-            <Text variant="caption" tone="warning" className="flex-1">
-              {t('earnings.simulationNotice')}
-            </Text>
+            {/* Caught here, where it can be fixed, not as a failed payout later. */}
+            {momoNumber.trim().length >= 9 && !msisdn ? (
+              <Text variant="caption" tone="danger">
+                {t('earnings.numberInvalid')}
+              </Text>
+            ) : (
+              <Text variant="caption" tone="muted">
+                {t('earnings.numberHelp')}
+              </Text>
+            )}
           </View>
 
           <Button
-            label={t('earnings.confirmWithdraw')}
+            label={t('earnings.saveNumber')}
             size="lg"
             fullWidth
-            loading={processing}
-            disabled={momoNumber.trim().length < 9}
-            onPress={() => void handleWithdraw()}
+            loading={saving}
+            disabled={!msisdn}
+            onPress={() => void handleSaveNumber()}
           />
         </View>
       </Sheet>

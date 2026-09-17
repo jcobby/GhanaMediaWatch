@@ -80,6 +80,42 @@ export function GnaHorizontal({
   );
 }
 
+/**
+ * The home masthead lockup: the wordmark and the flag triangle, nothing else.
+ *
+ * **The supplied artwork, recoloured rather than replaced.** The file is the
+ * clean mark — no drums, no bells, no arc, no "Ghana News Agency" line — and it
+ * arrived with black lettering on transparency, which cannot be laid on a black
+ * bar. Two wrong answers were tried first: a white tile behind it, which is a
+ * white badge stuck on a black masthead; and the older full lockup, which is
+ * light but brings back every symbol the supplied mark deliberately leaves out.
+ *
+ * So the lettering is remapped to near-white and **the red/yellow/green wedge
+ * inside the A is left exactly as drawn** — only near-neutral dark pixels are
+ * touched, and the antialiased edges are carried across so the letterforms keep
+ * their shape instead of becoming a hard mask.
+ *
+ * Regenerate with `scratchpad/logo4.py` if the source artwork changes.
+ */
+export function GnaHomeLogo({
+  height = 24,
+  style,
+}: {
+  height?: number;
+  style?: StyleProp<ImageStyle>;
+}) {
+  return (
+    <Image
+      source={require('../../assets/brand/gna-home.png')}
+      // 825 x 233 after trimming the transparent margin.
+      style={[{ height, width: height * 3.541 }, style]}
+      contentFit="contain"
+      transition={0}
+      accessibilityLabel="GNA Ghana News Agency — Digital Platform"
+    />
+  );
+}
+
 /** The full lockup — mark, GNA, and the two lines beneath. */
 export function GnaLogo({
   width = 210,

@@ -52,7 +52,12 @@ export interface SubmitCaptureInput {
   category: IncidentCategory;
   description: string;
   isAnonymous: boolean;
-  displayFlags: { showLocation: boolean; showDate: boolean; showTime: boolean };
+  displayFlags: { showLocation: boolean; showAddress: boolean; showDate: boolean; showTime: boolean };
+  /**
+   * The place in words, as the review screen resolved it. Null parts were not
+   * found; the plus code is null only for a fix with no usable coordinates.
+   */
+  place: { address: string | null; plusCode: string | null };
   severity: Severity;
   landmark: string;
   /** The frame the reporter picked as the thumbnail, or null for the default. */
@@ -126,6 +131,10 @@ export async function submitCapture(input: SubmitCaptureInput): Promise<string> 
     showLocation: input.displayFlags.showLocation,
     showDate: input.displayFlags.showDate,
     showTime: input.displayFlags.showTime,
+    showAddress: input.displayFlags.showLocation && input.displayFlags.showAddress,
+    // Recorded whatever the flags say, like the fix itself: publishing is a separate decision.
+    address: input.place.address,
+    plusCode: input.place.plusCode,
     severity: input.severity,
     // Empty is stored as null so "not answered" and "answered blank" are the
     // same thing, which is what they mean here.

@@ -20,6 +20,7 @@ export const categoryIcon: Record<IncidentCategory, keyof typeof Ionicons.glyphM
   infrastructure: 'construct',
   utility: 'flash',
   corruption: 'briefcase',
+  whistleblower: 'megaphone',
   environment: 'leaf',
   wildlife: 'paw',
   flood: 'water',

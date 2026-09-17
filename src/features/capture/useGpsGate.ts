@@ -1,12 +1,29 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import * as Location from 'expo-location';
-import { GPS_WATCH_INTERVAL_MS } from '@/lib/constants';
+import { GPS_ACCURACY_THRESHOLD_M, GPS_WATCH_INTERVAL_MS } from '@/lib/constants';
 import { hapticUnlock } from '@/lib/haptics';
 import { evaluateGate, type GateStatus, type LocationFix } from './gpsGate';
 
 interface UseGpsGateResult {
   status: GateStatus;
   fix: LocationFix | null;
+  /**
+   * The last reading that cleared the accuracy threshold, if there has been one.
+   *
+   * **The gate must be a door, not a turnstile that keeps spinning.** It
+   * re-evaluates on every reading, and GPS accuracy is not stable — indoors it
+   * swings from ±9 m to ±70 m and back in the same room. The capture screen used
+   * to mount the camera only while the *current* reading passed, so one poor
+   * reading unmounted it mid-recording and the in-flight `recordAsync` died with
+   * `CameraUnmountedException`. A reporter filming something they may not get a
+   * second chance at lost the footage to a satellite.
+   *
+   * This is what lets the camera stay open across a wobble while still holding a
+   * coordinate somebody could be dispatched to. Strict threshold only: a fix let
+   * through by the reduced-accuracy hatch is already sticky, because accepting
+   * it is.
+   */
+  lastPassingFix: LocationFix | null;
   acceptReducedAccuracy: () => void;
   retryPermission: () => void;
 }
@@ -23,6 +40,7 @@ export function useGpsGate(active: boolean): UseGpsGateResult {
   const [permissionGranted, setPermissionGranted] = useState(false);
   const [servicesEnabled, setServicesEnabled] = useState(true);
   const [fix, setFix] = useState<LocationFix | null>(null);
+  const [lastPassingFix, setLastPassingFix] = useState<LocationFix | null>(null);
   const [elapsedMs, setElapsedMs] = useState(0);
   const [reducedAccepted, setReducedAccepted] = useState(false);
   const [permissionAttempt, setPermissionAttempt] = useState(0);
@@ -78,7 +96,7 @@ export function useGpsGate(active: boolean): UseGpsGateResult {
         },
         (reading) => {
           if (cancelled) return;
-          setFix({
+          const next: LocationFix = {
             latitude: reading.coords.latitude,
             longitude: reading.coords.longitude,
             // A reading with no accuracy figure cannot be trusted to pass the
@@ -89,7 +107,18 @@ export function useGpsGate(active: boolean): UseGpsGateResult {
             speed: reading.coords.speed,
             isMocked: Boolean((reading as { mocked?: boolean }).mocked),
             timestamp: reading.timestamp,
-          });
+          };
+
+          setFix(next);
+          /*
+           * Remembered here, in the subscription callback, rather than derived
+           * in an effect from the status — setting state as an effect is a
+           * cascading render the compiler rejects, and this is an event.
+           *
+           * The freshest passing reading wins, so waiting for a better one
+           * still improves the coordinate the shutter locks.
+           */
+          if (next.accuracyM <= GPS_ACCURACY_THRESHOLD_M) setLastPassingFix(next);
         },
       );
     })();
@@ -126,5 +155,5 @@ export function useGpsGate(active: boolean): UseGpsGateResult {
   const acceptReducedAccuracy = useCallback(() => setReducedAccepted(true), []);
   const retryPermission = useCallback(() => setPermissionAttempt((n) => n + 1), []);
 
-  return { status, fix, acceptReducedAccuracy, retryPermission };
+  return { status, fix, lastPassingFix, acceptReducedAccuracy, retryPermission };
 }

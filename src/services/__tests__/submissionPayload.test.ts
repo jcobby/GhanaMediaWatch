@@ -34,6 +34,9 @@ const base: CaptureMetadata = {
   showLocation: true,
   showDate: true,
   showTime: true,
+  showAddress: false,
+  address: null,
+  plusCode: '6CQ4H4GH+2V',
   severity: 'urgent',
   landmark: 'Beside the Kaneshie overpass',
   consentJson: '{"publicPlace":true}',
@@ -101,6 +104,24 @@ test("the reporter's other answers travel with it", () => {
   expect(request.severity).toBe('urgent');
   expect(request.landmark).toBe('Beside the Kaneshie overpass');
   expect(request.consent).toEqual({ publicPlace: true });
+});
+
+test('where it was travels in words: plus code always, address when found', () => {
+  const without = buildCreateRequest(record, base) as {
+    location: Record<string, unknown>;
+    displayFlags: Record<string, unknown>;
+  };
+  expect(without.location.plusCode).toBe('6CQ4H4GH+2V');
+  expect('address' in without.location).toBe(false);
+  expect(without.displayFlags.showAddress).toBe(false);
+
+  const withAddress = buildCreateRequest(record, {
+    ...base,
+    showAddress: true,
+    address: 'Ring Road West, Kaneshie, Accra',
+  }) as { location: Record<string, unknown>; displayFlags: Record<string, unknown> };
+  expect(withAddress.location.address).toBe('Ring Road West, Kaneshie, Accra');
+  expect(withAddress.displayFlags.showAddress).toBe(true);
 });
 
 test('an unanswered landmark is omitted rather than sent empty', () => {

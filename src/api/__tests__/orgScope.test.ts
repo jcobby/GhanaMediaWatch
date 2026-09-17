@@ -43,20 +43,6 @@ test('the scope header goes out whenever a call declares an organisation', () =>
   );
 });
 
-test('the organisation endpoint declares one', () => {
-  // Without this the header is a parameter nothing ever passes.
-  expect(code('api/http.ts')).toMatch(/'\/org\/dashboard', \{ orgId \}/);
-});
-
-test('it is a required argument, not an optional courtesy', () => {
-  /*
-   * A caller that forgets it gets a 403 at runtime and no warning at build
-   * time, which is the failure this whole file exists about. The type makes
-   * forgetting it impossible.
-   */
-  expect(code('api/client.ts')).toMatch(/getOrgDashboard\(orgId: string\): Promise<OrgDashboard>/);
-});
-
 describe('membership is asked for, not inferred from a refusal', () => {
   test('the caller is described by its own endpoint', () => {
     /*

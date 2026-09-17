@@ -36,6 +36,7 @@ const SCENES: Record<string, number> = {
   infrastructure: require('../../assets/placeholders/infrastructure.png'),
   utility: require('../../assets/placeholders/utility.png'),
   corruption: require('../../assets/placeholders/corruption.png'),
+  whistleblower: require('../../assets/placeholders/corruption.png'),
   environment: require('../../assets/placeholders/environment.png'),
   wildlife: require('../../assets/placeholders/wildlife.png'),
   flood: require('../../assets/placeholders/flood.png'),

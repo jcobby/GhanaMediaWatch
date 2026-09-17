@@ -1,128 +1,185 @@
-import { TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Pressable, Text } from '@/components/ui';
-import { GnaHorizontal } from '@/components/Brand';
+import { Pressable, Sheet, Text } from '@/components/ui';
+import { useColors } from '@/lib/theme';
+import { GnaHomeLogo } from '@/components/Brand';
+import { OrganisationAvatar } from '@/components/OrganisationAvatar';
+import type { DirectoryOrganisation } from '@/types/dawuro';
 
 /**
- * The bar above the category tabs.
+ * The bar above the desks.
  *
- * Deliberately one line. The previous header stacked a brand block, a tagline
- * and a filter row, which cost about a fifth of the screen before a single
- * report appeared — on a list layout whose whole point is how much fits, that
- * is the wrong trade.
+ * On the GNA homepage: a menu, the lockup, and a search icon. Search is one
+ * icon opening one screen — the bar used to carry a wide "Search organisations"
+ * field that opened a sheet with a second search field inside it, which is two
+ * fields for one job and a pattern nobody expects.
  *
- * Search expands in place rather than pushing to its own screen, so the tabs
- * underneath stay put and the reader keeps their bearings.
+ * On an organisation's homepage the bar becomes that organisation's: a back
+ * arrow to GNA, its logo, its name.
  */
 export function FeedBar({
-  query,
-  onQuery,
-  searching,
-  onToggleSearch,
+  onOpenSearch,
+  onOpenInstitutions,
   onOpenMap,
   onOpenSlides,
   onOpenBusinesses,
+  organisation,
+  onExitOrganisation,
 }: {
-  query: string;
-  onQuery: (value: string) => void;
-  searching: boolean;
-  onToggleSearch: () => void;
+  onOpenSearch: () => void;
+  /** Search the directory of institutions, rather than reports. */
+  onOpenInstitutions: () => void;
   onOpenMap: () => void;
   onOpenSlides: () => void;
   onOpenBusinesses: () => void;
+  /** The organisation whose homepage this is, or null for the GNA homepage. */
+  organisation: DirectoryOrganisation | null;
+  onExitOrganisation: () => void;
 }) {
   const { t } = useTranslation();
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  /** Close the menu first, so the next screen is not opened underneath it. */
+  const choose = (action: () => void) => () => {
+    setMenuOpen(false);
+    action();
+  };
 
   return (
-    <View className="flex-row items-center gap-2 px-4 pb-2.5 pt-1">
-      {searching ? (
-        <View className="h-9 flex-1 flex-row items-center gap-2 rounded-sm bg-white/10 px-3">
-          <Ionicons name="search" size={15} color="rgba(255,255,255,0.6)" />
-          <TextInput
-            value={query}
-            onChangeText={onQuery}
-            placeholder={t('feed.searchPlaceholder')}
-            placeholderTextColor="rgba(255,255,255,0.5)"
-            autoFocus
-            accessibilityLabel={t('feed.search')}
-            style={{
-              flex: 1,
-              color: '#FFFFFF',
-              fontFamily: 'Inter_400Regular',
-              fontSize: 15,
-            }}
-          />
-        </View>
-      ) : (
-        // Two brands, one bar. GNA owns the platform; Dawuro is the product.
-        // A hairline between them is how a co-brand is normally read — set
-        // side by side with only a gap they look like one long name, and
-        // "GNA Dawuro" is not what either is called.
-        <View className="min-w-0 flex-1 flex-row items-center gap-2.5">
-          <GnaHorizontal height={28} reversed />
-          <View className="h-5 w-px bg-white/20" />
-          <Text variant="title-sm" onMedia className="shrink font-display" numberOfLines={1}>
-            {t('app.name')}
-          </Text>
-        </View>
-      )}
-
-      <Pressable
-        onPress={onToggleSearch}
-        accessibilityLabel={t('feed.search')}
-        className="h-9 w-9 items-center justify-center rounded-pill"
-      >
-        <Ionicons
-          name={searching ? 'close' : 'search'}
-          size={19}
-          color={searching ? '#FFFFFF' : 'rgba(255,255,255,0.75)'}
-        />
-      </Pressable>
-
-      {!searching ? (
-        <>
-          {/*
-            Slides sits first and is the only filled control in the bar.
-            It is a different way to read the same feed rather than a utility
-            like search or the map, and it needs to be found without being
-            explained.
-          */}
-          {/*
-            Slides is tinted rather than filled.
-            A solid accent pill next to the logo won the whole bar — the eye
-            went to it before the brand or the first report, which is the wrong
-            order for a control most people will use occasionally. Tinted, it
-            still reads as the one thing here that is not a plain icon.
-          */}
-          <Pressable
-            onPress={onOpenSlides}
-            accessibilityLabel={t('slides.open')}
-            className="h-9 flex-row items-center gap-1.5 rounded-pill bg-white/15 px-3"
-          >
-            <Ionicons name="play" size={12} color="#FFFFFF" />
-            <Text variant="caption" onMedia className="font-sans-semibold">
-              {t('slides.label')}
+    <>
+      <View className="flex-row items-center px-2" style={{ height: 56 }}>
+        {organisation ? (
+          <>
+            {/* Back to the GNA homepage. */}
+            <Pressable
+              onPress={onExitOrganisation}
+              accessibilityLabel={t('feed.backToGna')}
+              className="h-11 w-11 items-center justify-center rounded-pill"
+            >
+              <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+            </Pressable>
+            {/* The organisation's mark where GNA's was. */}
+            <View style={{ marginLeft: 4 }}>
+              <OrganisationAvatar name={organisation.name} logoUrl={organisation.logoUrl} size={32} />
+            </View>
+            <Text
+              onMedia
+              numberOfLines={1}
+              className="ml-3 shrink font-sans-medium"
+              style={{ fontSize: 19 }}
+            >
+              {organisation.name}
             </Text>
-          </Pressable>
+            {organisation.verified ? (
+              <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" style={{ marginLeft: 6 }} />
+            ) : null}
+            <View className="flex-1" />
+          </>
+        ) : (
+          <>
+            <Pressable
+              onPress={() => setMenuOpen(true)}
+              accessibilityLabel={t('feed.menu')}
+              className="h-11 w-11 items-center justify-center rounded-pill"
+            >
+              <Ionicons name="menu" size={26} color="#FFFFFF" />
+            </Pressable>
+            {/*
+              The supplied mark, straight on the bar.
 
-          <Pressable
-            onPress={onOpenBusinesses}
-            accessibilityLabel={t('organisations.title')}
-            className="h-9 w-9 items-center justify-center rounded-pill"
-          >
-            <Ionicons name="business-outline" size={19} color="rgba(255,255,255,0.75)" />
-          </Pressable>
+              The wordmark and the flag triangle and nothing else — no drums, no
+              bells, no arc. Its lettering is recoloured for a dark ground (see
+              `GnaHomeLogo`), so it needs no white tile behind it.
 
+              24 rather than 30: with no second and third line of type under the
+              mark, the letters carry it, and a wordmark that size sits level
+              with the icons either side of it instead of crowding the bar.
+            */}
+            <GnaHomeLogo height={24} style={{ marginLeft: 8 }} />
+            {/* The mark alone. A word beside it said what the screen already is. */}
+            <View className="flex-1" />
+          </>
+        )}
+
+        {/*
+          Two searches, because they are two different questions.
+
+          One screen with two tabs made finding an institution a second step
+          behind a field that defaults to reports — and reports are what most
+          people open this bar for, so the institution directory sat where
+          nobody looked. A magnifier for reports and a building for institutions
+          says which is which before either is tapped.
+        */}
+        <Pressable
+          onPress={onOpenSearch}
+          accessibilityLabel={t('search.reportsTitle')}
+          className="h-11 w-11 items-center justify-center rounded-pill"
+        >
+          <Ionicons name="search" size={23} color="#FFFFFF" />
+        </Pressable>
+        <Pressable
+          onPress={onOpenInstitutions}
+          accessibilityLabel={t('search.institutionsTitle')}
+          className="h-11 w-11 items-center justify-center rounded-pill"
+        >
+          <Ionicons name="business-outline" size={22} color="#FFFFFF" />
+        </Pressable>
+
+        {organisation ? (
           <Pressable
-            onPress={onOpenMap}
-            accessibilityLabel={t('feed.map')}
-            className="h-9 w-9 items-center justify-center rounded-pill"
+            onPress={() => setMenuOpen(true)}
+            accessibilityLabel={t('feed.menu')}
+            className="h-11 w-11 items-center justify-center rounded-pill"
           >
-            <Ionicons name="map-outline" size={19} color="rgba(255,255,255,0.75)" />
+            <Ionicons name="ellipsis-vertical" size={20} color="#FFFFFF" />
           </Pressable>
-        </>
-      ) : null}
-    </View>
+        ) : null}
+      </View>
+
+      <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={t('app.name')}>
+        <View className="gap-1">
+          <MenuItem
+            icon="play-circle-outline"
+            label={t('slides.label')}
+            onPress={choose(onOpenSlides)}
+          />
+          <MenuItem
+            icon="business-outline"
+            label={t('organisations.title')}
+            onPress={choose(onOpenBusinesses)}
+          />
+          <MenuItem icon="map-outline" label={t('feed.map')} onPress={choose(onOpenMap)} />
+        </View>
+      </Sheet>
+    </>
+  );
+}
+
+function MenuItem({
+  icon,
+  label,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+}) {
+  // Theme tokens, not fixed greys: the sheet is light or dark with the app.
+  const c = useColors();
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityLabel={label}
+      className="flex-row items-center gap-4 rounded-md px-2"
+      style={{ minHeight: 52 }}
+    >
+      <Ionicons name={icon} size={22} color={c.textPrimary} />
+      <Text variant="body" className="flex-1">
+        {label}
+      </Text>
+      <Ionicons name="chevron-forward" size={18} color={c.textFaint} />
+    </Pressable>
   );
 }

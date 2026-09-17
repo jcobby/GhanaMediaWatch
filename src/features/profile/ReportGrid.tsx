@@ -90,11 +90,18 @@ function ReportTile({ report, onOpen }: { report: AuthoredIncident; onOpen: () =
    * without this every video tile is the same drawing of its category — twelve
    * tiles that all look alike, for twelve different things they filmed.
    */
+  /*
+   * The service's 320px copy. A third of the screen needs a small still, and
+   * the poster or the photo itself is a full-size file. Reports stored before
+   * the service made copies fall back to the poster.
+   */
+  const still = report.media.thumbUrl || report.media.posterUrl;
+
   const poster = useVideoPoster({
     id: report.id,
     kind: report.media.kind,
     url: report.media.url,
-    posterUrl: report.media.posterUrl,
+    posterUrl: still,
   });
 
   const markColour: Record<DeliveryMark, string> = {
@@ -131,7 +138,7 @@ function ReportTile({ report, onOpen }: { report: AuthoredIncident; onOpen: () =
           fetched once rather than on every visit.
         */}
         <Thumbnail
-          uri={report.media.posterUrl}
+          uri={still}
           poster={poster}
           cacheKey={report.id}
           category={report.category}

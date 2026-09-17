@@ -7,6 +7,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Glass, Pressable, Text } from '@/components/ui';
+import { api } from '@/api';
+import { describeApiError } from '@/lib/apiErrorCopy';
 import { useColors } from '@/lib/theme';
 import { AuthField } from './AuthField';
 import { forgotPasswordSchema, type ForgotPasswordValues } from './schemas';
@@ -18,6 +20,7 @@ export function ForgotPasswordScreen() {
   const insets = useSafeAreaInsets();
   const [sent, setSent] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [failure, setFailure] = useState<{ title: string; body: string } | null>(null);
 
   const { control, handleSubmit, formState } = useForm<ForgotPasswordValues>({
     resolver: zodResolver(forgotPasswordSchema),
@@ -25,13 +28,32 @@ export function ForgotPasswordScreen() {
     mode: 'onBlur',
   });
 
-  const onSubmit = async () => {
+  /*
+   * Sent to the service now.
+   *
+   * This waited 600ms and said "check your email" without sending anything, so
+   * a reporter locked out of their account waited for an email that was never
+   * going to arrive. `POST /auth/password/forgot` answers the same way whether
+   * or not the address has an account, so the success message stays the same
+   * and still reveals nothing.
+   *
+   * A failure to reach the service is a different thing from an unknown
+   * address, and is said so — otherwise somebody offline is told to check an
+   * inbox that will stay empty.
+   */
+  const onSubmit = async (values: ForgotPasswordValues) => {
     setSubmitting(true);
+    setFailure(null);
     try {
-      // No reset endpoint exists yet — flagged in API_CONTRACT.md. The screen
-      // is built so wiring it later is a one-line change.
-      await new Promise((resolve) => setTimeout(resolve, 600));
+      await api.requestPasswordReset(values.email.trim());
       setSent(true);
+    } catch (cause) {
+      setFailure(
+        describeApiError(cause, t, {
+          title: t('auth.resetFailedTitle'),
+          body: t('auth.resetFailedBody'),
+        }),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -102,6 +124,21 @@ export function ForgotPasswordScreen() {
                 />
               )}
             />
+
+            {failure ? (
+              <Glass elevation="low" className="flex-row items-start gap-3 rounded-lg p-4">
+                <Ionicons name="alert-circle-outline" size={20} color={c.danger} />
+                <View className="flex-1 gap-1">
+                  <Text variant="body-sm" className="font-sans-semibold">
+                    {failure.title}
+                  </Text>
+                  <Text variant="caption" tone="muted">
+                    {failure.body}
+                  </Text>
+                </View>
+              </Glass>
+            ) : null}
+
             <Button
               label={t('auth.sendResetLink')}
               size="lg"

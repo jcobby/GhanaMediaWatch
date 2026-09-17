@@ -18,10 +18,10 @@ import {
   Text,
 } from '@/components/ui';
 import { useMyIncidents } from '@/hooks/useIncidents';
-import { ORGANISATION_TIER_ENABLED } from '@/lib/features';
 import { toast } from '@/stores/toastStore';
 import { ReportGrid } from './ReportGrid';
 import { ReportSheetBody } from './ReportSheetBody';
+import { AccountSettings } from './AccountSettings';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'expo-router';
 import { accentGradient, useColors } from '@/lib/theme';
@@ -133,14 +133,6 @@ export function ProfileScreen() {
           {profile?.orgName ? (
             <Badge label={`${profile.orgName} · ${profile.role ?? 'member'}`} tone="accent" />
           ) : null}
-          {profile?.accountType === 'platform_owner' ? (
-            <Button
-              label={t('platform.console')}
-              size="sm"
-              onPress={() => router.push('/platform/(tabs)')}
-              leading={<Ionicons name="git-branch-outline" size={15} color={c.textOnDark} />}
-            />
-          ) : null}
           {profile?.accountType === 'reporter' || !profile ? (
             <Button
               label={t('surveys.title')}
@@ -157,22 +149,6 @@ export function ProfileScreen() {
               variant="glass"
               onPress={() => router.push('/earnings')}
               leading={<Ionicons name="cash-outline" size={15} color={c.textPrimary} />}
-            />
-          ) : null}
-          {ORGANISATION_TIER_ENABLED && profile?.accountType === 'organisation' ? (
-            <Button
-              label={t('organisation.brand')}
-              size="sm"
-              onPress={() => router.push('/organisation/(tabs)')}
-              leading={<Ionicons name="briefcase-outline" size={15} color={c.textOnDark} />}
-            />
-          ) : null}
-          {ORGANISATION_TIER_ENABLED && !profile ? (
-            <Button
-              label={t('organisation.createAccount')}
-              size="sm"
-              variant="glass"
-              onPress={() => router.push('/organisation/register')}
             />
           ) : null}
           {!profile ? (
@@ -324,6 +300,9 @@ export function ProfileScreen() {
                 onValueChange={setAnonymousDefault}
               />
             </Glass>
+
+            {/* Name, password and deleting the account — signed-in accounts only. */}
+            <AccountSettings />
 
             <Glass elevation="low" className="gap-0 rounded-lg">
               <SettingRow icon="language-outline" label={t('settings.language')} value="English" />

@@ -61,7 +61,9 @@
     "welcomeBackBody": "Welcome back, {{name}}.",
     "welcomeBackTitle": "Signed in",
     "sessionEndedTitle": "You have been signed out",
-    "sessionEndedBody": "Your session expired and could not be renewed. Sign in again — anything queued on this phone still sends."
+    "sessionEndedBody": "Your session expired and could not be renewed. Sign in again — anything queued on this phone still sends.",
+    "resetFailedTitle": "Couldn't send the reset link",
+    "resetFailedBody": "Check your connection and try again. Nothing was sent."
   },
   "organisation": {
     "allowanceRemaining": "{{count}} reports left this month",
@@ -179,6 +181,9 @@
     "flip": "Flip camera",
     "grantAccess": "Allow access",
     "tapToRecord": "Tap to record",
+    "cameraFailedTitle": "The camera did not start",
+    "saveStuckTitle": "That recording could not be saved",
+    "saveStuckBody": "The camera stopped responding while it was saving. The camera has been restarted — please film it again.",
     "recordFailedTitle": "The recording stopped",
     "recordFailedBody": "The camera ended the recording before it finished. Please film it again.",
     "stopRecording": "Tap to stop",
@@ -197,7 +202,7 @@
     "permissionDeniedBody": "Dawuro stamps every report with GPS coordinates so responders can find the scene. Without location access the camera stays locked.",
     "permissionDeniedTitle": "Location permission needed",
     "photo": "Photo",
-    "previewPlaceholder": "Camera preview — Phase 4",
+    "findingPlace": "Finding where you are…",
     "proceedReduced": "Proceed with reduced accuracy",
     "provider": "Provider",
     "reducedAccuracyBadge": "Low location confidence",
@@ -221,7 +226,8 @@
     "infrastructure": "Infrastructure",
     "other": "Other",
     "utility": "Utility",
-    "wildlife": "Wildlife"
+    "wildlife": "Wildlife",
+    "whistleblower": "Whistleblower"
   },
   "comments": {
     "addedFootage": "Added footage",
@@ -245,7 +251,10 @@
     "postedBody": "It is now visible under this report.",
     "removeAttachment": "Remove attachment",
     "title": "Comments",
-    "videoAttached": "Video attached"
+    "videoAttached": "Video attached",
+    "placeholderText": "Add a comment",
+    "postFailedTitle": "Couldn't post your comment",
+    "postFailedBody": "Check your connection and try again. Your comment was not posted."
   },
   "common": {
     "all": "All",
@@ -270,28 +279,20 @@
   },
   "destination": {
     "both": {
-      "title": "Public and organisations",
-      "body": "An editor reviews it for the feed, and organisations can license it."
+      "title": "Send to GNA",
+      "body": "An editor reviews it for the feed, and any subscribing organisation can license it."
     },
     "directed": {
-      "title": "Send to specific organisations",
-      "body": "An editor reviews it, then only the ones you choose receive it. Exclusive, so it pays more."
+      "title": "Send to GNA and specific organisations",
+      "body": "Goes to GNA as usual, and straight to the institutions you name. Sending it directly pays more."
     },
     "earningHelp": "Paid once an organisation licenses this report.",
     "estimatedEarning": "You could earn {{amount}}",
     "interestedIn": "Actively looking for {{category}} reports",
     "label": "Where should this go?",
-    "marketplace": {
-      "title": "Offer to organisations",
-      "body": "An editor reviews it, then subscribing organisations can license it. You earn a commission."
-    },
-    "noEarning": "No payment for public reports",
-    "noEarningHelp": "Choose a organisation option above to earn a commission.",
-    "public": {
-      "title": "Public feed",
-      "body": "An editor reviews it, then it runs on the feed for everyone. No payment — visibility is the reward."
-    },
-    "recipientCount": "{{count}} selected",
+    "noEarning": "No payment for this report",
+    "noEarningHelp": "Nothing here can be licensed yet, so there is nothing to pay.",
+    "recipientCount": "{{count}} chosen",
     "loadingOrganisations": "Looking up organisations…",
     "directoryFailedTitle": "Could not load organisations",
     "directoryFailedBody": "Your report is safe. Send it to the public feed instead, or try again when you have a connection.",
@@ -301,7 +302,11 @@
     "nobodyBuyingHelp": "No organisation has joined the platform, so nothing can be licensed and nothing can be paid. Sending to the public feed still gets it seen.",
     "notAvailableYet": "No buyers yet",
     "chooseOrganisations": "Choose organisations",
-    "chooseOrganisationsHelp": "Only subscribing organisations are listed."
+    "chooseOrganisationsHelp": "Only organisations approved to receive reports are listed.",
+    "chooseNext": "You'll choose which ones next",
+    "forwardSearch": "Search organisations",
+    "forwardNoMatch": "No organisation matches “{{query}}”.",
+    "offerHelp": "Includes a higher rate offered by an organisation you chose. Paid once it licenses this report."
   },
   "detail": {
     "actions": "Actions",
@@ -335,7 +340,9 @@
     "routeTo": "Incident",
     "showLess": "Less",
     "showMore": "More",
-    "straightLine": "Straight-line distance"
+    "straightLine": "Straight-line distance",
+    "reportFailedTitle": "Couldn't send your report",
+    "reportFailedBody": "Check your connection and try again. The moderator was not told."
   },
   "earn": {
     "filmBody": "Send it to organisations who need it and get paid when they license it.",
@@ -364,22 +371,36 @@
     "network": "Network",
     "notYetLicensed": "Not yet licensed",
     "paidOut": "Paid out",
-    "payoutSentBody": "Simulated payout to {{network}}.",
-    "payoutSentTitle": "{{amount}} on its way",
     "progressLabel": "Payout progress, {{percent}} percent",
-    "simulationNotice": "Simulation only — no money moves. A real payout needs a mobile-money integration and identity checks.",
     "status": {
       "pending": "Pending",
       "earned": "Earned",
       "paid": "Paid",
       "void": "Not paid"
     },
-    "thresholdMet": "You can withdraw now.",
+    "payout": {
+      "held": "Held",
+      "pending": "Waiting to be sent",
+      "sent": "Sent",
+      "failed": "Payment failed",
+      "paid": "Paid to your phone"
+    },
+    "payoutHeldNoNumber": "Add a payout number and this is sent in the next run.",
+    "payoutFailedHelp": "It will be tried again. Check your payout number is right.",
     "thresholdRemaining": "{{amount}} more to reach the payout minimum",
     "title": "Earnings",
-    "withdraw": "Withdraw",
-    "withdrawSubtitle": "Sending {{amount}}",
-    "withdrawTitle": "Withdraw to mobile money"
+    "owed": "Owed to you",
+    "thresholdMetNextRun": "Paid to your mobile money number in the next payout run.",
+    "setPayoutNumber": "Payout number",
+    "payoutNumberTitle": "Where to send your money",
+    "payoutNumberSubtitle": "Commission is paid to this mobile money number.",
+    "numberHelp": "MTN MoMo, Telecel Cash or AT Money. Payouts are sent in batches by Dawuro.",
+    "numberInvalid": "That is not a Ghanaian mobile number. Check it and try again.",
+    "saveNumber": "Save number",
+    "numberSavedTitle": "Payout number saved",
+    "numberSavedBody": "Commission will be sent to {{number}}.",
+    "numberFailedTitle": "Couldn't save your number",
+    "numberFailedBody": "Check your connection and try again. Your number was not saved."
   },
   "error": {
     "boundaryBody": "You can go back and try again. Your captured reports are saved on this device and were not affected.",
@@ -401,6 +422,7 @@
     "latest": "Latest",
     "map": "Open the map",
     "moreOptions": "More options",
+    "menu": "Menu",
     "mute": "Mute",
     "navigateHere": "Navigate",
     "noMatchesBody": "Try another category, or clear the search.",
@@ -418,15 +440,29 @@
     "title": "Near you",
     "topStory": "Top story",
     "unmute": "Unmute",
-    "video": "Video"
+    "video": "Video",
+    "backToGna": "Back to GNA",
+    "organisationFeed": "Reports",
+    "viewProfile": "View profile",
+    "loadingOrganisationFeed": "Loading reports…",
+    "organisationEmptyTitle": "Nothing from {{name}} yet",
+    "organisationEmptyBody": "Reports published under this organisation will appear here.",
+    "organisationErrorTitle": "Couldn't load {{name}}",
+    "orgTabReports": "Reports",
+    "orgTabSurveys": "Surveys",
+    "orgTabAbout": "About",
+    "loadingOrganisationSurveys": "Loading surveys…"
   },
   "map": {
     "all": "All",
     "hint": "{{count}} incidents shown · tap a pin",
     "openIncident": "View incident",
     "loading": "Loading reports…",
-    "emptyTitle": "No published reports to show",
-    "emptyBody": "Reports appear here once a newsroom or agency releases them. Nothing is hidden from you.",
+    "loadingIncident": "Opening this report…",
+    "incidentUnavailable": "This report could not be opened.",
+    "cluster": "{{count}} reports here",
+    "emptyHereTitle": "Nothing reported in this area",
+    "emptyHereBody": "Move or zoom out to see reports from further afield.",
     "unavailableTitle": "Could not load the map",
     "unavailableBody": "This phone could not reach the service. The map is empty because nothing loaded, not because nothing happened."
   },
@@ -710,6 +746,11 @@
     "privatePropertyHelp": "Inside a home, or its gate or entrance.",
     "publicPlace": "A public place",
     "publicPlaceHelp": "A street, market or open ground.",
+    "guestSheetTitle": "Sending anonymously",
+    "guestSheetBody": "This report will reach the newsroom exactly as it is. What you will not have is any way to follow it — you will not see whether an editor published it, and nothing can be paid to you for it.",
+    "guestSheetKeep": "You can still fix that. Sign in before this finishes sending and it is filed under your account instead. Once it has gone, it cannot be attached to one.",
+    "guestSheetSignIn": "Sign in first",
+    "guestSheetSend": "Send as anonymous",
     "queuedBody": "It will upload automatically when you are online.",
     "queuedTitle": "Saved to your outbox",
     "saveFailedTitle": "Couldn't save this report",
@@ -717,7 +758,7 @@
     "showDate": "Show date",
     "showDateHelp": "Turn off to hide when this happened entirely.",
     "showLocation": "Show location",
-    "showLocationHelp": "Turn off to hide the place and remove it from the map.",
+    "showLocationHelp": "Publish the street name and plus code. Turn off to hide the place and remove it from the map.",
     "showTime": "Show exact time",
     "showTimeHelp": "Turn off to publish only the date.",
     "storedRegardless": "Hidden values are still recorded for review and lawful requests. They are never shown publicly.",
@@ -731,7 +772,25 @@
     "yourName": "You",
     "needDescription": "Add a short description before sending.",
     "emptyCaptureTitle": "Nothing was recorded",
-    "emptyCaptureBody": "The file came back empty, so there is nothing to send. Check that Dawuro still has camera and microphone permission, then film it again."
+    "emptyCaptureBody": "The file came back empty, so there is nothing to send. Check that Dawuro still has camera and microphone permission, then film it again.",
+    "stepCapture": "Capture & description",
+    "stepDetails": "Category & urgency",
+    "optional": "Optional",
+    "whistleblowerShort": "Reporting wrongdoing you know about. Starts anonymous.",
+    "stepSend": "Where to send it",
+    "stepRecipients": "Choose organisations",
+    "needRecipients": "Choose at least one organisation to send this to.",
+    "stepOf": "Step {{step}} of {{total}}",
+    "next": "Next",
+    "whistleblowerNote": "Whistleblower reports start as anonymous, so the public never sees your name. The organisations you send it to can see who filed it, so they can follow up with you.",
+    "whereItWas": "Where it was filmed",
+    "findingStreet": "Finding the street…",
+    "noStreet": "No street name found here — the plus code still marks the exact spot.",
+    "plusCode": "Plus code",
+    "showLocationValue": "Shows {{place}}. Turn off to hide the place and remove it from the map.",
+    "showAddress": "Show address",
+    "showAddressHelp": "Publish the full street address too. Only if it is safe — an address points at a door.",
+    "showAddressValue": "Shows {{address}}. Only if it is safe — an address points at a door."
   },
   "safety": {
     "dontExpose": "Do not film victims, casualties or children up close.",
@@ -741,6 +800,18 @@
     "dontTrespass": "Do not enter private property or restricted areas.",
     "emergencyFirst": "If someone is in immediate danger, call 112 first. Filming is not help.",
     "title": "Before you film"
+  },
+  "search": {
+    "title": "Search",
+    "reportsTitle": "Search reports",
+    "institutionsTitle": "Find an institution",
+    "placeholder": "Search reports",
+    "institutionsPlaceholder": "Search institutions by name or sector",
+    "hint": "Search published reports by what happened, or where.",
+    "recent": "Latest reports",
+    "loading": "Loading reports…",
+    "noStories": "No match for “{{query}}” in the {{count}} reports loaded so far.",
+    "scopeNote": "Searched the {{count}} reports loaded so far."
   },
   "sector": {
     "government": "Government agency",
@@ -1048,5 +1119,35 @@
       "title": "Something went wrong at our end",
       "body": "This is not your connection. Try again shortly."
     }
+  },
+  "account": {
+    "title": "Account",
+    "displayName": "Display name",
+    "displayNameHelp": "Shown on reports you file under your name. Anonymous reports never show it.",
+    "nameInvalid": "Use between 2 and 40 characters.",
+    "nameSavedTitle": "Name updated",
+    "nameSavedBody": "You now appear as {{name}}.",
+    "nameFailedTitle": "Couldn't update your name",
+    "nameFailedBody": "Check your connection and try again. Your name was not changed.",
+    "changePassword": "Change password",
+    "currentPassword": "Current password",
+    "newPassword": "New password",
+    "savePassword": "Save new password",
+    "currentPasswordRequired": "Enter your current password.",
+    "passwordTooShort": "Use at least 10 characters.",
+    "passwordsDiffer": "The new passwords do not match.",
+    "passwordSavedTitle": "Password changed",
+    "passwordSavedBody": "Use your new password next time you sign in.",
+    "passwordFailedTitle": "Couldn't change your password",
+    "passwordFailedBody": "Check your current password and connection, then try again.",
+    "delete": "Delete account",
+    "deleting": "Deleting your account…",
+    "deleteTitle": "Delete your account?",
+    "deleteBody": "Your account and sign-in are removed and cannot be recovered. Reports you already filed stay published, but become anonymous. Commission still owed to you must be settled first.",
+    "deleteConfirm": "Delete account",
+    "deletedTitle": "Account deleted",
+    "deletedBody": "Reports you filed stay published anonymously. Reports still queued on this phone will send as a guest.",
+    "deleteFailedTitle": "Couldn't delete your account",
+    "deleteFailedBody": "Check your connection and try again. Nothing was deleted."
   }
 }

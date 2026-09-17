@@ -53,7 +53,21 @@ export function EarnHubScreen() {
     nextPayoutIso: null,
   };
   const progress = payoutProgress(summary.pendingPesewas, summary.payoutThresholdPesewas);
-  const canWithdraw = summary.pendingPesewas >= summary.payoutThresholdPesewas;
+  /*
+   * Whether the balance clears the floor — not whether anything can be pulled.
+   *
+   * This was `canWithdraw`, and the name did the damage. A reporter cannot
+   * withdraw: the platform runs payouts in batches, and the only thing the
+   * reporter controls is whether a mobile-money number is on file. But the name
+   * invited copy to match it — "You can withdraw now." — so the screen announced
+   * an action, offered no button for it, and left somebody to conclude either
+   * that the app was broken or that they were being kept from their money, on
+   * the one screen where trust is the entire product.
+   *
+   * `thresholdMetNextRun` is what the earnings screen has always said, and it
+   * describes the mechanism instead: paid into your number on the next run.
+   */
+  const clearsThreshold = summary.pendingPesewas >= summary.payoutThresholdPesewas;
 
   // Reads through the same overrides the organisation account screen writes, so
   // an organisation narrowing its interests shows up here as less demand.
@@ -120,8 +134,8 @@ export function EarnHubScreen() {
           accessibilityLabel={t('earnings.progressLabel', { percent: Math.round(progress * 100) })}
         />
         <Text variant="caption" className="text-white/80">
-          {canWithdraw
-            ? t('earnings.thresholdMet')
+          {clearsThreshold
+            ? t('earnings.thresholdMetNextRun')
             : t('earnings.thresholdRemaining', {
                 amount: formatCedis(summary.payoutThresholdPesewas - summary.pendingPesewas),
               })}

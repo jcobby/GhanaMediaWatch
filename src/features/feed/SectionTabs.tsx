@@ -63,7 +63,7 @@ export function SectionTabs({
       ref={scroller}
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 6 }}
+      contentContainerStyle={{ paddingHorizontal: 8 }}
       onLayout={(e) => {
         viewport.current = e.nativeEvent.layout.width;
       }}
@@ -106,14 +106,15 @@ function Tab({
       accessibilityRole="tab"
       accessibilityState={{ selected: active }}
       accessibilityLabel={label}
-      className="px-3.5 pb-2.5 pt-1"
+      style={{ paddingHorizontal: 18, paddingTop: 6, paddingBottom: 14 }}
     >
       <Text
-        variant="body-sm"
+        variant="body"
         onMedia
         className={active ? 'font-sans-semibold uppercase' : 'font-sans-medium uppercase'}
         style={{
-          letterSpacing: 0.7,
+          fontSize: 16,
+          letterSpacing: 0.6,
           // Inactive labels are dimmed rather than recoloured: on a dark
           // masthead a grey that reads as "secondary" on white reads as
           // "disabled" instead.
@@ -126,9 +127,19 @@ function Tab({
 
       {/* Accent, not the category hue — a section spans several categories and
           borrowing one of their colours would imply it was that one. */}
+      {/* Positioned through `style`: an offset class the compiled sheet has not
+          seen is dropped silently, and an absolute view with no offsets falls
+          back to its static position. */}
       <View
-        className="absolute bottom-0 left-3.5 right-3.5 rounded-t-pill bg-accent-bright"
-        style={{ height: 3, opacity: active ? 1 : 0 }}
+        className="bg-accent-bright"
+        style={{
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 4,
+          opacity: active ? 1 : 0,
+        }}
       />
     </Pressable>
   );

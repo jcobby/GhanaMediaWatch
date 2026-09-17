@@ -58,8 +58,9 @@ describe('tab-root screens clear the tab bar', () => {
 
   it('finds the tab routes at all', () => {
     // If this breaks, the walk above stopped matching and every case below
-    // would vacuously pass.
-    expect(routes.length).toBeGreaterThan(8);
+    // would vacuously pass. Only the reporter's tab shell remains — the
+    // platform and organisation shells were removed; that work is in the console.
+    expect(routes.length).toBeGreaterThanOrEqual(5);
   });
 
   it.each(routes.map((r) => [basename(r), r] as const))(

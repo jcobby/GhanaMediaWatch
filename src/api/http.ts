@@ -23,16 +23,17 @@ import type {
   MapData,
   MapQuery,
   Caller,
-  OrgDashboard,
   RegisterRequest,
   SignInRequest,
   UploadStatus,
 } from './client';
 import type { ReportOutcome } from '@/types/outcome';
+import { PAYOUT_STATUSES } from '@/types/dawuro';
 import type {
   CommissionEntry,
   DirectoryOrganisation,
   EarningsSummary,
+  PayoutStatus,
   Survey,
 } from '@/types/dawuro';
 import { formatReportId } from '@/types/context';
@@ -525,9 +526,10 @@ export class HttpApiClient implements ApiClient {
     return normaliseIncident(await this.request<RawIncident>(`/incidents/${id}`));
   }
 
-  async getMapData(query: MapQuery = {}): Promise<MapData> {
+  async getMapData(query: MapQuery): Promise<MapData> {
     const params = new URLSearchParams();
-    if (query.bbox) params.set('bbox', query.bbox);
+    // Always sent: the service requires it and answers 400 without one.
+    params.set('bbox', query.bbox);
     if (query.zoom !== undefined) params.set('zoom', String(query.zoom));
     query.category?.forEach((c) => params.append('category', c));
     const qs = params.toString();
@@ -649,10 +651,24 @@ export class HttpApiClient implements ApiClient {
 
   async getCommissions(): Promise<CommissionEntry[]> {
     // Tolerates either a bare array or a paged envelope.
-    const raw = await this.request<CommissionEntry[] | { items?: CommissionEntry[] }>(
-      '/me/commissions',
-    );
-    return Array.isArray(raw) ? raw : (raw.items ?? []);
+    const raw = await this.request<
+      Partial<CommissionEntry>[] | { items?: Partial<CommissionEntry>[] }
+    >('/me/commissions');
+    const items = Array.isArray(raw) ? raw : (raw.items ?? []);
+
+    /*
+     * `payoutStatus` and `heldReason` arrived on 16 September, and they are the
+     * two fields that tell a reporter whether the money actually moved. Read
+     * defensively: an unrecognised status is dropped rather than shown, because
+     * a word this app cannot explain is worse on a wallet than no word at all.
+     */
+    return items.map((item) => ({
+      ...(item as CommissionEntry),
+      payoutStatus: PAYOUT_STATUSES.includes(item.payoutStatus as PayoutStatus)
+        ? (item.payoutStatus as PayoutStatus)
+        : null,
+      heldReason: typeof item.heldReason === 'string' && item.heldReason ? item.heldReason : null,
+    }));
   }
 
   /**
@@ -666,6 +682,48 @@ export class HttpApiClient implements ApiClient {
       '/organisations',
     );
     return Array.isArray(page) ? page : (page.items ?? []);
+  }
+
+  /*
+   * `GET /organisations/{id}/incidents` — published reports credited to one
+   * organisation. It documents no response schema, so a bare list and a page
+   * are both read, and every item goes through the same normalising as the feed.
+   */
+  async getOrganisationIncidents(organisationId: string): Promise<Incident[]> {
+    const page = await this.request<Page<RawIncident> | RawIncident[]>(
+      `/organisations/${encodeURIComponent(organisationId)}/incidents`,
+    );
+    const items = Array.isArray(page) ? page : (page.items ?? []);
+    return items.map(normaliseIncident);
+  }
+
+  /*
+   * `GET /organisations/{id}/surveys` — public, with no response schema. Read as
+   * a summary may arrive: every field the survey card reads is given a safe
+   * value, so a summary without `questions` or a reward cannot crash the page.
+   */
+  async getOrganisationSurveys(organisationId: string): Promise<Survey[]> {
+    const page = await this.request<Page<Partial<Survey> & Record<string, unknown>> | (Partial<Survey> & Record<string, unknown>)[]>(
+      `/organisations/${encodeURIComponent(organisationId)}/surveys`,
+    );
+    const items = Array.isArray(page) ? page : (page.items ?? []);
+    const count = (value: unknown) =>
+      typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : 0;
+    return items.map((raw) => ({
+      id: String(raw.id ?? ''),
+      businessId: String(raw.businessId ?? raw.orgId ?? organisationId),
+      businessName: String(raw.businessName ?? ''),
+      title: String(raw.title ?? ''),
+      description: String(raw.description ?? ''),
+      questions: Array.isArray(raw.questions) ? raw.questions : [],
+      rewardPesewas: count(raw.rewardPesewas),
+      targetArea: raw.targetArea ?? null,
+      responsesTarget: count(raw.responsesTarget),
+      responsesReceived: count(raw.responsesReceived),
+      closesAtIso: String(raw.closesAtIso ?? ''),
+      // The service says `open`; the app's cards say `live`.
+      status: raw.status === 'closed' ? 'closed' : raw.status === 'draft' ? 'draft' : 'live',
+    }));
   }
 
   /** Reporter-facing surveys. Scoped to the caller by the server. */
@@ -705,15 +763,185 @@ export class HttpApiClient implements ApiClient {
     };
   }
 
-  async getOrgDashboard(orgId: string): Promise<OrgDashboard> {
-    const res = await this.request<Partial<OrgDashboard>>('/org/dashboard', { orgId });
-    return {
-      byCategory: res.byCategory ?? [],
-      byState: res.byState ?? [],
-      trend: res.trend ?? [],
-      highPriority: res.highPriority ?? [],
-    };
+  async getComments(incidentId: string): Promise<IncidentCommentShape[]> {
+    // "Comments page" — a paged envelope or a bare array; both are accepted.
+    const raw = await this.request<{ items?: RawComment[] } | RawComment[]>(
+      `/incidents/${encodeURIComponent(incidentId)}/comments`,
+    );
+    const items = Array.isArray(raw) ? raw : (raw?.items ?? []);
+    return items
+      .map((item) => normaliseComment(item, incidentId))
+      .filter((comment): comment is IncidentCommentShape => comment !== null)
+      .sort((a, b) => a.createdAtIso.localeCompare(b.createdAtIso));
   }
+
+  async postComment(
+    incidentId: string,
+    body: string,
+    isAnonymous = false,
+  ): Promise<IncidentCommentShape> {
+    const raw = await this.request<RawComment | { comment?: RawComment }>(
+      `/incidents/${encodeURIComponent(incidentId)}/comments`,
+      // Only sent when it is true: the service's default is a named comment, and
+      // an explicit `false` would be this client asserting something it was not asked to.
+      { method: 'POST', body: { body, ...(isAnonymous ? { isAnonymous: true } : {}) } },
+    );
+    const inner = raw && typeof raw === 'object' && 'comment' in raw ? raw.comment : raw;
+    /*
+     * If the service answers with less than a comment, show the one that was
+     * written rather than nothing — the list is refetched straight after, and the
+     * server's copy replaces this one.
+     */
+    return (
+      normaliseComment(inner as RawComment, incidentId) ?? {
+        id: `cmt_pending_${Date.now()}`,
+        incidentId,
+        author: { handle: '', avatarUrl: null, isAnonymous },
+        body,
+        media: null,
+        createdAtIso: new Date().toISOString(),
+        isContribution: false,
+        reactions: 0,
+        viewerHasReacted: false,
+      }
+    );
+  }
+
+  async setReaction(incidentId: string, reacted: boolean): Promise<void> {
+    const path = `/incidents/${encodeURIComponent(incidentId)}/reactions`;
+    if (reacted) {
+      await this.request<unknown>(path, {
+        method: 'POST',
+        body: { type: 'like' },
+        // One like per person per report: a double tap must not count twice.
+        idempotencyKey: `react:${incidentId}`,
+      });
+    } else {
+      await this.request<void>(path, { method: 'DELETE' });
+    }
+  }
+
+  async reportAbuse(input: { incidentId: string; reason: string }): Promise<void> {
+    await this.request<unknown>('/abuse', {
+      method: 'POST',
+      body: { incidentId: input.incidentId, reason: input.reason },
+    });
+  }
+
+  async requestPasswordReset(email: string): Promise<void> {
+    // No account is needed to ask, and none should be implied by asking.
+    await this.request<unknown>('/auth/password/forgot', {
+      method: 'POST',
+      body: { email },
+      anonymous: true,
+    });
+  }
+
+  async setPayoutNumber(msisdn: string): Promise<void> {
+    await this.request<unknown>('/me/payout-msisdn', { method: 'PUT', body: { msisdn } });
+  }
+
+  async registerPushToken(pushToken: string): Promise<void> {
+    await this.request<unknown>('/me/push-token', { method: 'PUT', body: { pushToken } });
+  }
+
+  async logout(refreshToken: string): Promise<void> {
+    /*
+     * Anonymous: the refresh token is the credential being revoked, and signing
+     * out must not first try to refresh or register a device to make the call.
+     */
+    await this.request<unknown>('/auth/logout', {
+      method: 'POST',
+      body: { refreshToken },
+      anonymous: true,
+    });
+  }
+
+  async updateProfile(input: { displayName: string }): Promise<void> {
+    await this.request<unknown>('/me', { method: 'PATCH', body: { displayName: input.displayName } });
+  }
+
+  async changePassword(input: { currentPassword: string; newPassword: string }): Promise<void> {
+    await this.request<unknown>('/me/password', {
+      method: 'PUT',
+      body: { currentPassword: input.currentPassword, newPassword: input.newPassword },
+    });
+  }
+
+  async deleteAccount(): Promise<void> {
+    await this.request<void>('/me', { method: 'DELETE' });
+  }
+}
+
+type IncidentCommentShape = import('@/types/comments').IncidentComment;
+
+/**
+ * A comment as the service might send it.
+ *
+ * `GET /incidents/{id}/comments` publishes no response schema, so every field is
+ * optional and read under the names a comment is likely to use. Anything
+ * missing is filled rather than assumed.
+ */
+interface RawComment {
+  id?: string;
+  commentId?: string;
+  body?: string;
+  text?: string;
+  createdAt?: string;
+  createdAtIso?: string;
+  isAnonymous?: boolean;
+  displayName?: string;
+  author?: {
+    kind?: string;
+    displayName?: string;
+    handle?: string;
+    name?: string;
+    avatarUrl?: string | null;
+    organisationName?: string | null;
+  } | null;
+  user?: { displayName?: string; avatarUrl?: string | null } | null;
+  org?: { name?: string | null } | null;
+  reactions?: number;
+  reactionCount?: number;
+  counts?: { reactions?: number };
+  viewerHasReacted?: boolean;
+}
+
+/** Null for a row with no id, which cannot be rendered or keyed. */
+function normaliseComment(raw: RawComment | null | undefined, incidentId: string) {
+  if (!raw) return null;
+  const id = raw.id ?? raw.commentId;
+  if (!id) return null;
+
+  const author = raw.author ?? null;
+  const anonymous = raw.isAnonymous === true || author?.kind === 'anonymous';
+  const organisationName = author?.organisationName ?? raw.org?.name ?? undefined;
+  const handle =
+    author?.displayName ??
+    author?.handle ??
+    author?.name ??
+    raw.user?.displayName ??
+    raw.displayName ??
+    '';
+
+  const comment: IncidentCommentShape = {
+    id,
+    incidentId,
+    author: {
+      handle,
+      avatarUrl: author?.avatarUrl ?? raw.user?.avatarUrl ?? null,
+      isAnonymous: anonymous || handle === '',
+      ...(organisationName ? { organisationName } : {}),
+    },
+    body: raw.body ?? raw.text ?? '',
+    // The service stores text only; attachments are not part of its comment.
+    media: null,
+    createdAtIso: raw.createdAtIso ?? raw.createdAt ?? new Date(0).toISOString(),
+    isContribution: false,
+    reactions: raw.reactions ?? raw.reactionCount ?? raw.counts?.reactions ?? 0,
+    viewerHasReacted: raw.viewerHasReacted ?? false,
+  };
+  return comment;
 }
 
 /** One entry as `/me/incidents/{id}/responses` returns it. */
@@ -965,6 +1193,18 @@ function normaliseIncident(raw: RawIncident): Incident {
       (raw.publisher && raw.publisher.kind !== 'organisation'
         ? raw.publisher
         : { kind: 'anonymous' as const }),
+
+    /*
+     * Never missing, for the same reason as the reporter above.
+     *
+     * **This crashed the Africa desk.** The feed row and the top story began
+     * reading `publisher.kind` to credit the organisation a report is from,
+     * and a report arriving with no `publisher` threw inside the list — the
+     * whole desk became an error screen. The detail screen and the
+     * organisation pages read it the same way. Filled in once here, at the
+     * boundary, every screen can rely on it.
+     */
+    publisher: raw.publisher ?? { kind: 'anonymous' as const },
     // A suppressed location arrives as null rather than a partial object;
     // give the UI a consistent shape so it only ever checks for null fields.
     location: raw.location ?? {
@@ -996,6 +1236,15 @@ function normaliseIncident(raw: RawIncident): Incident {
           ...raw.media,
           url: absoluteMedia(raw.media.url),
           posterUrl: absoluteMedia(posterFor(raw.media)),
+          /*
+           * The service's own copies, made absolute like everything else here.
+           * Null stays null: a copy still being made is not an empty string, and
+           * a screen falling back to `posterUrl` needs to be able to tell.
+           */
+          thumbUrl: raw.media.thumbUrl ? absoluteMedia(raw.media.thumbUrl) : null,
+          viewUrl: raw.media.viewUrl ? absoluteMedia(raw.media.viewUrl) : null,
+          playbackUrl: raw.media.playbackUrl ? absoluteMedia(raw.media.playbackUrl) : null,
+          originalUrl: raw.media.originalUrl ? absoluteMedia(raw.media.originalUrl) : null,
         }
       : raw.media,
   };

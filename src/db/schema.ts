@@ -32,6 +32,15 @@ export const incidents = sqliteTable(
     showLocation: integer('show_location', { mode: 'boolean' }).notNull().default(true),
     showDate: integer('show_date', { mode: 'boolean' }).notNull().default(true),
     showTime: integer('show_time', { mode: 'boolean' }).notNull().default(true),
+    showAddress: integer('show_address', { mode: 'boolean' }).notNull().default(false),
+    /*
+     * The place in words, resolved on the phone at filing: the full address
+     * when the geocoder had one, and the plus code, which is arithmetic on the
+     * fix and always present. Stored because the upload can happen hours later,
+     * offline at filing and online somewhere else.
+     */
+    address: text('address'),
+    plusCode: text('plus_code'),
 
     /*
      * The reporter's account of the incident, beyond category and description.
