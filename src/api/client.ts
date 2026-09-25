@@ -4,8 +4,24 @@ import type {
   CommissionEntry,
   DirectoryOrganisation,
   EarningsSummary,
+  OrganisationSector,
   Survey,
 } from '@/types/dawuro';
+import type {
+  DocumentId,
+  OnboardingApplication,
+  OnboardingStepId,
+} from '@/types/onboarding';
+import type {
+  LicenceResult,
+  OrgAssignment,
+  OrgDashboard,
+  OrgInboxItem,
+  OrgIncidentStatus,
+  OrgMember,
+  OrgResponseAction,
+  PublicationRequest,
+} from '@/types/org';
 
 /**
  * The single boundary between the app and the network.
@@ -105,6 +121,18 @@ export interface RegisterRequest {
   email: string;
   password: string;
   displayName: string;
+  /**
+   * What kind of account to create. Omitted means a reporter.
+   *
+   * `organisation` also creates a **pending** organisation and an owner
+   * membership, so `/org/onboarding/*` works immediately with the scope header.
+   * Until a platform administrator approves it, that is the only thing the
+   * account may reach — every other `/org/*` route answers
+   * `403 check: "org_pending"`.
+   */
+  accountKind?: 'user' | 'organisation';
+  /** Required when `accountKind` is `organisation`. Sector defaults to `other`. */
+  organisation?: { name: string; sector?: OrganisationSector };
 }
 
 /**
@@ -120,7 +148,14 @@ export interface Caller {
   /** The account's default organisation, or null for a plain reporter. */
   orgId: string | null;
   role: string | null;
-  memberships: { orgId: string; role?: string; name?: string }[];
+  /**
+   * `verified` is how `/me` says whether the platform has approved the
+   * organisation. It is false for an applicant part-way through onboarding, and
+   * the service then refuses every `/org/*` route but onboarding itself with
+   * `check: "org_pending"` — so a client that ignores it opens an inbox that can
+   * only render refusals, on an account with nothing wrong with it.
+   */
+  memberships: { orgId: string; role?: string; name?: string; verified?: boolean }[];
 }
 
 export interface CreateIncidentRequest {
@@ -213,6 +248,32 @@ export interface ApiClient {
   signIn(input: SignInRequest): Promise<AuthTokens>;
 
   register(input: RegisterRequest): Promise<AuthTokens>;
+
+  /**
+   * Exchange a Google identity for Dawuro tokens. Registers on first use.
+   *
+   * `POST /auth/google`. There is no separate "sign up with Google": the
+   * service creates the account if the address is new and signs it in if it is
+   * not, which is the behaviour people expect from the button and the reason it
+   * can sit on both screens.
+   *
+   * **The `idToken` is the credential and is always sent.** The endpoint's
+   * schema marks every field optional, which would make a request carrying only
+   * an email a way to mint a session for an address you do not own — the same
+   * hole `POST /auth/signin` has and which nothing in this app is allowed to
+   * use. Whether the service verifies the token against Google is the service's
+   * business, but the client must never give it the option of not having one.
+   *
+   * `kind` and `orgId` are in the schema and are deliberately not sent. They
+   * name the role and the organisation, and a client that could choose those
+   * would be granting itself an account type — which is the exact thing the
+   * seeded-login sign-in used to do here.
+   */
+  signInWithGoogle(input: {
+    idToken: string;
+    email: string;
+    displayName: string;
+  }): Promise<AuthTokens>;
 
   /**
    * Exchange a refresh token for a fresh access token.
@@ -378,4 +439,147 @@ export interface ApiClient {
    * refuses while commissions are outstanding.
    */
   deleteAccount(): Promise<void>;
+
+  // ─── the organisation side ───────────────────────────────────────────────
+  /*
+   * Every call below is scoped by `X-Dawuro-Org`, which is why each one takes
+   * an `orgId` rather than reading it from a store. The service refuses these
+   * routes outright without the header — `check: "org_header"` — and checks the
+   * named organisation against membership, so naming one you do not belong to
+   * gets `check: "membership"` and nothing else. An id passed explicitly is an
+   * id that cannot be forgotten by a caller that happens to run before the
+   * profile has hydrated.
+   */
+
+  /** Counts for the organisation's home, and the plan behind them. */
+  getOrgDashboard(orgId: string): Promise<OrgDashboard>;
+
+  /**
+   * Reports the platform routed to this organisation.
+   *
+   * Carries `licensed` and `licensedAt` per item, which is what makes a
+   * licences list possible on a client at all.
+   */
+  getOrgInbox(orgId: string): Promise<Page<OrgInboxItem>>;
+
+  /** One routed or licensed report, with freshly signed media. */
+  getOrgIncident(orgId: string, incidentId: string): Promise<OrgInboxItem>;
+
+  /**
+   * Buy the right to use a report. **This spends money.**
+   *
+   * No request body — the terms come from the organisation's plan and the
+   * reporter's destination choice, so the client cannot influence the price and
+   * must not pretend to. The report's own id is the idempotency key, so a
+   * double tap or a retried request cannot charge twice for the same footage.
+   */
+  licenseIncident(orgId: string, incidentId: string): Promise<LicenceResult>;
+
+  /** The organisation's internal disposition. Not shown to the reporter. */
+  setOrgIncidentStatus(
+    orgId: string,
+    incidentId: string,
+    status: OrgIncidentStatus,
+  ): Promise<void>;
+
+  /**
+   * What the organisation tells the reporter it is doing.
+   *
+   * This lands on the reporter's outcome timeline, under their own report. It
+   * is the answer to the question the whole product asks a citizen to take a
+   * risk on: did anybody do anything about it.
+   */
+  respondToIncident(
+    orgId: string,
+    incidentId: string,
+    input: { action: OrgResponseAction; note?: string },
+  ): Promise<void>;
+
+  /**
+   * Ask an editor to run a licensed report under this organisation's name.
+   *
+   * Does **not** publish. It creates a publication request the editorial desk
+   * approves or declines, and the desk is required — the service rejects a
+   * publish with no section and invents none.
+   */
+  requestPublication(
+    orgId: string,
+    incidentId: string,
+    input: PublicationRequest,
+  ): Promise<void>;
+
+  /** Who is on their way to what. */
+  getOrgAssignments(orgId: string): Promise<OrgAssignment[]>;
+
+  /** Send somebody to a report. */
+  createAssignment(
+    orgId: string,
+    input: { incidentId: string; assigneeId: string; note?: string },
+  ): Promise<void>;
+
+  /** Move a dispatch along, or reopen a closed one. */
+  updateAssignment(
+    orgId: string,
+    assignmentId: string,
+    input: { status: AssignmentStatusInput; note?: string },
+  ): Promise<void>;
+
+  /** The organisation's people — who a report can be dispatched to. */
+  getOrgMembers(orgId: string): Promise<OrgMember[]>;
+
+  // ─── becoming an organisation ────────────────────────────────────────────
+  /*
+   * The only `/org/*` routes a pending organisation may call. Everything else
+   * under that prefix answers `403 check: "org_pending"` until a platform
+   * administrator approves the application, which is why the onboarding screen
+   * is a destination in its own right rather than a banner over the inbox.
+   */
+
+  /** The application so far: which steps are done, what was entered, what is attached. */
+  getOnboarding(orgId: string): Promise<OnboardingApplication>;
+
+  /** Save a step's answers and leave it editable. */
+  saveOnboardingStep(
+    orgId: string,
+    stepId: OnboardingStepId,
+    payload: Record<string, unknown>,
+  ): Promise<OnboardingApplication>;
+
+  /** Send one step for review. Refused while its required documents are missing. */
+  submitOnboardingStep(orgId: string, stepId: OnboardingStepId): Promise<OnboardingApplication>;
+
+  /**
+   * Attach a document: declared, then its bytes sent.
+   *
+   * Two calls because that is what the service offers. The first records the
+   * type, name, hash, media type and size and reserves the slot; the second
+   * sends the bytes, which the service checks against the declared `sha256`
+   * before it counts the document as attached.
+   *
+   * Both are needed. Declaring alone would leave a platform owner approving an
+   * organisation's access to citizens' footage on the strength of a filename.
+   */
+  attachOnboardingDocument(
+    orgId: string,
+    input: {
+      documentType: DocumentId;
+      fileName: string;
+      sha256: string;
+      mimeType: string;
+      byteSize: number;
+    },
+  ): Promise<void>;
+
+  uploadOnboardingDocumentBytes(
+    orgId: string,
+    documentType: DocumentId,
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<void>;
+
+  /** Send the whole application for review. */
+  submitOnboarding(orgId: string): Promise<OnboardingApplication>;
 }
+
+/** Narrowed here so the client interface does not re-export the whole union. */
+type AssignmentStatusInput = OrgAssignment['status'];

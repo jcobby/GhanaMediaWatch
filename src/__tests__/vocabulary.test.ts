@@ -75,12 +75,28 @@ describe('the word a reporter reads', () => {
     // The keys are read by developers and appear in every call site; leaving
     // `t('business.plan')` beside copy that says organisation is the same
     // split, one layer down.
+
+    /*
+     * Two keys keep the word, and neither is ours to rename.
+     *
+     * `section.business` is the news desk — a different thing entirely from an
+     * organisation, and the reason this exception existed first.
+     *
+     * `apply.document.business_registration` is a **document type on the wire**:
+     * the service keys `PUT /org/onboarding/documents/{documentType}/bytes` on
+     * that exact string, and the console names the same slot. Renaming the
+     * translation key alone would leave the copy and the upload disagreeing
+     * about which document a person just photographed; renaming the value would
+     * upload it to a slot the service does not have.
+     */
+    const ONTHEWIRE = new Set(['section.business', 'apply.document.business_registration']);
+
     const keys: string[] = [];
     const walk = (node: unknown, keyPath: string) => {
       if (node && typeof node === 'object' && !Array.isArray(node)) {
         for (const [key, value] of Object.entries(node)) {
           const here = keyPath ? `${keyPath}.${key}` : key;
-          if (/business/i.test(key) && here !== 'section.business') keys.push(here);
+          if (/business/i.test(key) && !ONTHEWIRE.has(here)) keys.push(here);
           walk(value, here);
         }
       }

@@ -13,13 +13,13 @@
  */
 
 export const lightColors = {
-  masthead: '#1A1A1D',
+  masthead: '#0B3FA8',
   canvas: '#F4F5FA',
   canvasSoft: '#FFFFFF',
   canvasRaise: '#E9ECF4',
 
   glass: '#FFFFFF',
-  glassMedia: '#10111A',
+  glassMedia: '#0B1020',
   hairline: '#0E1024',
 
   textPrimary: '#0B0C14',
@@ -29,10 +29,10 @@ export const lightColors = {
   /** Fixed white — media overlays and accent fills only. */
   textOnDark: '#FFFFFF',
 
-  accent: '#5B3DF5',
-  accentAlt: '#2563EB',
-  accentBright: '#7C5CFF',
-  accentWash: '#EDE9FE',
+  accent: '#0B5FD1',
+  accentAlt: '#2F6BF0',
+  accentBright: '#4E8BFF',
+  accentWash: '#E0E9FE',
 
   success: '#0B7A4B',
   warning: '#A25C00',
@@ -48,9 +48,14 @@ export const lightColors = {
 export type ThemeColors = Record<keyof typeof lightColors, string>;
 
 /**
- * The signature gradient — violet to blue, on primary actions and the capture
+ * The signature gradient — blue to blue, on primary actions and the capture
  * button. Kept as a tuple so every consumer renders identical stops; a gradient
  * that drifts between screens is the fastest way to make a design feel unowned.
+ *
+ * It ran violet to blue, which was half of "blue and black". Both stops now
+ * carry a white label at 4.5:1 or better, which is what allows the primary
+ * button to be white-on-blue — the old pair only cleared 3:1 against the
+ * near-black label it was actually drawn with.
  */
 export const accentGradient = [lightColors.accent, lightColors.accentAlt] as const;
 

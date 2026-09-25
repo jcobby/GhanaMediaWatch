@@ -4,13 +4,24 @@ import { api } from '@/api';
 import { session } from '@/services/session';
 import { setOnSignedOut } from '@/api/http';
 import { toast } from '@/stores/toastStore';
+import { forgetGoogleSession, signInWithGoogle as googleSignIn } from '@/services/googleSignIn';
 import i18n from '@/i18n';
-import type { AccountType } from '@/types/dawuro';
+import type { AccountType, OrganisationSector } from '@/types/dawuro';
 
 const PROFILE_KEY = 'gmw.profile';
 const ONBOARDED_KEY = 'gmw.onboarded';
 
-export type Role = 'owner' | 'admin' | 'analyst' | 'viewer' | null;
+/**
+ * The roles the service grants inside an organisation.
+ *
+ * `dispatcher` is the service's own fifth value — `GET /org/members` enumerates
+ * `owner|admin|analyst|dispatcher|viewer` — and it was missing here, so the one
+ * role whose entire job is sending people to incidents did not exist in the
+ * type the phone stores.
+ */
+export type Role = 'owner' | 'admin' | 'analyst' | 'dispatcher' | 'viewer' | null;
+
+const ROLES: readonly string[] = ['owner', 'admin', 'analyst', 'dispatcher', 'viewer'];
 
 export interface Profile {
   id: string;
@@ -21,6 +32,21 @@ export interface Profile {
   orgId: string | null;
   orgName: string | null;
   role: Role;
+  /**
+   * Whether the platform has approved this organisation.
+   *
+   * `/me` marks a membership `verified: false` while the application is still
+   * being reviewed, and the service refuses every `/org/*` route but onboarding
+   * for one — `check: "org_pending"`. Without this the phone would open an
+   * inbox that can only ever render a refusal, which reads as an outage on a
+   * perfectly healthy account.
+   *
+   * Absent on a profile written before this field existed, so it is optional
+   * and a missing value is treated as approved: the common case is an approved
+   * organisation, and demoting one to a waiting screen on the strength of a
+   * keychain record written by an older build would be the worse mistake.
+   */
+  orgVerified?: boolean;
   /** Reporter handle, shown on the routing desk and the public feed. */
   handle: string | null;
 }
@@ -33,9 +59,31 @@ interface AuthState {
 
   hydrate: () => Promise<void>;
   signIn: (email: string, password: string) => Promise<void>;
-  /** Creates the account, then signs it in. */
-  register: (email: string, password: string, displayName: string) => Promise<void>;
+  /**
+   * Creates the account, then signs it in.
+   *
+   * `organisation` turns this into an application to join the platform: the
+   * service creates a *pending* organisation and an owner membership alongside
+   * the account, and the app lands on onboarding rather than on an inbox.
+   */
+  register: (input: {
+    email: string;
+    password: string;
+    displayName: string;
+    organisation?: { name: string; sector: OrganisationSector };
+  }) => Promise<void>;
   signOut: () => Promise<void>;
+  /**
+   * Sign in — or register — with a Google account.
+   *
+   * One action for both, because the service makes no distinction: `/auth/google`
+   * creates the account when the address is new and signs it in when it is not.
+   * Returns false when the person dismissed Google's picker, so the caller can
+   * tell "changed their mind" from "it failed" — they need opposite answers.
+   */
+  signInWithGoogle: () => Promise<boolean>;
+  /** Ask the service again whether this organisation has been approved yet. */
+  refreshMembership: () => Promise<void>;
   /** Rename the account on the service, then on this phone. Throws on refusal. */
   updateDisplayName: (displayName: string) => Promise<void>;
   /** Delete the account on the service, then clear this phone. Throws on refusal. */
@@ -78,7 +126,12 @@ interface AuthState {
  * error worth surfacing — it simply makes them a reporter, which is the common
  * case and the right default.
  */
-async function describeOrg(): Promise<{ id: string; name: string } | null> {
+async function describeOrg(): Promise<{
+  id: string;
+  name: string;
+  role: Role;
+  verified: boolean;
+} | null> {
   try {
     const me = await api.getCaller();
 
@@ -96,9 +149,32 @@ async function describeOrg(): Promise<{ id: string; name: string } | null> {
     const id = me.orgId ?? named?.orgId ?? null;
     if (!id) return null;
 
-    // A name the server did not send is not a reason to drop the membership;
-    // the account screens fall back to the id rather than to being a reporter.
-    return { id, name: named?.name ?? id };
+    /*
+     * The role is the server's, not this client's.
+     *
+     * It used to be written as `role: org ? 'admin' : null` — the phone
+     * granting itself the second-highest role in an organisation on the
+     * strength of belonging to one. Nothing on the wire changes as a result,
+     * because the service decides what a token may do regardless, but the
+     * screens read this: a `viewer` who cannot license anything was shown every
+     * control an administrator has, and learned what they could not do from a
+     * 403 after tapping a button that spends money.
+     */
+    const granted = me.role ?? named?.role ?? null;
+
+    return {
+      id,
+      // A name the server did not send is not a reason to drop the membership;
+      // the account screens fall back to the id rather than to being a reporter.
+      name: named?.name ?? id,
+      role: ROLES.includes(granted ?? '') ? (granted as Role) : null,
+      /*
+       * Approved unless the service says otherwise. `verified` is absent on a
+       * service that does not send it, and treating that absence as "pending"
+       * would put every working organisation on a waiting screen.
+       */
+      verified: named?.verified !== false,
+    };
   } catch {
     return null;
   }
@@ -207,14 +283,15 @@ export const useAuthStore = create<AuthState>((set) => ({
       accountType: org ? 'organisation' : 'reporter',
       orgId: org?.id ?? null,
       orgName: org?.name ?? null,
-      role: org ? 'admin' : null,
+      role: org?.role ?? null,
+      orgVerified: org ? org.verified : undefined,
       handle: org ? null : `@${name.toLowerCase().replace(/\s+/g, '')}`,
     };
     await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
     set({ profile });
   },
 
-  register: async (email, password, displayName) => {
+  register: async ({ email, password, displayName, organisation }) => {
     /*
      * A real account creation, not a sign-in that happens to create one.
      *
@@ -224,18 +301,102 @@ export const useAuthStore = create<AuthState>((set) => ({
      * Registering explicitly means the server can say "that email is already
      * taken" — which is the useful answer.
      */
-    const tokens = await api.register({ email, password, displayName });
+    const tokens = await api.register({
+      email,
+      password,
+      displayName,
+      ...(organisation
+        ? { accountKind: 'organisation' as const, organisation }
+        : {}),
+    });
     await session.save(tokens);
+
+    /*
+     * The organisation is read back, never assumed.
+     *
+     * Registering with `accountKind: organisation` asks the service to create
+     * one; `/me` is what says it did, under what id, and whether it has been
+     * approved — which it has not, because approval is a platform decision made
+     * later. Taking the id from our own request instead would be the client
+     * granting itself a membership, and it would be wrong the moment the
+     * service refuses the organisation half of the registration.
+     *
+     * A reporter skips the call entirely: they have no organisation to find and
+     * `describeOrg` would be a round trip to learn nothing.
+     */
+    const org = organisation ? await describeOrg() : null;
+
     const profile: Profile = {
       id: email,
       email,
       displayName,
-      // The public does not apply for an account type.
-      accountType: 'reporter',
-      orgId: null,
-      orgName: null,
-      role: null,
-      handle: `@${displayName.toLowerCase().replace(/\s+/g, '')}`,
+      // The public does not apply for an account type — but an institution does,
+      // and this is that application.
+      accountType: org ? 'organisation' : 'reporter',
+      orgId: org?.id ?? null,
+      orgName: org?.name ?? null,
+      role: org?.role ?? null,
+      orgVerified: org ? org.verified : undefined,
+      handle: org ? null : `@${displayName.toLowerCase().replace(/\s+/g, '')}`,
+    };
+    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+    set({ profile });
+  },
+
+  signInWithGoogle: async () => {
+    const identity = await googleSignIn();
+    // Dismissed the picker. Not a failure, and nothing to write.
+    if (!identity) return false;
+
+    const tokens = await api.signInWithGoogle(identity);
+    await session.save(tokens);
+
+    /*
+     * What this account is comes from `/me`, exactly as it does for a password
+     * sign-in. A Google account can belong to an organisation — somebody at an
+     * agency signing in with their work address is the common case — and
+     * assuming "Google means reporter" would put them in the wrong app.
+     */
+    const org = await describeOrg();
+    const name = org?.name ?? identity.displayName;
+
+    const profile: Profile = {
+      id: identity.email,
+      email: identity.email,
+      displayName: identity.displayName,
+      accountType: org ? 'organisation' : 'reporter',
+      orgId: org?.id ?? null,
+      orgName: org?.name ?? null,
+      role: org?.role ?? null,
+      orgVerified: org ? org.verified : undefined,
+      handle: org ? null : `@${name.toLowerCase().replace(/\s+/g, '')}`,
+    };
+    await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+    set({ profile });
+    return true;
+  },
+
+  /**
+   * Re-read the organisation's approval state from the service.
+   *
+   * The only way an applicant learns they have been approved: the decision is
+   * made by a platform administrator days later, and nothing on the phone hears
+   * about it. Called when the onboarding screen is pulled down, so somebody
+   * checking back gets an answer rather than the screen they left.
+   */
+  refreshMembership: async () => {
+    const current = useAuthStore.getState().profile;
+    if (!current || current.accountType !== 'organisation') return;
+
+    const org = await describeOrg();
+    if (!org) return;
+
+    const profile: Profile = {
+      ...current,
+      orgId: org.id,
+      orgName: org.name,
+      role: org.role,
+      orgVerified: org.verified,
     };
     await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
     set({ profile });
@@ -269,6 +430,16 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (stored?.kind === 'user' && stored.refreshToken) {
       await api.logout(stored.refreshToken).catch(() => undefined);
     }
+
+    /*
+     * And Google, where it was used.
+     *
+     * Without this, signing out and tapping "Continue with Google" again
+     * silently re-uses the last account rather than offering the picker — which
+     * on a shared phone signs the next person into the previous person's
+     * account. It never blocks the sign-out.
+     */
+    await forgetGoogleSession();
 
     await SecureStore.deleteItemAsync(PROFILE_KEY);
     // The session is cleared too, so the next request re-registers a device

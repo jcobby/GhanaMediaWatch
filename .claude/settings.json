@@ -49,7 +49,17 @@
       "Bash(cp apps/console/src/app/\\\\\\(platform\\\\\\)/platform/routing/RoutingDesk.tsx /tmp/rd2.bak)",
       "Bash(curl -s -m 20 -o /dev/null -w \"%{http_code}\\\\n\" \"https://698zp0x7-8000.uks1.devtunnels.ms/v1/health\")",
       "Bash(curl -s -m 20 \"https://698zp0x7-8000.uks1.devtunnels.ms/v1/incidents?limit=2\")",
-      "Bash(npx --yes prettier@3 --write \"apps/console/src/__tests__/deskQueueGrouping.test.ts\")"
+      "Bash(npx --yes prettier@3 --write \"apps/console/src/__tests__/deskQueueGrouping.test.ts\")",
+      "PowerShell(npx tsc --noEmit -p tsconfig.json)",
+      "PowerShell(npx eslint src/api/mock.ts)",
+      "Bash(sed -i 's/^\\\\\\(\\\\s*\\\\\\)<Row$/\\\\1<SettingRow/; s/^\\\\\\(\\\\s*\\\\\\)<Row /\\\\1<SettingRow /' src/features/org/OrgAccountScreen.tsx)",
+      "Bash(sed -i \"s|import { Badge, Glass, Pressable, Skeleton, Text } from '@/components/ui';|import { Badge, Glass, Skeleton, Text } from '@/components/ui';\\\\nimport { SettingRow } from '@/components/SettingRow';|\" src/features/org/OrgAccountScreen.tsx)",
+      "PowerShell(npx eslint src 2>&1)",
+      "PowerShell(npx expo export --platform ios --output-dir \"$env:TEMP\\\\dawuro-check\" --no-minify 2>&1 | Select-String -Pattern \"error|Error|bundles|Exported\" | Select-Object -Last 6)",
+      "Bash(node -e \"const d=require\\('./package.json'\\).dependencies; for\\(const k of Object.keys\\(d\\)\\) if\\(/auth|browser|google|session/i.test\\(k\\)\\) console.log\\(k,d[k]\\); console.log\\('---none above means not installed---'\\)\")",
+      "WebFetch(domain:docs.expo.dev)",
+      "PowerShell(npx expo install \"@react-native-google-signin/google-signin\" 2>&1)",
+      "PowerShell(npx tsc --noEmit -p tsconfig.json 2>&1)"
     ],
     "additionalDirectories": [
       "\\tmp"

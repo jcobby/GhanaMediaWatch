@@ -17,6 +17,7 @@ import {
   SwitchRow,
   Text,
 } from '@/components/ui';
+import { SettingRow } from '@/components/SettingRow';
 import { useMyIncidents } from '@/hooks/useIncidents';
 import { toast } from '@/stores/toastStore';
 import { ReportGrid } from './ReportGrid';
@@ -136,27 +137,47 @@ export function ProfileScreen() {
           {profile?.accountType === 'reporter' || !profile ? (
             <Button
               label={t('surveys.title')}
-              size="sm"
+              size="md"
               variant="glass"
               onPress={() => router.push('/surveys')}
-              leading={<Ionicons name="clipboard-outline" size={15} color={c.textPrimary} />}
+              leading={<Ionicons name="clipboard-outline" size={18} color={c.textPrimary} />}
             />
           ) : null}
           {profile?.accountType === 'reporter' || !profile ? (
             <Button
               label={t('earnings.title')}
-              size="sm"
+              size="md"
               variant="glass"
               onPress={() => router.push('/earnings')}
-              leading={<Ionicons name="cash-outline" size={15} color={c.textPrimary} />}
+              leading={<Ionicons name="cash-outline" size={18} color={c.textPrimary} />}
             />
           ) : null}
+          {/*
+            A guest gets both doors, and creating an account is the first of
+            them.
+
+            There was only "Sign in" here, which is the wrong single button for
+            this screen: everything above it — no reports, no earnings, no
+            responses — is what somebody sees precisely *because* they have no
+            account yet, so the likelier answer is that they need to make one.
+          */}
           {!profile ? (
-            <Button
-              label={t('profile.signIn')}
-              size="sm"
-              onPress={() => router.push('/(auth)/sign-in')}
-            />
+            <View className="w-full gap-2 pt-1">
+              <Button
+                label={t('auth.createAccount')}
+                size="lg"
+                fullWidth
+                onPress={() => router.push('/(auth)/sign-up')}
+                leading={<Ionicons name="person-add-outline" size={18} color={c.textOnDark} />}
+              />
+              <Button
+                label={t('profile.signIn')}
+                variant="glass"
+                size="lg"
+                fullWidth
+                onPress={() => router.push('/(auth)/sign-in')}
+              />
+            </View>
           ) : null}
         </View>
 
@@ -184,12 +205,12 @@ export function ProfileScreen() {
                 accessibilityLabel={t(`profile.${value}`)}
                 className={
                   tab === value
-                    ? 'flex-1 items-center rounded-pill bg-glass/[0.18] py-2'
-                    : 'flex-1 items-center rounded-pill py-2'
+                    ? 'flex-1 items-center rounded-pill bg-glass/[0.18] py-4'
+                    : 'flex-1 items-center rounded-pill py-4'
                 }
               >
                 <Text
-                  variant="body-sm"
+                  variant="title-sm"
                   tone={tab === value ? 'primary' : 'muted'}
                   className="font-sans-semibold"
                 >
@@ -240,12 +261,18 @@ export function ProfileScreen() {
                   description={mineErrorCopy.body}
                   retryLabel={
                     mineError instanceof ApiError && mineError.code === 'SIGN_IN_REQUIRED'
-                      ? t('profile.signIn')
+                      ? t('auth.getStarted')
                       : t('common.retry')
                   }
+                  /*
+                   * `SIGN_IN_REQUIRED` means a guest reached something that
+                   * needs an account — which usually means they have not made
+                   * one. Sending them to the sign-in form asks for a password
+                   * they have never set, so this lands on the choice instead.
+                   */
                   onRetry={() =>
                     mineError instanceof ApiError && mineError.code === 'SIGN_IN_REQUIRED'
-                      ? router.push('/(auth)/sign-in')
+                      ? router.push('/(auth)/welcome')
                       : void refetchMine()
                   }
                 />
@@ -280,20 +307,33 @@ export function ProfileScreen() {
           </View>
         ) : (
           <View className="gap-3 px-4">
+            {/*
+              Taller than the default row: these are the three switches a
+              reporter flips with one thumb, often in a hurry.
+
+              `py-4` rather than `py-4.5`. The 4.5 step is in the Tailwind config
+              but no file had ever used it, and NativeWind builds this project's
+              stylesheet from the class names present when Metro boots — so a
+              first use is absent until Metro restarts, silently, and the row
+              keeps the padding it was meant to lose.
+            */}
             <Glass elevation="low" className="rounded-lg px-4">
               <SwitchRow
+                size="lg"
                 label={t('settings.wifiOnly')}
                 description={t('settings.wifiOnlyHelp')}
                 value={wifiOnly}
                 onValueChange={setWifiOnly}
               />
               <SwitchRow
+                size="lg"
                 label={t('settings.notifications')}
                 description={t('settings.notificationsHelp')}
                 value={notifications}
                 onValueChange={setNotifications}
               />
               <SwitchRow
+                size="lg"
                 label={t('settings.anonymousDefault')}
                 description={t('settings.anonymousDefaultHelp')}
                 value={anonymousDefault}
@@ -305,6 +345,12 @@ export function ProfileScreen() {
             <AccountSettings />
 
             <Glass elevation="low" className="gap-0 rounded-lg">
+              {/*
+                These three carry no `onPress`, so they now render without a
+                chevron. That is the honest shape: none of them opens anything,
+                and an arrow on a row that goes nowhere promises a screen that
+                does not exist.
+              */}
               <SettingRow icon="language-outline" label={t('settings.language')} value="English" />
               <SettingRow icon="server-outline" label={t('settings.storage')} value="248 MB" />
               <SettingRow icon="document-text-outline" label={t('settings.legal')} />
@@ -313,6 +359,7 @@ export function ProfileScreen() {
               <SettingRow
                 icon="information-circle-outline"
                 label={t('settings.replayIntro')}
+                divider={Boolean(profile)}
                 onPress={() => {
                   void replayOnboarding();
                   router.replace('/(auth)/onboarding');
@@ -323,6 +370,7 @@ export function ProfileScreen() {
                   icon="log-out-outline"
                   label={t('settings.signOut')}
                   danger
+                  divider={false}
                   onPress={() => {
                     void signOut();
                     /*
@@ -381,36 +429,9 @@ function Stat({ label, value }: { label: string; value: string }) {
   );
 }
 
-function SettingRow({
-  icon,
-  label,
-  value,
-  danger,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value?: string;
-  danger?: boolean;
-  onPress?: () => void;
-}) {
-  const c = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityLabel={label}
-      className="flex-row items-center gap-3 border-b border-hairline/[0.08] px-4 py-3.5"
-    >
-      <Ionicons name={icon} size={18} color={danger ? c.danger : c.textMuted} />
-      <Text variant="body" tone={danger ? 'danger' : 'primary'} className="flex-1">
-        {label}
-      </Text>
-      {value ? (
-        <Text variant="body-sm" tone="muted">
-          {value}
-        </Text>
-      ) : null}
-      <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
-    </Pressable>
-  );
-}
+/*
+ * `SettingRow` moved to `components/SettingRow`, shared with the account panel
+ * below it and with the organisation's account screen. Three copies of the same
+ * twenty lines had already drifted apart, and every request to resize them had
+ * to be made three times.
+ */

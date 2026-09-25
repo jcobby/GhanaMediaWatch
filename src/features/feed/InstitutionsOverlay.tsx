@@ -88,11 +88,19 @@ export function InstitutionsOverlay({
           contentContainerStyle={{ paddingBottom: insets.bottom + 24 }}
         >
           <View className="px-4 pt-3">
-            {/* The whole approved directory, filtered as you type. */}
+            {/*
+              The whole approved directory, filtered as you type.
+
+              `showSearch={false}`: the field is the one in the bar above, beside
+              the back arrow. The list used to draw its own as well, bound to the
+              same state — two identical boxes stacked, and typing in either
+              filled both.
+            */}
             <OrganisationList
               organisations={organisations}
               query={query}
               onQuery={setQuery}
+              showSearch={false}
               mode="single"
               loading={loading}
               failed={failed}

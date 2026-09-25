@@ -30,8 +30,17 @@ const PADDING: Record<ButtonSize, string> = {
   lg: 'px-7',
 };
 
+/**
+ * `primary` is white, on the blue fill under it.
+ *
+ * It was `primary` — near-black — on a violet gradient, which cleared only
+ * 3.19:1 and is the contrast floor for *non-text*, not for a label somebody has
+ * to read before pressing. White on the blue pair clears 4.7:1 at the lightest
+ * stop, and white-on-blue is what "blue and white" means on the one control the
+ * eye is supposed to go to first.
+ */
 const LABEL_TONE: Record<ButtonVariant, TextTone> = {
-  primary: 'primary',
+  primary: 'on-dark',
   glass: 'primary',
   ghost: 'secondary',
   danger: 'danger',
@@ -87,9 +96,17 @@ export function Button({
         accessibilityLabel={label}
         accessibilityState={{ disabled: !!isDisabled, busy: loading }}
         className={cn('overflow-hidden', SIZE[size], fullWidth && 'w-full', className)}
-        // The primary action is the only element that casts an accent-tinted
-        // shadow, which is what makes it read as the one thing to press.
-        style={{ boxShadow: '0px 4px 14px rgba(91, 61, 245, 0.32)' }}
+        /*
+          The primary action is the only element that casts an accent-tinted
+          shadow, which is what makes it read as the one thing to press.
+
+          The channels are `--color-accent`, written out: `boxShadow` takes a
+          string and cannot interpolate a CSS variable through NativeWind, so
+          this is the one place the accent is duplicated. It has to move with
+          the token — a violet glow under a blue button is how the old palette
+          would linger after the rest of it changed.
+        */
+        style={{ boxShadow: '0px 4px 14px rgba(11, 95, 209, 0.32)' }}
         {...rest}
       >
         <LinearGradient

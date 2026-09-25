@@ -1,4 +1,4 @@
-import { AAA_BODY_TEXT, NON_TEXT_MIN, contrastRatio } from '../contrast';
+import { AAA_BODY_TEXT, NON_TEXT_MIN, contrastRatio, relativeLuminance } from '../contrast';
 import { accentGradient, categoryColor, colors } from '../theme';
 
 /*
@@ -45,12 +45,36 @@ describe('light glass palette', () => {
     },
   );
 
-  it('white label is legible on both ends of the accent gradient', () => {
-    // A gradient fill is only as accessible as its lightest stop — the label
-    // has to survive the whole ramp, not just the average.
+  it('the white label is legible on both ends of the accent gradient', () => {
+    /*
+     * A gradient fill is only as accessible as its lightest stop — the label
+     * has to survive the whole ramp, not just the average.
+     *
+     * **This was checking the wrong colour.** The name said white and the
+     * assertion measured `textPrimary`, the near-black, against a violet
+     * gradient at a 3:1 floor — the floor for *non-text*. The primary button
+     * really was drawn that way, so the test was accurate and the button was
+     * the problem: 3.19:1 on the label of the one control the eye is meant to
+     * go to first.
+     *
+     * The label is white now, on a blue pair, and the floor is the one that
+     * applies to text.
+     */
     for (const stop of accentGradient) {
-      expect(contrastRatio(colors.textPrimary, stop)).toBeGreaterThanOrEqual(3);
+      expect(contrastRatio(colors.textOnDark, stop)).toBeGreaterThanOrEqual(4.5);
     }
+  });
+
+  it('the accent is distinguishable from the info blue beside it', () => {
+    /*
+     * Both are blue now, and they mean different things — accent is "press
+     * this", info is "this was released". Not a contrast rule: a fixed minimum
+     * separation so the two cannot converge into one colour through a later
+     * nudge of either.
+     */
+    const apart = (a: string, b: string) =>
+      Math.abs(relativeLuminance(a) - relativeLuminance(b));
+    expect(apart(colors.accent, colors.info)).toBeGreaterThan(0.01);
   });
 
   it('the ground is not pure white', () => {

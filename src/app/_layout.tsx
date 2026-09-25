@@ -160,6 +160,18 @@ export default function RootLayout() {
             >
               <Stack.Screen name="(auth)" />
               <Stack.Screen name="(tabs)" />
+              {/*
+                The organisation's own shell. A separate tab group rather than
+                extra tabs on the reporter's, because it is a different job with
+                a different navigation — no camera, no outbox, no earnings —
+                and one bar that changed shape by account type would be four
+                conditionals in the tab layout for the rest of its life.
+              */}
+              <Stack.Screen name="(org)" />
+              <Stack.Screen name="inbox/[id]" options={{ presentation: 'card' }} />
+              {/* The application a pending organisation works through. Outside
+                  `(org)` because that shell is four tabs it may not use yet. */}
+              <Stack.Screen name="onboarding/organisation" />
               {/* Presented as a card over the tabs so the feed stays mounted
                 behind it and returns to the same scroll position. */}
               <Stack.Screen name="incident/[id]" options={{ presentation: 'card' }} />

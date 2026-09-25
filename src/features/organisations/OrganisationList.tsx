@@ -17,6 +17,16 @@ import { filterOrganisations } from './organisationSearch';
  * pickers is how the app ended up with a search box inside a sheet under another
  * search box in the bar.
  *
+ * **`showSearch` exists because that happened again.** Sharing the picker fixed
+ * the two-pickers problem and left a subtler version of it: the institutions
+ * overlay has a search bar of its own, beside the back arrow, and passed its
+ * query straight through — so the screen showed two identical fields, one under
+ * the other, bound to the same state. Typing in either filled both.
+ *
+ * A screen that already owns a search bar passes `showSearch={false}` and keeps
+ * being the only place to type. A screen that embeds the list inline — the last
+ * step of filing — leaves it on, because there the list *is* the search.
+ *
  * It renders a plain column, not its own scroller, so the screen around it can
  * own the scrolling — nested scrollers are what make a list feel stuck.
  */
@@ -32,6 +42,7 @@ export function OrganisationList({
   emptyTitle,
   emptyBody,
   autoFocus = false,
+  showSearch = true,
 }: {
   organisations: DirectoryOrganisation[];
   query: string;
@@ -44,6 +55,8 @@ export function OrganisationList({
   emptyTitle?: string;
   emptyBody?: string;
   autoFocus?: boolean;
+  /** False where the screen already has a search bar of its own. */
+  showSearch?: boolean;
 }) {
   const c = useColors();
   const { t } = useTranslation();
@@ -55,25 +68,37 @@ export function OrganisationList({
 
   return (
     <View className="gap-3">
-      <View className="h-11 flex-row items-center gap-2 rounded-pill bg-canvas-raise px-3.5">
-        <Ionicons name="search" size={17} color={c.textMuted} />
-        <TextInput
-          value={query}
-          onChangeText={onQuery}
-          placeholder={t('destination.forwardSearch')}
-          placeholderTextColor={c.textFaint}
-          autoCorrect={false}
-          autoFocus={autoFocus}
-          returnKeyType="search"
-          accessibilityLabel={t('destination.forwardSearch')}
-          style={{ flex: 1, color: c.textPrimary, fontFamily: 'Inter_400Regular', fontSize: 15, padding: 0 }}
-        />
-        {query ? (
-          <Pressable onPress={() => onQuery('')} accessibilityLabel={t('common.clear')} haptic={false}>
-            <Ionicons name="close-circle" size={18} color={c.textFaint} />
-          </Pressable>
-        ) : null}
-      </View>
+      {showSearch ? (
+        <View className="h-11 flex-row items-center gap-2 rounded-pill bg-canvas-raise px-3.5">
+          <Ionicons name="search" size={17} color={c.textMuted} />
+          <TextInput
+            value={query}
+            onChangeText={onQuery}
+            placeholder={t('destination.forwardSearch')}
+            placeholderTextColor={c.textFaint}
+            autoCorrect={false}
+            autoFocus={autoFocus}
+            returnKeyType="search"
+            accessibilityLabel={t('destination.forwardSearch')}
+            style={{
+              flex: 1,
+              color: c.textPrimary,
+              fontFamily: 'Inter_400Regular',
+              fontSize: 15,
+              padding: 0,
+            }}
+          />
+          {query ? (
+            <Pressable
+              onPress={() => onQuery('')}
+              accessibilityLabel={t('common.clear')}
+              haptic={false}
+            >
+              <Ionicons name="close-circle" size={18} color={c.textFaint} />
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {loading ? (
         <Text variant="body-sm" tone="muted" className="py-8 text-center">

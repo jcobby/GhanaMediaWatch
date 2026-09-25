@@ -37,6 +37,26 @@ import type {
   Survey,
 } from '@/types/dawuro';
 import { formatReportId } from '@/types/context';
+import { ASSIGNMENT_STATUSES } from '@/types/org';
+import { normaliseOnboarding } from './onboardingShape';
+import type {
+  DocumentId,
+  OnboardingApplication,
+  OnboardingStepId,
+} from '@/types/onboarding';
+import type {
+  AssignmentStatus,
+  LicenceResult,
+  OrgAssignment,
+  OrgDashboard,
+  OrgInboxItem,
+  OrgIncidentStatus,
+  OrgMember,
+  OrgMemberRole,
+  OrgResponseAction,
+  OrgSubscriptionDetail,
+  PublicationRequest,
+} from '@/types/org';
 
 const APP_VERSION = Constants.expoConfig?.version ?? '1.0.0';
 
@@ -417,8 +437,49 @@ export class HttpApiClient implements ApiClient {
     return this.authenticate('/auth/refresh', { refreshToken });
   }
 
+  /**
+   * Create an account — a reporter, or an organisation applying to join.
+   *
+   * The two optional fields are omitted rather than sent empty. `accountKind`
+   * defaults to a reporter server-side, and an `organisation` object present on
+   * a reporter's registration is a claim about an institution nobody made.
+   */
   async register(input: RegisterRequest): Promise<AuthTokens> {
-    return this.authenticate('/auth/register', input);
+    const { accountKind, organisation, ...rest } = input;
+    return this.authenticate('/auth/register', {
+      ...rest,
+      ...(accountKind ? { accountKind } : {}),
+      ...(organisation
+        ? {
+            organisation: {
+              name: organisation.name,
+              // Omitted rather than defaulted here: the service's own default is
+              // `other`, and duplicating it would be a second place to change.
+              ...(organisation.sector ? { sector: organisation.sector } : {}),
+            },
+          }
+        : {}),
+    });
+  }
+
+  async signInWithGoogle(input: {
+    idToken: string;
+    email: string;
+    displayName: string;
+  }): Promise<AuthTokens> {
+    /*
+     * Three fields, and no fourth.
+     *
+     * `kind` and `orgId` exist in the request schema and are not sent: they
+     * name the role and the organisation this session speaks for, and a client
+     * that picks those is a client granting itself an account type. What this
+     * account *is* comes back from `/me`, the same as for a password sign-in.
+     */
+    return this.authenticate('/auth/google', {
+      idToken: input.idToken,
+      email: input.email,
+      displayName: input.displayName,
+    });
   }
 
   /** Both endpoints answer with the same token envelope. */
@@ -871,6 +932,377 @@ export class HttpApiClient implements ApiClient {
   async deleteAccount(): Promise<void> {
     await this.request<void>('/me', { method: 'DELETE' });
   }
+
+  // ─── the organisation side ───────────────────────────────────────────────
+  /*
+   * Every call here passes `orgId`, which becomes `X-Dawuro-Org`. Omitting it
+   * is not a degraded request, it is a refused one: the service answers 403
+   * with `check: "org_header"` before it looks at the token. The id is taken as
+   * an argument rather than read from a store so that a call made before the
+   * profile hydrates fails at the type level rather than on the wire.
+   */
+
+  async getOrgDashboard(orgId: string): Promise<OrgDashboard> {
+    const res = await this.request<RawOrgDashboard>('/org/dashboard', { orgId });
+    return {
+      inboxCount: count(res.inboxCount),
+      publishedCount: count(res.publishedCount),
+      openAssignments: count(res.openAssignments),
+      subscription: res.subscription ? normaliseSubscription(res.subscription) : null,
+    };
+  }
+
+  /**
+   * The routed inbox, with each item's licence state.
+   *
+   * `limit=50` because the default is 20 on every collection this API serves
+   * and the inbox is the screen an officer scrolls looking for the report they
+   * were pushed about. Fifty is under the documented ceiling of 100.
+   *
+   * `licensed` and `licensedAt` are named in the endpoint's description but not
+   * in its schema, so they are read off the raw record and defaulted. False and
+   * null is the safe direction: it offers a licence that may already be held
+   * rather than claiming one that was never bought — and the service's
+   * idempotency key on the report means a re-licence of the same report cannot
+   * charge twice anyway.
+   */
+  async getOrgInbox(orgId: string): Promise<Page<OrgInboxItem>> {
+    const page = await this.request<Page<RawIncident & RawLicenceFields>>('/org/inbox?limit=50', {
+      orgId,
+    });
+    return { ...page, items: (page.items ?? []).map(toOrgInboxItem) };
+  }
+
+  async getOrgIncident(orgId: string, incidentId: string): Promise<OrgInboxItem> {
+    const raw = await this.request<RawIncident & RawLicenceFields>(
+      `/org/incidents/${encodeURIComponent(incidentId)}`,
+      { orgId },
+    );
+    return toOrgInboxItem(raw);
+  }
+
+  /**
+   * Licensing, which is a purchase.
+   *
+   * The idempotency key is the report's own id, so the same report cannot be
+   * bought twice by a double tap, a retry after a timeout, or a screen that
+   * mounts again while the first request is still in flight. The service takes
+   * no body — the price comes from the plan and the reporter's destination
+   * choice, and a client that could name a price could name the wrong one.
+   */
+  async licenseIncident(orgId: string, incidentId: string): Promise<LicenceResult> {
+    const res = await this.request<Partial<LicenceResult>>(
+      `/org/incidents/${encodeURIComponent(incidentId)}/license`,
+      { method: 'POST', body: {}, orgId, idempotencyKey: `license:${incidentId}` },
+    );
+    return {
+      incidentId: res.incidentId ?? incidentId,
+      /*
+       * Absent means licensed. The call answered 200, which is the service
+       * saying it created the licence and the commission; reading a missing
+       * flag as `false` would tell an organisation its money bought nothing.
+       */
+      licensed: res.licensed ?? true,
+      grossPesewas: count(res.grossPesewas),
+      platformFeePesewas: count(res.platformFeePesewas),
+      reporterPesewas: count(res.reporterPesewas),
+      downloadChargePesewas: count(res.downloadChargePesewas),
+    };
+  }
+
+  async setOrgIncidentStatus(
+    orgId: string,
+    incidentId: string,
+    status: OrgIncidentStatus,
+  ): Promise<void> {
+    await this.request<unknown>(`/org/incidents/${encodeURIComponent(incidentId)}/status`, {
+      method: 'POST',
+      body: { status },
+      orgId,
+    });
+  }
+
+  async respondToIncident(
+    orgId: string,
+    incidentId: string,
+    input: { action: OrgResponseAction; note?: string },
+  ): Promise<void> {
+    await this.request<unknown>(`/org/incidents/${encodeURIComponent(incidentId)}/response`, {
+      method: 'POST',
+      // `note` is omitted rather than sent empty: the reporter reads this, and
+      // a blank line under an action is noise on somebody's own report.
+      body: { action: input.action, ...(input.note ? { note: input.note } : {}) },
+      orgId,
+    });
+  }
+
+  async requestPublication(
+    orgId: string,
+    incidentId: string,
+    input: PublicationRequest,
+  ): Promise<void> {
+    await this.request<unknown>(`/org/incidents/${encodeURIComponent(incidentId)}/publish`, {
+      method: 'POST',
+      body: { section: input.section, ...(input.note ? { note: input.note } : {}) },
+      orgId,
+    });
+  }
+
+  async getOrgAssignments(orgId: string): Promise<OrgAssignment[]> {
+    const page = await this.request<Page<RawAssignment>>('/org/assignments?limit=50', { orgId });
+    return (page.items ?? []).map(normaliseAssignment);
+  }
+
+  async createAssignment(
+    orgId: string,
+    input: { incidentId: string; assigneeId: string; note?: string },
+  ): Promise<void> {
+    await this.request<unknown>('/org/assignments', {
+      method: 'POST',
+      body: {
+        incidentId: input.incidentId,
+        assigneeId: input.assigneeId,
+        ...(input.note ? { note: input.note } : {}),
+      },
+      orgId,
+    });
+  }
+
+  async updateAssignment(
+    orgId: string,
+    assignmentId: string,
+    input: { status: AssignmentStatus; note?: string },
+  ): Promise<void> {
+    await this.request<unknown>(`/org/assignments/${encodeURIComponent(assignmentId)}`, {
+      method: 'PATCH',
+      body: { status: input.status, ...(input.note ? { note: input.note } : {}) },
+      orgId,
+    });
+  }
+
+  async getOrgMembers(orgId: string): Promise<OrgMember[]> {
+    const page = await this.request<Page<Partial<OrgMember>>>('/org/members?limit=100', { orgId });
+    return (page.items ?? [])
+      .filter((m): m is Partial<OrgMember> & { userId: string } => Boolean(m.userId))
+      .map((m) => ({
+        userId: m.userId,
+        role: ORG_MEMBER_ROLES.includes(m.role as OrgMemberRole) ? (m.role as OrgMemberRole) : null,
+        email: m.email ?? '',
+        // A member with no name is still a member, and still has to be pickable
+        // from the dispatch list — the email is what identifies them until the
+        // service has a name for them.
+        displayName: m.displayName || m.email || m.userId,
+      }));
+  }
+
+  // ─── becoming an organisation ────────────────────────────────────────────
+
+  async getOnboarding(orgId: string): Promise<OnboardingApplication> {
+    return normaliseOnboarding(await this.request<unknown>('/org/onboarding', { orgId }));
+  }
+
+  async saveOnboardingStep(
+    orgId: string,
+    stepId: OnboardingStepId,
+    payload: Record<string, unknown>,
+  ): Promise<OnboardingApplication> {
+    return normaliseOnboarding(
+      await this.request<unknown>(`/org/onboarding/steps/${encodeURIComponent(stepId)}`, {
+        method: 'PUT',
+        body: payload,
+        orgId,
+      }),
+    );
+  }
+
+  async submitOnboardingStep(
+    orgId: string,
+    stepId: OnboardingStepId,
+  ): Promise<OnboardingApplication> {
+    return normaliseOnboarding(
+      await this.request<unknown>(`/org/onboarding/steps/${encodeURIComponent(stepId)}/submit`, {
+        method: 'POST',
+        body: {},
+        orgId,
+      }),
+    );
+  }
+
+  async attachOnboardingDocument(
+    orgId: string,
+    input: {
+      documentType: DocumentId;
+      fileName: string;
+      sha256: string;
+      mimeType: string;
+      byteSize: number;
+    },
+  ): Promise<void> {
+    await this.request<unknown>('/org/onboarding/documents', {
+      method: 'POST',
+      body: input,
+      orgId,
+    });
+  }
+
+  /**
+   * The file itself.
+   *
+   * Raw octet-stream, so it bypasses `request()` the way `putChunk` does — that
+   * helper serialises JSON and would corrupt the bytes. The documented route is
+   * called directly rather than any signed target the declare step hands back:
+   * this request carries the caller's token and the organisation header, which
+   * is what the service checks.
+   */
+  async uploadOnboardingDocumentBytes(
+    orgId: string,
+    documentType: DocumentId,
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<void> {
+    await this.ensureToken();
+    const stored = await session.read();
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CHUNK_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/org/onboarding/documents/${encodeURIComponent(documentType)}/bytes`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': mimeType,
+            'X-Tunnel-Skip-AntiPhishing-Page': 'true',
+            'X-Dawuro-Org': orgId,
+            ...(stored ? { Authorization: `Bearer ${stored.accessToken}` } : {}),
+          },
+          body: bytes as unknown as BodyInit,
+          signal: controller.signal,
+        },
+      );
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        let parsed: unknown = null;
+        try {
+          parsed = text ? JSON.parse(text) : null;
+        } catch {
+          parsed = null;
+        }
+        throw toApiError(response.status, parsed);
+      }
+    } catch (cause) {
+      if (cause instanceof ApiError) throw cause;
+      throw new ApiError({
+        code: 'NETWORK_UNAVAILABLE',
+        status: 0,
+        message: cause instanceof Error ? cause.message : 'Document upload failed',
+        retryable: true,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async submitOnboarding(orgId: string): Promise<OnboardingApplication> {
+    return normaliseOnboarding(
+      await this.request<unknown>('/org/onboarding/submit', {
+        method: 'POST',
+        body: {},
+        orgId,
+      }),
+    );
+  }
+}
+
+// ─── organisation normalisation ────────────────────────────────────────────
+
+const ORG_MEMBER_ROLES: readonly string[] = ['owner', 'admin', 'analyst', 'dispatcher', 'viewer'];
+const SUBSCRIPTION_TIERS: readonly string[] = ['basic', 'standard', 'enterprise'];
+const SUBSCRIPTION_STATUSES: readonly string[] = ['trialing', 'active', 'past_due', 'cancelled'];
+
+/** A non-negative integer, or zero. Counts drive layout, never money. */
+function count(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.trunc(value) : 0;
+}
+
+interface RawLicenceFields {
+  licensed?: boolean;
+  licensedAt?: string | null;
+}
+
+interface RawOrgDashboard {
+  inboxCount?: number;
+  publishedCount?: number;
+  openAssignments?: number;
+  subscription?: RawSubscription | null;
+}
+
+interface RawSubscription {
+  tier?: string;
+  status?: string;
+  renewsAtIso?: string | null;
+  seatsUsed?: number;
+  reportsUsedThisPeriod?: number;
+}
+
+interface RawAssignment {
+  id?: string;
+  incidentId?: string;
+  assigneeId?: string;
+  employeeName?: string;
+  status?: string;
+  note?: string | null;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+function toOrgInboxItem(raw: RawIncident & RawLicenceFields): OrgInboxItem {
+  return {
+    ...normaliseIncident(raw),
+    licensed: raw.licensed === true,
+    licensedAt: raw.licensedAt ?? null,
+  };
+}
+
+/**
+ * The plan, narrowed.
+ *
+ * `tier` and `status` are bare strings on the wire. An unrecognised tier is
+ * null rather than passed through, because the tier is what prices a download —
+ * the account screen would rather say nothing about the plan than quote a
+ * number derived from a word it does not know.
+ */
+function normaliseSubscription(raw: RawSubscription): OrgSubscriptionDetail {
+  return {
+    tier: SUBSCRIPTION_TIERS.includes(raw.tier ?? '')
+      ? (raw.tier as OrgSubscriptionDetail['tier'])
+      : null,
+    status: SUBSCRIPTION_STATUSES.includes(raw.status ?? '')
+      ? (raw.status as OrgSubscriptionDetail['status'])
+      : null,
+    renewsAtIso: raw.renewsAtIso ?? null,
+    seatsUsed: count(raw.seatsUsed),
+    reportsUsedThisPeriod: count(raw.reportsUsedThisPeriod),
+  };
+}
+
+function normaliseAssignment(raw: RawAssignment): OrgAssignment {
+  return {
+    id: raw.id ?? '',
+    incidentId: raw.incidentId ?? '',
+    assigneeId: raw.assigneeId ?? '',
+    employeeName: raw.employeeName ?? '',
+    // `assigned` is what the service says a new one is, and it is the only
+    // value that cannot mislead: it claims nobody has moved yet.
+    status: ASSIGNMENT_STATUSES.includes(raw.status as AssignmentStatus)
+      ? (raw.status as AssignmentStatus)
+      : 'assigned',
+    note: raw.note ?? null,
+    createdAt: raw.createdAt ?? '',
+    updatedAt: raw.updatedAt ?? raw.createdAt ?? '',
+  };
 }
 
 type IncidentCommentShape = import('@/types/comments').IncidentComment;

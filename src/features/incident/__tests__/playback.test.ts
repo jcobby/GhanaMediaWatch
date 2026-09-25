@@ -114,7 +114,7 @@ test('a file too small to be footage is named rather than played', () => {
    * source at all — so a `notMedia` file cannot reach one.
    */
   expect(stage).toMatch(/const playable = isVideo && !notMedia;/);
-  expect(stage).toMatch(/const source = playable &&/);
+  expect(stage).toMatch(/const signed = playable &&/);
   expect(stage).toMatch(/if \(notMedia \|\| failed \|\| playbackFailed\)/);
 });
 
@@ -181,8 +181,27 @@ test('the player is given the URL, not a file on disk', () => {
   const stage = code(STAGE);
   expect(stage).toMatch(/useVideoPlayer\(source/);
   expect(stage).toMatch(
-    /const source = playable && incident\.media\.url \? incident\.media\.url : null/,
+    /const signed = playable && incident\.media\.url \? incident\.media\.url : null/,
   );
+});
+
+test('a re-signed URL does not restart the clip', () => {
+  /*
+   * Media URLs carry an expiry and a signature, so the same frame of the same
+   * report arrives under a different URL on every response.
+   * `useVideoPlayer` replaces its item when the source string changes, and a
+   * replaced item plays from zero — so the video restarted underneath whoever
+   * was watching: on the detail screen whenever the app returned to the
+   * foreground, and on the organisation's report screen whenever the inbox
+   * refetched, which includes the moment a licence is bought.
+   *
+   * The identity of the media is the report, not the signature. `Thumbnail`
+   * already carries the same fix for images under the name `cacheKey`.
+   */
+  const stage = code(STAGE);
+  expect(stage).toMatch(/const source = useStableSource\(incident\.id, signed\)/);
+  // Keyed on the report, so a different report still swaps the source.
+  expect(stage).toMatch(/held\.id !== incidentId/);
 });
 
 test('nothing is fetched ahead of playback any more', () => {
@@ -212,7 +231,7 @@ test('a photo is never handed to the player', () => {
    */
   const stage = code(STAGE);
   expect(stage).toMatch(/const playable = isVideo && !notMedia;/);
-  expect(stage).toMatch(/playable && incident\.media\.url \? incident\.media\.url : null/);
+  expect(stage).toMatch(/const signed = playable && incident\.media\.url \?/);
 });
 
 test('buffering is said out loud rather than shown as black', () => {

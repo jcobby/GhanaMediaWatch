@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { colors, lightColors, useColors } from '@/lib/theme';
+import { AAA_BODY_TEXT, contrastRatio, parseHex } from '@/lib/contrast';
 
 /**
  * The app has one appearance and cannot be talked out of it.
@@ -72,11 +73,42 @@ test('nothing picks brand artwork by asking the theme', () => {
   expect(brand).toMatch(/reversed/);
 });
 
-test('the masthead is black and the news ground is white', () => {
-  // The thing that was actually asked for, pinned so a token rename cannot
-  // quietly undo it.
-  expect(lightColors.masthead.toLowerCase()).toBe('#1a1a1d');
+test('the masthead is the brand blue and the news ground is white', () => {
+  /*
+   * Blue and white, pinned so a token rename cannot quietly undo it.
+   *
+   * It was black — the app read as blue and black — and the masthead is the
+   * surface that decided that, because it is the one large area of colour on
+   * the screen the reader opens onto.
+   */
+  expect(lightColors.masthead.toLowerCase()).toBe('#0b3fa8');
   expect(lightColors.canvasSoft.toLowerCase()).toBe('#ffffff');
+
+  /*
+   * And the chrome is still dark enough to carry what sits on it. The masthead
+   * holds white icons and the reversed silver-and-gold artwork; a blue light
+   * enough to look "bright" would take both below the floor and there is no
+   * type error for that.
+   */
+  expect(contrastRatio(lightColors.textOnDark, lightColors.masthead)).toBeGreaterThanOrEqual(
+    AAA_BODY_TEXT,
+  );
+});
+
+test('nothing brand-coloured is still violet', () => {
+  /*
+   * The old accent was `#5B3DF5`. A violet surviving anywhere — a hardcoded
+   * gradient stop, a shadow written as rgba — is the previous palette lingering
+   * beside the new one, which reads as a bug rather than as a colour scheme.
+   *
+   * Blue means the blue channel leads and red is well behind it; violet has the
+   * two close together. Checked on the tokens themselves rather than by
+   * grepping for one hex, so a *different* violet cannot slip in.
+   */
+  for (const token of ['accent', 'accentAlt', 'accentBright', 'masthead'] as const) {
+    const [r, , b] = parseHex(lightColors[token]);
+    expect([token, b > r + 40]).toEqual([token, true]);
+  }
 });
 
 test('there is no theme store to hydrate', () => {

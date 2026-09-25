@@ -22,7 +22,18 @@
  *      "dark mode"; it is the only thing legible over an arbitrary photo, and
  *      every photo-led app does the same.
  *
- * ONE THEME. A black masthead over a white page, and no way to change it.
+ * ONE THEME. A blue masthead over a white page, and no way to change it.
+ *
+ * It was a black masthead and a violet accent — blue and black. The two
+ * identity colours are now blue and white: the chrome carries the brand blue,
+ * the page under it stays white, and the accent is a blue rather than a violet
+ * so the whole app reads as one colour rather than two that nearly rhyme.
+ *
+ * Two dark values deliberately survive that change, and neither is brand:
+ * `--color-glass-media` and `--color-text-primary`. The first is what makes
+ * white text legible over arbitrary photography and the second is body copy on
+ * a white page. "Blue and white" is about the surfaces people recognise the app
+ * by, not an instruction to put white text on white.
  *
  * A dark/light switch was built here and taken back out. It gave one question
  * — what colour is this app — three answers that disagreed: a value stored on
@@ -52,8 +63,11 @@
 
     /* Frosted panel fill on light surfaces. Painted at high alpha over a blur. */
     --color-glass: 255 255 255;
-    /* Frosted panel fill over media. Dark, so white text survives any frame. */
-    --color-glass-media: 16 17 26;
+    /* Frosted panel fill over media. Dark, so white text survives any frame.
+       Tinted towards the brand blue rather than neutral, but it stays dark:
+       this value exists for legibility over an arbitrary photograph, and a
+       white panel there would put white text on a bright sky. */
+    --color-glass-media: 11 16 32;
 
     /* Hairlines are dark on light ground, and light over media. */
     --color-hairline: 14 16 36;
@@ -66,12 +80,14 @@
     /* Fixed white — used only on media overlays and accent fills. */
     --color-text-on-dark: 255 255 255;
 
-    /* Accent — violet to blue. Deepened from the dark-theme values so a white
-       label on the gradient still clears contrast on a light page. */
-    --color-accent: 91 61 245;
-    --color-accent-alt: 37 99 235;
-    --color-accent-bright: 124 92 255;
-    --color-accent-wash: 237 233 254;
+    /* Accent — blue to blue. Both stops carry a white label at 4.5:1 or better,
+       which is what lets the primary button be white-on-blue rather than the
+       near-black-on-violet it was. A gradient fill is only as accessible as its
+       lightest stop, so the ramp is short on purpose. */
+    --color-accent: 11 95 209;
+    --color-accent-alt: 47 107 240;
+    --color-accent-bright: 78 139 255;
+    --color-accent-wash: 224 233 254;
 
     /* Semantic. Darkened for a light ground; these are read as text and icons,
        not just as fills. */
@@ -86,12 +102,14 @@
 
     /* Live / urgent — reserved for active incidents only. */
     --color-live: 200 18 56;
-    /* The masthead. Identical in both themes: the page belongs to the reader,
-       the bar belongs to the publication.
+    /* The masthead: the page belongs to the reader, the bar belongs to the
+       publication.
 
-       Neutral rather than the navy of the dark palette — above a white page a
-       blue-cast bar reads as the dark theme leaking in at the top rather than
-       as a masthead. */
-    --color-masthead: 26 26 29;
+       The brand blue, deep enough to carry the reversed artwork and white icons
+       at AAA — it was near-black, which made the app read as blue and black. A
+       *white* bar was the other way to read "blue and white" and is worse here:
+       it would vanish into the page it sits on, and the supplied home wordmark
+       exists only in the near-white form drawn for a dark bar. */
+    --color-masthead: 11 63 168;
   }
 }

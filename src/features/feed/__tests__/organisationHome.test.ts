@@ -39,13 +39,48 @@ describe('one standard search', () => {
     expect(screen()).not.toMatch(/OrganisationPickerSheet/);
   });
 
-  test('one field searches both, under two tabs', () => {
+  test('two questions, two buttons, two screens', () => {
+    /*
+     * This asserted the opposite until now — one field under two tabs — and had
+     * been failing since the design moved on without it.
+     *
+     * The tabs were the problem being fixed: one button opened a search that
+     * might be about reports or about institutions, and finding an institution
+     * meant first noticing a tab. The magnifier now asks "what happened" and the
+     * building asks "who is on Dawuro".
+     */
+    expect(bar()).toMatch(/onPress=\{onOpenSearch\}/);
+    expect(bar()).toMatch(/onPress=\{onOpenInstitutions\}/);
+
     const src = overlay();
-    expect(src).toMatch(/\(\['stories', 'organisations'\] as const\)/);
     expect(src).toMatch(/<FeedRow/);
-    expect(src).toMatch(/<OrganisationList/);
-    // One query drives both tabs, so switching tab keeps what was typed.
-    expect(src).toMatch(/query=\{query\}/);
+    // Reports only. An organisation list here would be the tab by another name.
+    expect(src).not.toMatch(/<OrganisationList/);
+  });
+
+  test('each search screen has exactly one field', () => {
+    /*
+     * The recurring defect on this screen, in its third form. First a pill above
+     * a sheet that held a second box; then two tabs sharing one field; then the
+     * institutions overlay drew its own search bar *and* passed its query to
+     * `OrganisationList`, which drew another — two identical boxes stacked, both
+     * bound to the same state, so typing in either filled both.
+     *
+     * A screen that owns a search bar passes `showSearch={false}`.
+     */
+    const institutions = code('features/feed/InstitutionsOverlay.tsx');
+    expect((institutions.match(/<TextInput/g) ?? []).length).toBe(1);
+    expect(institutions).toMatch(/showSearch=\{false\}/);
+
+    expect((overlay().match(/<TextInput/g) ?? []).length).toBe(1);
+
+    /*
+     * And the list still draws one where it is the only place to type — the last
+     * step of filing embeds it inline with no bar of its own.
+     */
+    const list = code('features/organisations/OrganisationList.tsx');
+    expect(list).toMatch(/showSearch = true/);
+    expect(code('features/capture/ReviewScreen.tsx')).not.toMatch(/showSearch=\{false\}/);
   });
 
   test('closing the search leaves the feed exactly as it was', () => {
@@ -56,7 +91,14 @@ describe('one standard search', () => {
   });
 
   test('choosing an organisation opens its homepage and closes the search', () => {
-    expect(overlay()).toMatch(/onClose\(\);\s*onOpenOrganisation\(id\);/);
+    /*
+     * Asserted against `SearchOverlay` until now, and stale for the same reason
+     * as the tabs above: choosing an organisation moved to the screen that lists
+     * them when the two searches were split.
+     */
+    expect(code('features/feed/InstitutionsOverlay.tsx')).toMatch(
+      /onClose\(\);\s*onOpenOrganisation\(id\);/,
+    );
     expect(screen()).toMatch(
       /onOpenOrganisation=\{\(id\) => enterOrganisation\(approved\.find\(\(o\) => o\.id === id\) \?\? null\)\}/,
     );
@@ -119,7 +161,8 @@ describe('one list of organisations, wherever one is chosen', () => {
     const src = list();
     expect(src).toMatch(/mode: 'single' \| 'multi'/);
     expect(src).toMatch(/accessibilityRole=\{mode === 'multi' \? 'checkbox' : 'button'\}/);
-    expect(code('features/feed/SearchOverlay.tsx')).toMatch(/mode="single"/);
+    // `single` moved to the institutions screen when the two searches split.
+    expect(code('features/feed/InstitutionsOverlay.tsx')).toMatch(/mode="single"/);
     expect(code('features/capture/ReviewScreen.tsx')).toMatch(/mode="multi"/);
   });
 

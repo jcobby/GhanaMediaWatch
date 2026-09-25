@@ -1,5 +1,6 @@
 import { View } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { accentGradient } from '@/lib/theme';
 
 interface SparklineProps {
   values: readonly number[];
@@ -32,8 +33,14 @@ export function Sparkline({ values, height = 44, highlightLast = true }: Sparkli
             // than vanishing into the baseline.
             style={{ height: Math.max(3, (value / max) * height) }}
           >
+            {/*
+              The accent tuple rather than a second copy of it. These bars were
+              written out as violet hex and would have stayed violet while the
+              rest of the app turned blue — the muted pair is the same ramp,
+              lightened, so both move with the token.
+            */}
             <LinearGradient
-              colors={isLast ? ['#5B3DF5', '#2563EB'] : ['#C7C0F7', '#B9CBF5']}
+              colors={isLast ? [...accentGradient] : ['#BBCDF3', '#C9D8F6']}
               style={{ flex: 1 }}
             />
           </View>

@@ -12,7 +12,9 @@ import { accentGradient, colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 import { hapticUnlock } from '@/lib/haptics';
+import { homeRouteFor } from '@/lib/homeRoute';
 import { AuthField } from './AuthField';
+import { GoogleButton } from './GoogleButton';
 import { DemoAccountSheet } from './DemoAccountSheet';
 import { isLiveBackend } from '@/api';
 import { signInSchema, type SignInValues } from './schemas';
@@ -47,11 +49,21 @@ export function SignInScreen() {
       hapticUnlock();
       toast.success(
         t('auth.welcomeBackTitle'),
-        t('auth.welcomeBackBody', { name: profile?.displayName ?? values.email }),
+        // An organisation operator is greeted by their organisation, not by
+        // their own name: the account they just reached acts as the
+        // organisation, and that is the thing they need to have seen.
+        t('auth.welcomeBackBody', {
+          name: profile?.orgName ?? profile?.displayName ?? values.email,
+        }),
       );
-      // Every account lands in the reporter app. Organisation and platform work
-      // is done in the web console.
-      router.replace('/(tabs)');
+      /*
+       * Into the shell the server says this account belongs to.
+       *
+       * A reporter lands in the reporter app; an account the service placed in
+       * an organisation lands in that organisation's inbox. Platform work stays
+       * in the web console.
+       */
+      router.replace(homeRouteFor(profile ?? null));
     } catch (cause) {
       toast.error(
         t('auth.signInFailed'),
@@ -155,6 +167,7 @@ export function SignInScreen() {
             loading={submitting}
             onPress={handleSubmit(onSubmit)}
           />
+          <GoogleButton />
           {/* Reporting must never require an account — that is the whole point
               of an anonymous reporting app. */}
           <Button

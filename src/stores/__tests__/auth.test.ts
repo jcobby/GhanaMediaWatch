@@ -56,7 +56,9 @@ test('creating an account is a separate call, not a sign-in', () => {
    * answer "that email is already taken", which is the useful reply; the old
    * flow could only ever succeed, silently, on a new account.
    */
-  void useAuthStore.getState().register('new@example.gh', 'a-real-passphrase', 'Ama K.');
+  void useAuthStore
+    .getState()
+    .register({ email: 'new@example.gh', password: 'a-real-passphrase', displayName: 'Ama K.' });
 
   expect(mockRegister).toHaveBeenCalledTimes(1);
   expect(mockSignIn).not.toHaveBeenCalled();
@@ -67,13 +69,43 @@ test('creating an account is a separate call, not a sign-in', () => {
   });
 });
 
-test('a registered account is a reporter with no organisation', () => {
-  // The public does not apply for an account type, and a new account must not
-  // inherit org fields from whatever was in the store before.
-  void useAuthStore.getState().register('new@example.gh', 'pw-long-enough', 'Ama K.');
+test('a registered account is a reporter unless an organisation was asked for', () => {
+  /*
+   * The public does not apply for an account type. `accountKind` and the
+   * organisation object are the *only* things that make the service create a
+   * pending organisation, so a plain registration must carry neither — a stray
+   * empty object here would apply to join the platform on somebody's behalf.
+   */
+  void useAuthStore
+    .getState()
+    .register({ email: 'new@example.gh', password: 'pw-long-enough', displayName: 'Ama K.' });
 
-  const call = mockRegister.mock.calls[0]![0] as { displayName: string };
+  const call = mockRegister.mock.calls[0]![0] as Record<string, unknown>;
   expect(call.displayName).toBe('Ama K.');
+  expect(call.accountKind).toBeUndefined();
+  expect(call.organisation).toBeUndefined();
+});
+
+test('an organisation registration names the organisation', () => {
+  /*
+   * `accountKind: 'organisation'` with a name is what makes the service create
+   * a pending organisation and an owner membership, so `/org/onboarding/*`
+   * works immediately. Without the name the service has nothing to create.
+   */
+  void useAuthStore.getState().register({
+    email: 'ops@ama.gov.gh',
+    password: 'pw-long-enough',
+    displayName: 'Ama Boateng',
+    organisation: { name: 'Accra Metropolitan Assembly', sector: 'government' },
+  });
+
+  expect(mockRegister.mock.calls[0]![0]).toEqual({
+    email: 'ops@ama.gov.gh',
+    password: 'pw-long-enough',
+    displayName: 'Ama Boateng',
+    accountKind: 'organisation',
+    organisation: { name: 'Accra Metropolitan Assembly', sector: 'government' },
+  });
 });
 
 test('the password is never used as a display name', () => {

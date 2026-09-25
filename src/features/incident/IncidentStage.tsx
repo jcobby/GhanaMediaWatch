@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { useEvent } from 'expo';
 import { Image } from 'expo-image';
@@ -40,6 +40,29 @@ import type { Incident } from '@/types/api';
  * overlaying the stage has to stay out of its way, or the controls exist and
  * cannot be pressed.
  */
+/**
+ * Holds the first URL a report is seen with, until a different report arrives.
+ *
+ * State adjusted during render rather than in an effect: React re-runs the
+ * component before committing, so the player is never created with the URL this
+ * is about to replace — an effect would recreate it one frame later, which is
+ * the restart being prevented.
+ */
+function useStableSource(incidentId: string, signed: string | null): string | null {
+  const [held, setHeld] = useState<{ id: string; url: string | null }>({
+    id: incidentId,
+    url: signed,
+  });
+
+  // A different report takes its own URL. The same report takes one only if it
+  // has none yet — the record can land after the first render.
+  if (held.id !== incidentId || (held.url === null && signed !== null)) {
+    setHeld({ id: incidentId, url: signed });
+  }
+
+  return held.id === incidentId ? held.url : signed;
+}
+
 export function IncidentStage({
   incident,
   onFailed,
@@ -75,7 +98,7 @@ export function IncidentStage({
   const playable = isVideo && !notMedia;
 
   /*
-   * The URL the player is given, or null.
+   * The URL as the most recent response signed it.
    *
    * Streamed straight from the service now that it answers byte ranges. The
    * whole file used to be downloaded to disk first — a few megabytes and a
@@ -85,7 +108,35 @@ export function IncidentStage({
    * Null for a photo and for anything too small to be footage, so the player is
    * never handed something it will sit on at 0:00.
    */
-  const source = playable && incident.media.url ? incident.media.url : null;
+  const signed = playable && incident.media.url ? incident.media.url : null;
+
+  /*
+   * One URL for as long as the report is on screen — which is what makes the
+   * scrubber hold.
+   *
+   * **Media URLs are signed, and re-signed on every response.**
+   * `/v1/media/{id}?exp=…&sig=…` comes back with a fresh deadline and therefore
+   * a fresh signature each time the record is fetched, so the *same frame of
+   * the same clip* arrives under a different URL every few seconds.
+   * `useVideoPlayer` replaces its item when the source string changes, and a
+   * replaced item starts at zero.
+   *
+   * So the video restarted underneath whoever was watching it: on the public
+   * detail screen every time the app came back to the foreground, and on the
+   * organisation's report screen every time the inbox refetched — which
+   * includes the moment a licence is bought, because that invalidates the list
+   * this screen reads from. Scrub to 0:45, tap License, and the clip you were
+   * paying for jumps back to 0:00.
+   *
+   * `Thumbnail` already carries the same fix for images, for the same reason,
+   * under the name `cacheKey`. The identity of media here is the report, not
+   * the signature.
+   *
+   * A signature that expires mid-watch — they last an hour, far longer than
+   * anyone spends on one report — surfaces as the `statusChange` error every
+   * other playback failure already does.
+   */
+  const source = useStableSource(incident.id, signed);
 
   /*
    * Called unconditionally, with a null source for a photo.

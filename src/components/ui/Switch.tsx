@@ -10,6 +10,15 @@ interface SwitchRowProps {
   value: boolean;
   onValueChange: (value: boolean) => void;
   disabled?: boolean;
+  /**
+   * `lg` matches the settings list's row size.
+   *
+   * The settings screen stacks these directly above `SettingRow`s, and at the
+   * default size the two read as two different lists — a 15px label under an
+   * 18px one, in the same panel. The capture screens keep the default: there a
+   * switch sits among form fields rather than among settings rows.
+   */
+  size?: 'md' | 'lg';
   className?: string;
 }
 
@@ -25,13 +34,26 @@ export function SwitchRow({
   value,
   onValueChange,
   disabled,
+  size = 'md',
   className,
 }: SwitchRowProps) {
   const c = useColors();
+  const large = size === 'lg';
   return (
-    <View className={cn('flex-row items-center gap-4 py-3', disabled && 'opacity-40', className)}>
+    <View
+      // Padding through `style` on the large variant: it has to line up with
+      // `SettingRow`, which measures itself the same way for the same reason —
+      // a spacing class this project has not used before is absent from the
+      // compiled stylesheet until Metro restarts, silently.
+      style={large ? { paddingVertical: 18, minHeight: 76 } : undefined}
+      className={cn(
+        large ? 'flex-row items-center gap-4' : 'flex-row items-center gap-4 py-3',
+        disabled && 'opacity-40',
+        className,
+      )}
+    >
       <View className="flex-1 gap-0.5">
-        <Text variant="body" className="font-sans-medium">
+        <Text variant={large ? 'title-md' : 'body'} className={large ? '' : 'font-sans-medium'}>
           {label}
         </Text>
         {description ? (

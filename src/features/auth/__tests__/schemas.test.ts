@@ -1,6 +1,9 @@
 import { forgotPasswordSchema, passwordStrength, signInSchema, signUpSchema } from '../schemas';
 
 const validSignUp = {
+  // Asked before anything else on the screen: it decides what the rest of the
+  // form collects and what the service creates.
+  accountKind: 'reporter' as const,
   displayName: 'Ama Kufuor',
   email: 'ama@example.gh',
   password: 'correct horse battery',
@@ -59,6 +62,22 @@ describe('sign up', () => {
       // field makes people retype the password they got right.
       expect(result.error.issues[0]!.path).toEqual(['confirmPassword']);
     }
+  });
+
+  it('asks an organisation for its name, and a reporter for nothing extra', () => {
+    /*
+     * The name is what the service creates the pending organisation from —
+     * `organisation.name` is its only required field — so an application
+     * without one has nothing to review. A reporter never sees the field, and a
+     * blanket rule would block them on something they were never shown.
+     */
+    const asOrg = { ...validSignUp, accountKind: 'organisation' as const };
+    expect(signUpSchema.safeParse(asOrg).success).toBe(false);
+    expect(
+      signUpSchema.safeParse({ ...asOrg, organisationName: 'Accra Metropolitan Assembly' }).success,
+    ).toBe(true);
+    // The same submission as a reporter needs no organisation at all.
+    expect(signUpSchema.safeParse(validSignUp).success).toBe(true);
   });
 
   it('rejects a password under ten characters', () => {

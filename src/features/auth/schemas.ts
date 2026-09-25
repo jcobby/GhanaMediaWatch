@@ -40,13 +40,49 @@ export const signInSchema = z.object({
   password: z.string().min(1, 'Enter your password'),
 });
 
+/**
+ * What kind of account is being created.
+ *
+ * Not a preference — the two produce different things on the service. A
+ * `reporter` gets an account and can file immediately; an `organisation` gets a
+ * *pending* organisation that a platform administrator has to approve before it
+ * can reach anything.
+ */
+export const ACCOUNT_KINDS = ['reporter', 'organisation'] as const;
+export type SignUpKind = (typeof ACCOUNT_KINDS)[number];
+
 export const signUpSchema = z
   .object({
+    /*
+     * Required, and answered before anything is typed.
+     *
+     * Not `.default('reporter')`, tempting as that is: a zod default makes the
+     * parsed output required while the input stays optional, and
+     * react-hook-form then types the form on one and the resolver on the other.
+     * The form always supplies this — it is the first thing the screen asks —
+     * so there is nothing for a default to rescue.
+     *
+     * The service's own default lives where it belongs, at the boundary:
+     * `http.ts` omits `accountKind` unless one was chosen, and `/auth/register`
+     * reads an absent one as a reporter.
+     */
+    accountKind: z.enum(ACCOUNT_KINDS),
     displayName: z
       .string()
       .trim()
       .min(2, 'Enter a name people will see on your reports')
       .max(40, 'Keep this under 40 characters'),
+    /**
+     * The institution's own name, as it should appear on the platform.
+     *
+     * Optional in the schema and required by the refinement below, because it
+     * is only asked of an organisation — a reporter never sees the field, and a
+     * blanket `min(2)` would block them on something they were never shown.
+     */
+    organisationName: z.string().trim().max(80, 'Keep this under 80 characters').optional(),
+    organisationSector: z
+      .enum(['government', 'media', 'utility', 'insurance', 'ngo', 'research', 'other'])
+      .optional(),
     email: emailSchema,
     password: passwordSchema,
     confirmPassword: z.string(),
@@ -56,7 +92,14 @@ export const signUpSchema = z
   .refine((data) => data.password === data.confirmPassword, {
     message: 'Both passwords need to match',
     path: ['confirmPassword'],
-  });
+  })
+  .refine(
+    (data) => data.accountKind !== 'organisation' || (data.organisationName ?? '').length >= 2,
+    {
+      message: 'Enter the name of the organisation',
+      path: ['organisationName'],
+    },
+  );
 
 export const forgotPasswordSchema = z.object({ email: emailSchema });
 

@@ -3,7 +3,8 @@ import { Alert, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Button, Glass, Pressable, Sheet, Text } from '@/components/ui';
+import { Button, Glass, Sheet, Text } from '@/components/ui';
+import { SettingRow } from '@/components/SettingRow';
 import { AuthField } from '@/features/auth/AuthField';
 import { passwordSchema } from '@/features/auth/schemas';
 import { api } from '@/api';
@@ -135,7 +136,7 @@ export function AccountSettings() {
           {t('account.title')}
         </Text>
         <Glass elevation="low" className="gap-0 rounded-lg">
-          <Row
+          <SettingRow
             icon="person-outline"
             label={t('account.displayName')}
             value={profile.displayName}
@@ -145,7 +146,7 @@ export function AccountSettings() {
               setNameOpen(true);
             }}
           />
-          <Row
+          <SettingRow
             icon="key-outline"
             label={t('account.changePassword')}
             onPress={() => {
@@ -153,10 +154,11 @@ export function AccountSettings() {
               setPasswordOpen(true);
             }}
           />
-          <Row
+          <SettingRow
             icon="trash-outline"
             label={deleting ? t('account.deleting') : t('account.delete')}
             danger
+            divider={false}
             onPress={deleting ? undefined : confirmDelete}
           />
         </Glass>
@@ -240,36 +242,5 @@ export function AccountSettings() {
   );
 }
 
-function Row({
-  icon,
-  label,
-  value,
-  danger,
-  onPress,
-}: {
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
-  value?: string;
-  danger?: boolean;
-  onPress?: () => void;
-}) {
-  const c = useColors();
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityLabel={label}
-      className="flex-row items-center gap-3 border-b border-hairline/[0.08] px-4 py-3.5"
-    >
-      <Ionicons name={icon} size={18} color={danger ? c.danger : c.textMuted} />
-      <Text variant="body" tone={danger ? 'danger' : 'primary'} className="flex-1">
-        {label}
-      </Text>
-      {value ? (
-        <Text variant="body-sm" tone="muted" numberOfLines={1} className="max-w-[45%]">
-          {value}
-        </Text>
-      ) : null}
-      <Ionicons name="chevron-forward" size={15} color={c.textFaint} />
-    </Pressable>
-  );
-}
+/* The row itself is `components/SettingRow`, shared with the settings list this
+   panel sits inside and with the organisation's account screen. */

@@ -50,6 +50,41 @@ const ENUM_NAMESPACES = [
   'organisations.tab',
   'profile.mark',
   'review.handling',
+  /*
+   * The organisation app's enumerations, each reached as `t(`org.x.${value}`)`
+   * over a closed union in `types/org.ts` — the assignment ladder, the response
+   * actions an organisation can send a reporter, its internal statuses, the
+   * inbox filter, the roles the service grants, and the plan's tier and billing
+   * state.
+   *
+   * Named one namespace at a time rather than allowing `org.*`, which is the
+   * whole point of this list: the rest of that namespace is ordinary static copy
+   * and a dead key in it must still be caught.
+   */
+  'org.assignment',
+  'org.filter',
+  'org.response',
+  'org.role',
+  'org.status',
+  'org.subscription',
+  'org.tierName',
+  /*
+   * The organisation's application to join, which is entirely enum-driven: the
+   * steps, their help text, every field and its placeholder, the document
+   * types and the step statuses are all reached as `t(`apply.x.${value}`)` over
+   * the closed lists in `types/onboarding.ts`. `organisationSignUp.test.ts`
+   * asserts each of those lists has words for every member, which is the check
+   * that actually has teeth here.
+   */
+  'apply.document',
+  'apply.field',
+  'apply.placeholder',
+  'apply.status',
+  'apply.step',
+  'apply.stepHelp',
+  // Reporter or organisation, on the sign-up screen.
+  'auth.kind',
+  'auth.kindHelp',
 ];
 
 /**
@@ -114,11 +149,17 @@ function sourceFiles(dir: string, out: string[] = []): string[] {
  * that work is never coming back to the phone, deleting these namespaces is a
  * separate and deliberate change.
  */
+/*
+ * `org` has come off this list. The organisation's field work is on the phone
+ * again — the routed inbox, licences, dispatch and the account behind them —
+ * so that namespace is live copy and its dead keys must be caught like any
+ * other. The copy for the *console's* organisation screens, which did not come
+ * back, is still here under its own namespaces.
+ */
 const MOVED_TO_CONSOLE = [
   'organisation',
   'organisationAccount',
   'organisationTabs',
-  'org',
   'platformTabs',
   'platform',
   'routing',

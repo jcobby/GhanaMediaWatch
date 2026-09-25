@@ -6,13 +6,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Button, Pressable, Text } from '@/components/ui';
+import { Button, Chip, Pressable, Text } from '@/components/ui';
 import { useColors } from '@/lib/theme';
+import { homeRouteFor } from '@/lib/homeRoute';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 import { hapticUnlock } from '@/lib/haptics';
+import { ORGANISATION_SECTORS } from '@/types/dawuro';
 import { AuthField } from './AuthField';
-import { passwordStrength, signUpSchema, type SignUpValues } from './schemas';
+import { GoogleButton } from './GoogleButton';
+import { ACCOUNT_KINDS, passwordStrength, signUpSchema, type SignUpValues } from './schemas';
 
 const STRENGTH_LABEL = ['tooShort', 'weak', 'good', 'strong'] as const;
 const STRENGTH_CLASS = ['bg-danger', 'bg-warning', 'bg-info', 'bg-success'] as const;
@@ -25,10 +28,13 @@ export function SignUpScreen() {
   const register = useAuthStore((s) => s.register);
   const [submitting, setSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState } = useForm<SignUpValues>({
+  const { control, handleSubmit, formState, setValue } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
+      accountKind: 'reporter',
       displayName: '',
+      organisationName: '',
+      organisationSector: 'other',
       email: '',
       password: '',
       confirmPassword: '',
@@ -50,12 +56,33 @@ export function SignUpScreen() {
    */
   const password = useWatch({ control, name: 'password' });
   const accepted = useWatch({ control, name: 'acceptedTerms' });
+  const kind = useWatch({ control, name: 'accountKind' });
+  const sector = useWatch({ control, name: 'organisationSector' });
   const strength = passwordStrength(password);
+  const isOrganisation = kind === 'organisation';
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitting(true);
     try {
-      await register(values.email, values.password, values.displayName);
+      await register({
+        email: values.email,
+        password: values.password,
+        displayName: values.displayName,
+        /*
+         * The organisation half is sent only when one was asked for. The
+         * service reads its presence as "create a pending organisation", so a
+         * stray empty object on a reporter's registration would apply on their
+         * behalf to join the platform.
+         */
+        ...(values.accountKind === 'organisation'
+          ? {
+              organisation: {
+                name: (values.organisationName ?? '').trim(),
+                sector: values.organisationSector ?? 'other',
+              },
+            }
+          : {}),
+      });
 
       /*
        * Say that it worked.
@@ -66,8 +93,20 @@ export function SignUpScreen() {
        * without me", and the natural response is to go back and try again.
        */
       hapticUnlock();
-      toast.success(t('auth.accountCreatedTitle'), t('auth.accountCreatedBody'));
-      router.replace('/(tabs)');
+      /*
+       * And say which of the two things happened. A reporter has an account and
+       * can file now; an organisation has an *application* that a person has to
+       * approve, and telling it "account created" would promise access it does
+       * not have.
+       */
+      if (values.accountKind === 'organisation') {
+        toast.success(t('auth.applicationStartedTitle'), t('auth.applicationStartedBody'));
+      } else {
+        toast.success(t('auth.accountCreatedTitle'), t('auth.accountCreatedBody'));
+      }
+      // The store has read `/me` by now, so this lands on the onboarding
+      // application for an organisation and on the feed for a reporter.
+      router.replace(homeRouteFor(useAuthStore.getState().profile));
     } catch (cause) {
       toast.error(
         t('auth.signUpFailed'),
@@ -101,21 +140,114 @@ export function SignUpScreen() {
         </View>
 
         <Text variant="body" tone="muted">
-          {t('auth.signUpSubtitle')}
+          {isOrganisation ? t('auth.signUpOrgSubtitle') : t('auth.signUpSubtitle')}
         </Text>
 
+        {/*
+          Which of the two accounts this is, chosen before anything is typed.
+
+          Not a checkbox at the bottom: the answer changes what the form asks
+          for, what the service creates, and where the app goes next. An
+          organisation's registration opens an application that a platform
+          administrator reviews — it is not a faster way to get the same account.
+        */}
+        <Controller
+          control={control}
+          name="accountKind"
+          render={({ field: { onChange } }) => (
+            <View className="gap-2">
+              {ACCOUNT_KINDS.map((value) => {
+                const on = kind === value;
+                return (
+                  <Pressable
+                    key={value}
+                    onPress={() => onChange(value)}
+                    accessibilityRole="radio"
+                    accessibilityState={{ selected: on }}
+                    accessibilityLabel={t(`auth.kind.${value}`)}
+                    style={{ minHeight: 76, paddingVertical: 14, paddingHorizontal: 16 }}
+                    className={
+                      on
+                        ? 'flex-row items-center gap-3 rounded-lg border border-accent/60 bg-accent-wash'
+                        : 'flex-row items-center gap-3 rounded-lg border border-hairline/[0.12]'
+                    }
+                  >
+                    <Ionicons
+                      name={value === 'organisation' ? 'business-outline' : 'person-outline'}
+                      size={22}
+                      color={on ? c.accent : c.textMuted}
+                    />
+                    <View className="flex-1">
+                      <Text variant="title-sm">{t(`auth.kind.${value}`)}</Text>
+                      <Text variant="caption" tone="muted">
+                        {t(`auth.kindHelp.${value}`)}
+                      </Text>
+                    </View>
+                    {on ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
+                  </Pressable>
+                );
+              })}
+            </View>
+          )}
+        />
+
         <View className="gap-4">
+          {isOrganisation ? (
+            <>
+              <Controller
+                control={control}
+                name="organisationName"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <AuthField
+                    label={t('auth.organisationName')}
+                    value={value ?? ''}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={formState.errors.organisationName?.message}
+                    placeholder={t('auth.organisationNamePlaceholder')}
+                    autoCapitalize="words"
+                    maxLength={80}
+                  />
+                )}
+              />
+              {/*
+                Sector, as chips rather than a picker. Seven values, and the one
+                a person wants is usually visible without opening anything.
+              */}
+              <View className="gap-2">
+                <Text variant="label" tone="muted">
+                  {t('auth.organisationSector')}
+                </Text>
+                <View className="flex-row flex-wrap gap-2">
+                  {ORGANISATION_SECTORS.map((value) => (
+                    <Chip
+                      key={value}
+                      label={t(`sector.${value}`)}
+                      selected={sector === value}
+                      onPress={() => setValue('organisationSector', value)}
+                    />
+                  ))}
+                </View>
+              </View>
+            </>
+          ) : null}
           <Controller
             control={control}
             name="displayName"
             render={({ field: { onChange, onBlur, value } }) => (
               <AuthField
-                label={t('auth.displayName')}
+                // For an organisation this is the person signing up, not the
+                // institution — the institution has its own field above.
+                label={isOrganisation ? t('auth.yourName') : t('auth.displayName')}
                 value={value}
                 onChangeText={onChange}
                 onBlur={onBlur}
                 error={formState.errors.displayName?.message}
-                placeholder={t('auth.displayNamePlaceholder')}
+                placeholder={
+                  isOrganisation
+                    ? t('auth.yourNamePlaceholder')
+                    : t('auth.displayNamePlaceholder')
+                }
                 autoCapitalize="words"
                 autoComplete="name"
               />
@@ -234,6 +366,17 @@ export function SignUpScreen() {
           loading={submitting}
           onPress={handleSubmit(onSubmit)}
         />
+
+        {/*
+          Offered to a reporter only.
+
+          A Google account creates a *person's* account — `/auth/google` takes
+          no organisation, so there is nothing for it to apply with. An
+          institution registers with the form above and then works through the
+          application; putting the button here would be a shortcut that quietly
+          produces the wrong kind of account.
+        */}
+        {!isOrganisation ? <GoogleButton /> : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

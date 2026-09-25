@@ -24,6 +24,21 @@ export function formatRelativeTime(iso: string | null): string | null {
     .replace(/ years?/, 'y');
 }
 
+/**
+ * "18 Sep", or "18 Sep 2025" once the year stops being obvious.
+ *
+ * For dates that are a record rather than a countdown — when a licence was
+ * bought, when a plan renews. `formatRelativeTime` is wrong for those: "4mo" is
+ * a useful answer about a report somebody is looking for and a useless one on a
+ * receipt, where the question is which day it was.
+ */
+export function formatDate(iso: string | null): string | null {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return format(date, isThisYear(date) ? 'd MMM' : 'd MMM yyyy');
+}
+
 /** "820 m" under a kilometre, "5.2 km" above. */
 export function formatDistance(metres: number): string {
   if (!Number.isFinite(metres) || metres < 0) return '';

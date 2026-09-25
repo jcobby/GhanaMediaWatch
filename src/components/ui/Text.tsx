@@ -19,6 +19,14 @@ export type TextTone =
   | 'secondary'
   | 'muted'
   | 'faint'
+  /**
+   * Fixed white, for a label sitting on an accent fill.
+   *
+   * Distinct from `onMedia`, which also forces white but adds a shadow for
+   * unpredictable photography. A button's fill is a known colour, so the shadow
+   * would be a smudge under the label rather than the thing making it readable.
+   */
+  | 'on-dark'
   | 'accent'
   | 'success'
   | 'warning'
@@ -44,6 +52,7 @@ const TONE_CLASS: Record<TextTone, string> = {
   secondary: 'text-text-secondary',
   muted: 'text-text-muted',
   faint: 'text-text-faint',
+  'on-dark': 'text-text-on-dark',
   accent: 'text-accent',
   success: 'text-success',
   warning: 'text-warning',

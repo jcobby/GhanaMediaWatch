@@ -58,6 +58,23 @@ export const SUBMISSION_DESTINATIONS: readonly SubmissionDestination[] = [
 export type OrganisationSector =
   'government' | 'media' | 'utility' | 'insurance' | 'ngo' | 'research' | 'other';
 
+/**
+ * Enumerated so registration can offer them, `other` last.
+ *
+ * It is the service's default for an omitted sector, and it is the answer
+ * somebody picks when none of the others fit — both of which put it at the end
+ * rather than in the middle of the list.
+ */
+export const ORGANISATION_SECTORS: readonly OrganisationSector[] = [
+  'government',
+  'media',
+  'utility',
+  'insurance',
+  'ngo',
+  'research',
+  'other',
+];
+
 export type SubscriptionTier = 'basic' | 'standard' | 'enterprise';
 
 export type BillingPeriod = 'monthly' | 'annual';
