@@ -142,3 +142,54 @@ test('every opacity modifier used in the app actually compiles', () => {
 
   expect(missing).toEqual([]);
 });
+
+test('every colour class used in the app actually compiles', () => {
+  /*
+   * The same failure as the opacity check above, one step wider, and it shipped
+   * black text on the blue button.
+   *
+   * `text-text-on-dark` is a real token in `tailwind.config.js` — and NativeWind
+   * builds this stylesheet from the class names it finds in `src`, so a token
+   * no file had ever used produced no rule. The label matched nothing, took no
+   * colour at all, and fell back to the platform default: near-black on the
+   * primary button's blue fill, which is precisely what the tone was added to
+   * prevent. No error, no warning, and every other check passed.
+   *
+   * Colour classes are the ones worth pinning: a missing size collapses a box
+   * and somebody sees it, while a missing colour renders as *a* colour and
+   * reads as a deliberate choice.
+   */
+  const defined = new Set<string>();
+  const SELECTOR = new RegExp(String.raw`\.((?:[A-Za-z0-9_-]|\\.)+)`, 'g');
+  const ESCAPE = new RegExp(String.raw`\\(.)`, 'g');
+  for (const m of compiledCss.matchAll(SELECTOR)) {
+    defined.add(m[1]!.replace(ESCAPE, '$1'));
+  }
+
+  /** `text-*`, `bg-*` and `border-*` against a named token, no modifier. */
+  const COLOUR = /^(?:text|bg|border)-[a-z][a-z0-9-]*$/;
+
+  const used = new Map<string, string>();
+  (function walk(dir: string) {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const f = path.join(dir, e.name);
+      if (e.isDirectory()) walk(f);
+      else if (/\.tsx?$/.test(e.name) && !f.includes('__tests__')) {
+        const src = fs.readFileSync(f, 'utf8');
+        for (const m of src.matchAll(/className=\{?["'`]([^"'`]*)["'`]/g)) {
+          for (const cls of m[1]!.split(/\s+/)) {
+            if (COLOUR.test(cls) && !used.has(cls)) used.set(cls, f);
+          }
+        }
+      }
+    }
+  })(path.join(ROOT, 'src'));
+
+  expect(used.size).toBeGreaterThan(20);
+
+  const missing = [...used]
+    .filter(([cls]) => !defined.has(cls))
+    .map(([cls, file]) => `${cls} (${path.relative(ROOT, file)})`);
+
+  expect(missing).toEqual([]);
+});

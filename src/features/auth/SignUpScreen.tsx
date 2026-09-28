@@ -13,9 +13,34 @@ import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 import { hapticUnlock } from '@/lib/haptics';
 import { ORGANISATION_SECTORS } from '@/types/dawuro';
+import { toGhanaMsisdn } from '@/lib/momo';
+import { leaveOrGoHome } from '@/lib/leaveOrGoHome';
+import { api } from '@/api';
 import { AuthField } from './AuthField';
 import { GoogleButton } from './GoogleButton';
-import { ACCOUNT_KINDS, passwordStrength, signUpSchema, type SignUpValues } from './schemas';
+import {
+  ACCOUNT_KINDS,
+  passwordStrength,
+  signUpSchema,
+  type SignUpKind,
+  type SignUpValues,
+} from './schemas';
+
+/**
+ * A glyph per account kind.
+ *
+ * A map rather than the ternary this replaced, which could only ever answer
+ * two things — adding a third kind to `ACCOUNT_KINDS` silently gave it the
+ * person icon and nobody would have noticed until a screenshot.
+ *
+ * The pen is deliberately not a person: a blogger *is* an individual, and two
+ * cards showing the same glyph is a choice the eye cannot make.
+ */
+const KIND_ICON: Record<SignUpKind, keyof typeof Ionicons.glyphMap> = {
+  reporter: 'person-outline',
+  blogger: 'create-outline',
+  organisation: 'business-outline',
+};
 
 const STRENGTH_LABEL = ['tooShort', 'weak', 'good', 'strong'] as const;
 const STRENGTH_CLASS = ['bg-danger', 'bg-warning', 'bg-info', 'bg-success'] as const;
@@ -28,13 +53,34 @@ export function SignUpScreen() {
   const register = useAuthStore((s) => s.register);
   const [submitting, setSubmitting] = useState(false);
 
-  const { control, handleSubmit, formState, setValue } = useForm<SignUpValues>({
+  /**
+   * Which half of the form is on screen.
+   *
+   * Two steps rather than one long scroll, because the first question is a
+   * fork and not a field: an organisation's registration opens an application
+   * that a platform administrator reviews, and the form below it changes shape
+   * around the answer. Asked among eight inputs it read as the first of them.
+   */
+  /*
+   * A reporter is asked for three things in turn; an organisation for two.
+   *
+   * `payout` exists because a commission with no wallet behind it is held
+   * rather than paid, and the number used to be collected on the earnings
+   * screen — which somebody opens *after* they have earned something and
+   * wondered where it went. An organisation never sees it: it pays for
+   * subscriptions rather than receiving commissions, and there is nothing on
+   * the service to attach a payment method to at registration.
+   */
+  const [step, setStep] = useState<'kind' | 'details' | 'payout'>('kind');
+
+  const { control, handleSubmit, formState, setValue, trigger } = useForm<SignUpValues>({
     resolver: zodResolver(signUpSchema),
     defaultValues: {
       accountKind: 'reporter',
       displayName: '',
       organisationName: '',
       organisationSector: 'other',
+      payoutMsisdn: '',
       email: '',
       password: '',
       confirmPassword: '',
@@ -58,8 +104,14 @@ export function SignUpScreen() {
   const accepted = useWatch({ control, name: 'acceptedTerms' });
   const kind = useWatch({ control, name: 'accountKind' });
   const sector = useWatch({ control, name: 'organisationSector' });
+  const payoutTyped = useWatch({ control, name: 'payoutMsisdn' });
   const strength = passwordStrength(password);
   const isOrganisation = kind === 'organisation';
+  /** The number as the service stores it, or null while it is still wrong. */
+  const payoutMsisdn = toGhanaMsisdn(payoutTyped ?? '');
+
+  /** The step before this one, for the back button and the header. */
+  const previousStep = step === 'payout' ? 'details' : 'kind';
 
   const onSubmit = async (values: SignUpValues) => {
     setSubmitting(true);
@@ -81,7 +133,15 @@ export function SignUpScreen() {
                 sector: values.organisationSector ?? 'other',
               },
             }
-          : {}),
+          : values.accountKind === 'blogger'
+            ? /*
+               * `blogger` creates the same account a reporter gets plus a
+               * verification application — `GET /me/verification` answers with
+               * one the moment this returns. It is not an organisation: no
+               * membership, no inbox, nothing routed to them.
+               */
+              { accountKind: 'blogger' as const }
+            : {}),
       });
 
       /*
@@ -92,6 +152,35 @@ export function SignUpScreen() {
        * twice has no way to tell "account created" from "the app moved on
        * without me", and the natural response is to go back and try again.
        */
+      /*
+       * The wallet, once there is an account to hang it on.
+       *
+       * Two calls rather than one: `/auth/register` takes no payout number, so
+       * this is `PUT /me/payout-msisdn` against the session the registration
+       * just minted. That ordering matters for the failure case below — by the
+       * time this can fail, the account already exists.
+       */
+      if (values.accountKind !== 'organisation') {
+        const msisdn = toGhanaMsisdn(values.payoutMsisdn ?? '');
+        if (msisdn) {
+          try {
+            await api.setPayoutNumber(msisdn);
+          } catch {
+            /*
+             * The account is not thrown away over this.
+             *
+             * Treating a failed payout save as a failed registration would
+             * strand somebody whose account exists and whose password they
+             * have just chosen: the retry would answer "that email is already
+             * taken", which is true and useless. They are let through with the
+             * one thing they need to know — commissions are held until the
+             * number is on file, and Earnings is where to put it.
+             */
+            toast.error(t('auth.payoutSaveFailedTitle'), t('auth.payoutSaveFailedBody'));
+          }
+        }
+      }
+
       hapticUnlock();
       /*
        * And say which of the two things happened. A reporter has an account and
@@ -99,8 +188,19 @@ export function SignUpScreen() {
        * approve, and telling it "account created" would promise access it does
        * not have.
        */
+      /*
+       * Three endings, because three things just happened.
+       *
+       * An organisation has an *application* and no access until somebody
+       * approves it. A blogger has a working account **and** an application —
+       * telling them only "account created" would hide the second half, and
+       * telling them "application started" would imply they cannot file yet,
+       * which is the opposite of true.
+       */
       if (values.accountKind === 'organisation') {
         toast.success(t('auth.applicationStartedTitle'), t('auth.applicationStartedBody'));
+      } else if (values.accountKind === 'blogger') {
+        toast.success(t('auth.bloggerCreatedTitle'), t('auth.bloggerCreatedBody'));
       } else {
         toast.success(t('auth.accountCreatedTitle'), t('auth.accountCreatedBody'));
       }
@@ -130,7 +230,10 @@ export function SignUpScreen() {
       >
         <View className="flex-row items-center gap-3">
           <Pressable
-            onPress={() => router.back()}
+            /* Back goes to the choice first, and out of the screen only from
+               there — so changing your mind about the kind of account does not
+               mean starting the whole flow again. */
+            onPress={() => (step === 'kind' ? leaveOrGoHome() : setStep(previousStep))}
             accessibilityLabel={t('common.back')}
             className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
           >
@@ -140,57 +243,78 @@ export function SignUpScreen() {
         </View>
 
         <Text variant="body" tone="muted">
-          {isOrganisation ? t('auth.signUpOrgSubtitle') : t('auth.signUpSubtitle')}
+          {step === 'kind'
+            ? t('auth.kindQuestion')
+            : step === 'payout'
+              ? t('auth.payoutQuestion')
+              : isOrganisation
+                ? t('auth.signUpOrgSubtitle')
+                : t('auth.signUpSubtitle')}
         </Text>
 
         {/*
-          Which of the two accounts this is, chosen before anything is typed.
+          Step one, on its own screen.
 
-          Not a checkbox at the bottom: the answer changes what the form asks
-          for, what the service creates, and where the app goes next. An
-          organisation's registration opens an application that a platform
-          administrator reviews — it is not a faster way to get the same account.
+          It was a pair of cards above the form, which made it look like the
+          first of eight fields rather than the fork it is: the answer decides
+          what the rest of the form asks for, what the service creates, and
+          where the app goes next. An organisation's registration opens an
+          application a platform administrator reviews — it is not a faster way
+          to get the same account. Asking it alone, with nothing else on screen,
+          is what makes that read as a decision.
         */}
-        <Controller
-          control={control}
-          name="accountKind"
-          render={({ field: { onChange } }) => (
-            <View className="gap-2">
-              {ACCOUNT_KINDS.map((value) => {
-                const on = kind === value;
-                return (
-                  <Pressable
-                    key={value}
-                    onPress={() => onChange(value)}
-                    accessibilityRole="radio"
-                    accessibilityState={{ selected: on }}
-                    accessibilityLabel={t(`auth.kind.${value}`)}
-                    style={{ minHeight: 76, paddingVertical: 14, paddingHorizontal: 16 }}
-                    className={
-                      on
-                        ? 'flex-row items-center gap-3 rounded-lg border border-accent/60 bg-accent-wash'
-                        : 'flex-row items-center gap-3 rounded-lg border border-hairline/[0.12]'
-                    }
-                  >
-                    <Ionicons
-                      name={value === 'organisation' ? 'business-outline' : 'person-outline'}
-                      size={22}
-                      color={on ? c.accent : c.textMuted}
-                    />
-                    <View className="flex-1">
-                      <Text variant="title-sm">{t(`auth.kind.${value}`)}</Text>
-                      <Text variant="caption" tone="muted">
-                        {t(`auth.kindHelp.${value}`)}
-                      </Text>
-                    </View>
-                    {on ? <Ionicons name="checkmark" size={18} color={c.accent} /> : null}
-                  </Pressable>
-                );
-              })}
-            </View>
-          )}
-        />
+        {step === 'kind' ? (
+          <Controller
+            control={control}
+            name="accountKind"
+            render={({ field: { onChange } }) => (
+              <View className="gap-3">
+                {ACCOUNT_KINDS.map((value) => {
+                  const on = kind === value;
+                  return (
+                    <Pressable
+                      key={value}
+                      onPress={() => onChange(value)}
+                      accessibilityRole="radio"
+                      accessibilityState={{ selected: on }}
+                      accessibilityLabel={t(`auth.kind.${value}`)}
+                      style={{ minHeight: 96, paddingVertical: 18, paddingHorizontal: 18 }}
+                      className={
+                        on
+                          ? 'flex-row items-center gap-4 rounded-lg border border-accent/60 bg-accent-wash'
+                          : 'flex-row items-center gap-4 rounded-lg border border-hairline/[0.12]'
+                      }
+                    >
+                      <Ionicons
+                        name={KIND_ICON[value]}
+                        size={26}
+                        color={on ? c.accent : c.textMuted}
+                      />
+                      <View className="flex-1 gap-1">
+                        <Text variant="title-md">{t(`auth.kind.${value}`)}</Text>
+                        <Text variant="body-sm" tone="muted">
+                          {t(`auth.kindHelp.${value}`)}
+                        </Text>
+                      </View>
+                      {on ? <Ionicons name="checkmark" size={20} color={c.accent} /> : null}
+                    </Pressable>
+                  );
+                })}
 
+                <Button
+                  label={t('common.continue')}
+                  size="lg"
+                  fullWidth
+                  onPress={() => setStep('details')}
+                  trailing={<Ionicons name="arrow-forward" size={18} color={c.textOnDark} />}
+                />
+              </View>
+            )}
+          />
+        ) : null}
+
+        {step === 'details' ? (
+          <>
         <View className="gap-4">
           {isOrganisation ? (
             <>
@@ -359,24 +483,128 @@ export function SignUpScreen() {
           </Text>
         ) : null}
 
+        {/*
+          The last step for an organisation, the second of three for a reporter.
+
+          `trigger` on the fields this step owns, rather than `handleSubmit`:
+          the form's resolver validates the whole schema, and submitting from
+          here would fail on a payout number the person has not been shown yet
+          — an error on a field that is not on screen, which reads as the
+          button being broken.
+        */}
         <Button
-          label={t('auth.createAccount')}
+          label={isOrganisation ? t('auth.createAccount') : t('common.continue')}
           size="lg"
           fullWidth
           loading={submitting}
-          onPress={handleSubmit(onSubmit)}
+          trailing={
+            isOrganisation ? undefined : (
+              <Ionicons name="arrow-forward" size={18} color={c.textOnDark} />
+            )
+          }
+          onPress={() => {
+            if (isOrganisation) {
+              void handleSubmit(onSubmit)();
+              return;
+            }
+            void trigger(['displayName', 'email', 'password', 'confirmPassword', 'acceptedTerms'])
+              .then((ok) => {
+                if (ok) setStep('payout');
+              });
+          }}
         />
 
         {/*
-          Offered to a reporter only.
+          Offered to a plain reporter only, and to neither of the other two.
 
-          A Google account creates a *person's* account — `/auth/google` takes
-          no organisation, so there is nothing for it to apply with. An
-          institution registers with the form above and then works through the
-          application; putting the button here would be a shortcut that quietly
-          produces the wrong kind of account.
+          `/auth/google` takes an identity and nothing else: no organisation, no
+          `accountKind`, and it answers with tokens alone — no flag saying
+          whether the account was just created. So it can only ever make a plain
+          reporter.
+
+          For an institution that was always obvious. For a blogger it was not,
+          and it was worse: the card said "A blogger", the button sat directly
+          under it, and tapping it produced a reporter with no verification
+          application and no payout number — the two things the whole choice
+          exists to set up — with nothing on screen ever saying so. A shortcut
+          that quietly produces the wrong kind of account is worse than no
+          shortcut, and it is worst when the label above it promised otherwise.
+
+          Restoring it for bloggers needs `accountKind` on `/auth/google`, which
+          is item **X** in the console repo's `BACKEND-REQUESTS.md`.
         */}
-        {!isOrganisation ? <GoogleButton /> : null}
+        {kind === 'reporter' ? <GoogleButton /> : null}
+          </>
+        ) : null}
+
+        {/*
+          Step three: where the money goes.
+
+          On its own screen for the same reason the account kind is — it is not
+          one more field among eight. A commission with no wallet behind it is
+          held, and a reporter who discovers that after their first licence has
+          already been let down once.
+
+          Reporters only. An organisation pays for subscriptions through the
+          checkout rather than receiving commissions, and the service has
+          nothing to attach a payment method to before one exists.
+        */}
+        {step === 'payout' ? (
+          <View className="gap-6">
+            <Controller
+              control={control}
+              name="payoutMsisdn"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <View className="gap-2">
+                  <AuthField
+                    label={t('auth.payoutLabel')}
+                    value={value ?? ''}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={formState.errors.payoutMsisdn?.message}
+                    placeholder={t('auth.payoutPlaceholder')}
+                    keyboardType="phone-pad"
+                    autoComplete="tel"
+                    maxLength={20}
+                  />
+                  {/*
+                    The number as the service will store it, shown the moment it
+                    is recognised. `024 123 4567` and `+233 24 123 4567` are the
+                    same wallet, and seeing it normalised is how somebody knows
+                    the app understood them rather than merely accepted keystrokes.
+                  */}
+                  {payoutMsisdn ? (
+                    <View className="flex-row items-center gap-1.5">
+                      <Ionicons name="checkmark-circle" size={14} color={c.success} />
+                      <Text variant="caption" tone="success">
+                        {payoutMsisdn}
+                      </Text>
+                    </View>
+                  ) : null}
+                  <Text variant="body-sm" tone="muted">
+                    {t('auth.payoutHelp')}
+                  </Text>
+                </View>
+              )}
+            />
+
+            <View className="flex-row items-start gap-2.5 rounded-lg bg-canvas-raise p-3.5">
+              <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
+              <Text variant="caption" tone="muted" className="flex-1">
+                {t('auth.payoutWhyNow')}
+              </Text>
+            </View>
+
+            <Button
+              label={t('auth.createAccount')}
+              size="lg"
+              fullWidth
+              loading={submitting}
+              disabled={!payoutMsisdn}
+              onPress={handleSubmit(onSubmit)}
+            />
+          </View>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );

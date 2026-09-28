@@ -44,15 +44,6 @@ export function OrgInboxScreen() {
 
   const items = useMemo(() => data?.items ?? [], [data]);
 
-  const counts = useMemo(
-    () => ({
-      new: items.filter((i) => !i.licensed).length,
-      licensed: items.filter((i) => i.licensed).length,
-      all: items.length,
-    }),
-    [items],
-  );
-
   const shown = useMemo(() => {
     if (filter === 'licensed') return items.filter((i) => i.licensed);
     if (filter === 'new') return items.filter((i) => !i.licensed);
@@ -108,10 +99,19 @@ export function OrgInboxScreen() {
         showsHorizontalScrollIndicator={false}
         contentContainerClassName="gap-2 px-4 pb-4"
       >
+        {/*
+          Filters, not counts.
+
+          They carried the number of matching rows *on the loaded page*, which
+          sat inches below tiles counting the whole organisation from
+          `/org/dashboard` — two different scopes, adjacent, disagreeing, with
+          nothing to say why. The tiles are the authoritative figures; a chip's
+          job is to narrow the list.
+        */}
         {(['new', 'licensed', 'all'] as const).map((value) => (
           <Chip
             key={value}
-            label={`${t(`org.filter.${value}`)} · ${counts[value]}`}
+            label={t(`org.filter.${value}`)}
             selected={filter === value}
             onPress={() => setFilter(value)}
           />

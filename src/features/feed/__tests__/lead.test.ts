@@ -24,16 +24,28 @@ const code = (rel: string) =>
     .replace(/\{\/\*[\s\S]*?\*\/\}/g, ' ')
     .replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
 
-test('the top stories are the top of the feed, not a score this client invented', () => {
+test('the top stories come from the newsroom, not from a score this client invented', () => {
   /*
-   * The server orders the feed, and for a desk the top of it *is* the lead —
-   * the judgement an editor already made when they published each one to a
-   * section. Ranking them again here would be the phone second-guessing the
-   * newsroom with a number it computed on its own.
+   * The rule has not changed; what the service offers has.
+   *
+   * This used to require `visible.slice(0, topStoryCount)` — the top of the
+   * feed — on the reasoning that the order was already the newsroom's and
+   * re-ranking it here would be the phone second-guessing them. That was right
+   * while the only signal was position. It is not any more: `PublicIncident`
+   * now carries `lead`, set on the console's Leading desk and expired by the
+   * service, so an editor's actual choice is on the wire. Taking the newest N
+   * stopped being deference and became overruling them.
+   *
+   * What must never come back is a ranking the phone computes for itself.
+   * `lead` first, then the service's own order to fill the slots, and no score
+   * anywhere.
    */
   const screen = code('features/feed/FeedScreen.tsx');
-  expect(screen).toMatch(/visible\.slice\(0, topStoryCount\)/);
-  expect(screen).toMatch(/rows = useMemo\(\(\) => visible\.slice\(leading\.length\)/);
+  expect(screen).toMatch(/\.filter\(\(incident\) => incident\.lead\)/);
+  expect(screen).not.toMatch(/visible\.slice\(0, topStoryCount\)/);
+
+  // No engagement maths, no recency weighting, no "score" of any kind.
+  expect(screen).not.toMatch(/score|rank|weight|popularity/i);
 });
 
 test('a search has a first result, not a lead', () => {
@@ -478,23 +490,63 @@ describe('the feed is shaped like the news apps people already read', () => {
   const row = () => code('features/feed/FeedRow.tsx');
   const lead = () => code('features/feed/FeedLead.tsx');
 
-  test('the bar is a menu, the GNA mark and a title', () => {
+  test('the bar is a menu, the mark and the app’s own name', () => {
     expect(bar()).toMatch(/name="menu"/);
-    // The supplied lockup, on its own white tile: its lettering is dark and the
-    // bar is black, so laid straight on it the agency's name would vanish.
-    expect(bar()).toMatch(/<GnaHomeLogo height=\{24\}/);
     /*
-     * No tile: the mark's lettering is recoloured for a dark ground, so it sits
-     * straight on the black bar. A white badge on a black masthead was the
-     * supplied file's dark lettering showing through the workaround.
+     * **The mark belongs on the bar, not only on the screens nobody dwells on.**
+     *
+     * It was moved to the launch screen and the opening slide of the
+     * introduction — both of which are over in seconds — and taken off the one
+     * screen everybody opens and keeps open. The home masthead showed the word
+     * "Dawuro" and no mark at all.
+     *
+     * Reversed, because the bar is black and the gong-gong in the supplied
+     * artwork is drawn in near-neutral black: the standard file loses it
+     * entirely and silently, and it is the part of the mark the app is named
+     * after.
+     *
+     * 34 rather than 30. Rendered against the real bar at 3x, the drums and the
+     * gong-gong's frame collapse into a smudge below about 30pt of width; at 34
+     * both resolve, and a 29pt-tall mark still leaves room inside a 56pt bar.
      */
+    expect(bar()).toMatch(/<GnaMark size=\{34\} reversed/);
+    /*
+     * **The name on the masthead is Dawuro's, not the agency's.**
+     *
+     * This carried `GnaHomeLogo` — the Ghana News Agency wordmark — which says
+     * who stands behind the reports and never what the app is called. The name
+     * existed in `app.json` and nowhere a user could reach, so somebody looking
+     * at the home screen could not have told you what they had installed.
+     *
+     * Reversed, because the masthead is black. No tile behind it: a white badge
+     * on a black bar is what a dark-lettered logo forces, and type has no such
+     * problem.
+     */
+    expect(bar()).toMatch(/<DawuroWordmark size=\{22\} reversed/);
     expect(bar()).not.toMatch(/bg-white/);
-    // And it is the supplied wordmark, not the older lockup with the drums.
+    /*
+     * Set in the face the app actually loads. `font-display` maps to
+     * `Inter_800ExtraBold`, which `_layout.tsx` never registers — a wordmark
+     * built on it would render in the system face on every device, which is the
+     * one string that must not be left to a fallback.
+     */
     expect(code('components/Brand.tsx')).toMatch(
-      /GnaHomeLogo[\s\S]{0,600}assets\/brand\/gna-home\.png/,
+      /DawuroWordmark[\s\S]{0,900}Inter_700Bold/,
     );
-    // The mark alone: no word beside it naming the screen.
+    // No word beside it naming the screen.
     expect(bar()).not.toMatch(/feedsTitle/);
+
+    /*
+     * The skeleton draws the same lockup, at the same size and offset.
+     *
+     * This has been wrong twice before: a loading bar carrying a different mark
+     * from the real one means the first thing anybody sees is one logo
+     * replaced by another the moment the feed lands, which reads as the screen
+     * reloading. The skeleton is the masthead somebody stares at longest.
+     */
+    const skeleton = code('features/feed/FeedSkeleton.tsx');
+    expect(skeleton).toMatch(/<GnaMark size=\{34\} reversed style=\{\{ marginLeft: 8 \}\}/);
+    expect(skeleton).toMatch(/<DawuroWordmark size=\{22\} reversed style=\{\{ marginLeft: 8 \}\}/);
   });
 
   test('nothing the bar used to carry has been lost', () => {

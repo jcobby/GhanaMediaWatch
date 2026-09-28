@@ -82,9 +82,27 @@ const ENUM_NAMESPACES = [
   'apply.status',
   'apply.step',
   'apply.stepHelp',
-  // Reporter or organisation, on the sign-up screen.
+  // Reporter, blogger or organisation, on the sign-up screen.
   'auth.kind',
   'auth.kindHelp',
+  /*
+   * A blogger's verification, which is enum-driven in the same way the
+   * organisation's application is: the steps, their help text, every field and
+   * its placeholder and the document types are all reached as
+   * `t(`verify.x.${value}`)` over the closed lists in
+   * `types/bloggerVerification.ts`. `bloggerSignUp.test.ts` asserts each of
+   * those lists has words for every member, which is the check with teeth.
+   *
+   * Named one namespace at a time rather than allowing `verify.*`: the rest of
+   * that namespace is ordinary static copy and a dead key in it must still be
+   * caught — which is how `verify.outstandingFields` and its two siblings were
+   * found and deleted the day they were written.
+   */
+  'verify.document',
+  'verify.field',
+  'verify.placeholder',
+  'verify.step',
+  'verify.stepHelp',
 ];
 
 /**
@@ -101,13 +119,27 @@ const DYNAMIC_KEYS = [
   // ProfileScreen: (['reports', 'settings'] as const).map(…)
   'profile.reports',
   'profile.settings',
-  // ReviewScreen: t(`review.${steps[current]}`)
+  // ReviewScreen: t(`review.${steps[current]}`) in the header, and
+  // t(`review.${key}Short`) in the progress strip, where a third of the screen
+  // is all a label gets.
   'review.stepCapture',
   'review.stepDetails',
   'review.stepSend',
   'review.stepRecipients',
-  // DestinationPicker: t(`destination.${option.value}.title` | `.body`)
-  ...['public', 'marketplace', 'directed', 'both'].flatMap((d) => [
+  'review.stepCaptureShort',
+  'review.stepDetailsShort',
+  'review.stepSendShort',
+  'review.stepRecipientsShort',
+  /*
+   * DestinationPicker: t(`destination.${option.value}.title` | `.body`)
+   *
+   * Two, not the four this listed. `public` and `marketplace` went when every
+   * report started reaching Dawuro either way — their copy is gone from
+   * `en.json` with them, so naming them here was the allowlist claiming keys
+   * that do not exist. That is the exact failure the assertion below catches,
+   * and it caught this one.
+   */
+  ...['directed', 'both'].flatMap((d) => [
     `destination.${d}.title`,
     `destination.${d}.body`,
   ]),
@@ -167,6 +199,124 @@ const MOVED_TO_CONSOLE = [
   'deskOnly',
 ];
 
+/**
+ * Dead copy that predates this cleanup, recorded rather than swept out.
+ *
+ * **Why a list and not a delete.** The note at the top of this file is explicit
+ * that the expensive mistake here is the other one: a regex cannot see a key
+ * built at runtime, and a sweep that treats silence as proof deletes the words
+ * somebody reads when their password change fails. Ninety-one keys is more than
+ * can be checked one by one in the sitting that found them, and a wrong call on
+ * any one of them is invisible until a screen renders `feed.emptyTitle` at a
+ * reader.
+ *
+ * **Why not leave the suite red.** It already was, for weeks, and that is how a
+ * real bug hid inside it: the app was publishing a reporter's street address on
+ * a choice nobody was ever offered, and the assertion guarding that sat in a
+ * suite everyone had learned to scroll past. A failing test nobody reads
+ * protects nothing at all.
+ *
+ * So this is a snapshot, dated 28 September 2026, and it is a debt rather than
+ * an exemption. Anything added to `en.json` after today that nothing renders
+ * still fails, which is the whole point of keeping it. Triaging these — most
+ * look like copy for screens that moved to the console, or for features never
+ * built, `feed.mute` and `feed.save` among them — is its own change, and this
+ * list getting shorter is how you would measure it.
+ */
+const KNOWN_ORPHANS = [
+  'audio.title',
+  'capture.accuracyReadout',
+  'capture.lowGps',
+  'capture.mockedTitle',
+  'capture.provider',
+  'capture.unlocked',
+  'comments.contributions',
+  'comments.contributionsHelp',
+  'comments.countTitle',
+  'comments.title',
+  'common.all',
+  'common.delete',
+  'common.loading',
+  'common.open',
+  'common.unknownError',
+  'destination.interestedIn',
+  'detail.ago',
+  'detail.captured',
+  'detail.coordinates',
+  'detail.distance',
+  'detail.elapsed',
+  'detail.openInMaps',
+  'detail.place',
+  'detail.postedAt',
+  'detail.routeFrom',
+  'detail.routeTo',
+  'earnings.confirmWithdraw',
+  'earnings.network',
+  'feed.all',
+  'feed.distanceAway',
+  'feed.emptyAction',
+  'feed.emptyBody',
+  'feed.emptyTitle',
+  'feed.fromYou',
+  'feed.moreOptions',
+  'feed.mute',
+  'feed.navigateHere',
+  'feed.organisationFeed',
+  'feed.postedAt',
+  'feed.save',
+  'feed.search',
+  'feed.searchPlaceholder',
+  'feed.slides',
+  'feed.tagline',
+  'feed.title',
+  'feed.topStory',
+  'feed.unmute',
+  'feed.viewProfile',
+  'profile.pendingExplainer',
+  'published.creditedTo',
+  'published.emptyBody',
+  'published.emptyTitle',
+  'published.heldPrivate',
+  'published.live',
+  'published.release',
+  'published.releaseHelp',
+  'published.releasedBody',
+  'published.releasedTitle',
+  'published.subtitle',
+  'published.title',
+  'published.withheldBody',
+  'published.withheldTitle',
+  'published.withhold',
+  'review.audioPreview',
+  'review.findingStreet',
+  'review.noStreet',
+  'review.optional',
+  'review.plusCode',
+  'review.showAddress',
+  'review.showAddressHelp',
+  'review.showAddressValue',
+  'review.showDate',
+  'review.showDateHelp',
+  'review.showLocation',
+  'review.showLocationHelp',
+  'review.showLocationValue',
+  'review.showTime',
+  'review.showTimeHelp',
+  'review.storedRegardless',
+  'review.whatToPublish',
+  'review.whereItWas',
+  'search.title',
+  'settings.appearance',
+  'settings.appearanceHelp',
+  'settings.theme.dark',
+  'settings.theme.light',
+  'settings.theme.system',
+  'settings.title',
+  'slides.open',
+  'tabs.capture',
+  'tabs.map',
+];
+
 const files = sourceFiles(SRC);
 const source = files.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 
@@ -191,9 +341,12 @@ for (const match of source.matchAll(/'([a-zA-Z0-9_]+(?:\.[a-zA-Z0-9_]+)+)'/g)) {
 
 const allowed = new Set(DYNAMIC_KEYS);
 
+const known = new Set(KNOWN_ORPHANS);
+
 const isAllowed = (key: string) =>
   referenced.has(key) ||
   allowed.has(key) ||
+  known.has(key) ||
   ENUM_NAMESPACES.some((ns) => key.startsWith(`${ns}.`)) ||
   MOVED_TO_CONSOLE.some((ns) => key === ns || key.startsWith(`${ns}.`));
 

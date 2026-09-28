@@ -1,4 +1,14 @@
-# GhanaMediaWatch — Incident Reporting App (Frontend)
+# Dawuro — Incident Reporting App (Frontend)
+
+**The product is Dawuro; the repository is still called `GhanaMediaWatch`.** The app names
+itself on screen now — the masthead, the launch screen and the introduction all carry the
+Dawuro wordmark beside the Ghana News Agency symbol — where before every mark on screen was
+the agency's and the name existed only in `app.json`. A dawuro is the gong-gong, the bell a
+town crier sounds to gather people for news.
+
+**Provided by the Ghana News Agency and Softmasters.** That line appears under the name on
+the launch screen and on the opening slide of the introduction, and `src/components/Brand.tsx`
+is the only place any of these marks are drawn.
 
 A mobile app for capturing and transmitting incidents of public interest. Media is captured
 **only once an accurate GPS fix is locked**, stored locally first, and uploaded automatically when
@@ -177,6 +187,14 @@ Feature folders are self-contained. **Cross-feature imports go through `componen
 ---
 
 ## Design system
+
+> **Parts of this section are out of date and have not been rewritten here.** The palette
+> below describes an earlier direction — warm paper and a terracotta accent — that the app no
+> longer uses: the ground is `#F4F5FA` and the accent is `#0B5FD1`, a blue. The reasoning
+> about an aging reader still holds and is why the app is light rather than dark; the specific
+> hues do not. **`global.css` and `src/lib/theme.ts` are the source of truth**, and
+> `src/lib/__tests__/palette.test.ts` is what actually holds the line. Rewriting the rationale
+> here needs a design decision rather than an edit.
 
 **Designed for a 70-year-old reader.** That single decision drives the whole palette, and it
 inverts the usual "dark-first media app" instinct. Three facts about an aging eye:

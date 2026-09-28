@@ -5,7 +5,6 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import {
-  Badge,
   Button,
   Chip,
   EmptyState,
@@ -25,7 +24,7 @@ import { ReportSheetBody } from './ReportSheetBody';
 import { AccountSettings } from './AccountSettings';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'expo-router';
-import { accentGradient, useColors } from '@/lib/theme';
+import { accentGradient, shadow, useColors } from '@/lib/theme';
 import { formatCount } from '@/lib/format';
 import { ApiError, type AuthoredIncident, type VettingState } from '@/types/api';
 import { describeApiError } from '@/lib/apiErrorCopy';
@@ -51,6 +50,10 @@ export function ProfileScreen() {
   const profile = useAuthStore((s) => s.profile);
   const signOut = useAuthStore((s) => s.signOut);
   const replayOnboarding = useAuthStore((s) => s.replayOnboarding);
+  const isBlogger = useAuthStore((s) => s.profile?.accountType === 'blogger');
+  // Absent reads as not verified: a byline shown as checked when it has not
+  // been is the failure the whole flag exists to prevent.
+  const verified = useAuthStore((s) => s.profile?.verified === true);
   const [tab, setTab] = useState<Tab>('reports');
   const [stateFilter, setStateFilter] = useState<VettingState | null>(null);
   const [wifiOnly, setWifiOnly] = useState(true);
@@ -121,7 +124,9 @@ export function ProfileScreen() {
               justifyContent: 'center',
             }}
           >
-            <Text variant="display-md" className="font-display">
+            {/* On the blue gradient, so white. Without a tone it took the
+                default — near-black initials on a blue disc. */}
+            <Text variant="display-md" tone="on-dark" className="font-display">
               {(profile?.displayName ?? '?').charAt(0).toUpperCase()}
             </Text>
           </LinearGradient>
@@ -131,27 +136,29 @@ export function ProfileScreen() {
               {profile?.email ?? t('profile.guestSubtitle')}
             </Text>
           </View>
-          {profile?.orgName ? (
-            <Badge label={`${profile.orgName} · ${profile.role ?? 'member'}`} tone="accent" />
-          ) : null}
-          {profile?.accountType === 'reporter' || !profile ? (
-            <Button
-              label={t('surveys.title')}
-              size="md"
-              variant="glass"
-              onPress={() => router.push('/surveys')}
-              leading={<Ionicons name="clipboard-outline" size={18} color={c.textPrimary} />}
-            />
-          ) : null}
-          {profile?.accountType === 'reporter' || !profile ? (
-            <Button
-              label={t('earnings.title')}
-              size="md"
-              variant="glass"
-              onPress={() => router.push('/earnings')}
-              leading={<Ionicons name="cash-outline" size={18} color={c.textPrimary} />}
-            />
-          ) : null}
+          {/*
+            No organisation branches here any more.
+
+            This carried an org badge and guarded Surveys and Earnings on
+            `accountType === 'reporter'`, from when every account landed in this
+            tab. An organisation account now routes to `(org)` and can never
+            reach this screen, so those conditions could only ever be true —
+            three checks that read as though something varies when nothing does.
+          */}
+          <Button
+            label={t('surveys.title')}
+            size="md"
+            variant="glass"
+            onPress={() => router.push('/surveys')}
+            leading={<Ionicons name="clipboard-outline" size={18} color={c.textPrimary} />}
+          />
+          <Button
+            label={t('earnings.title')}
+            size="md"
+            variant="glass"
+            onPress={() => router.push('/earnings')}
+            leading={<Ionicons name="cash-outline" size={18} color={c.textPrimary} />}
+          />
           {/*
             A guest gets both doors, and creating an account is the first of
             them.
@@ -203,15 +210,31 @@ export function ProfileScreen() {
                 onPress={() => setTab(value)}
                 accessibilityState={{ selected: tab === value }}
                 accessibilityLabel={t(`profile.${value}`)}
+                /*
+                  The selected side is filled, not tinted.
+
+                  It was `bg-glass/[0.18]` — white at 18% over a white frosted
+                  panel, which is no contrast at all. Both halves looked
+                  identical, so tapping "My reports" gave no sign it had been
+                  tapped, and the only way to tell which tab you were on was to
+                  read the content underneath.
+
+                  A solid accent pill with a white label is the pattern this app
+                  already uses for "this one is chosen", and it survives being
+                  looked at in daylight.
+                */
+                style={
+                  tab === value ? { backgroundColor: c.accent, boxShadow: shadow.sm } : undefined
+                }
                 className={
                   tab === value
-                    ? 'flex-1 items-center rounded-pill bg-glass/[0.18] py-4'
+                    ? 'flex-1 items-center rounded-pill py-4'
                     : 'flex-1 items-center rounded-pill py-4'
                 }
               >
                 <Text
                   variant="title-sm"
-                  tone={tab === value ? 'primary' : 'muted'}
+                  tone={tab === value ? 'on-dark' : 'muted'}
                   className="font-sans-semibold"
                 >
                   {t(`profile.${value}`)}
@@ -354,6 +377,24 @@ export function ProfileScreen() {
               <SettingRow icon="language-outline" label={t('settings.language')} value="English" />
               <SettingRow icon="server-outline" label={t('settings.storage')} value="248 MB" />
               <SettingRow icon="document-text-outline" label={t('settings.legal')} />
+              {/*
+                A blogger's verification, and only a blogger's.
+
+                This is the only route to it, deliberately. An unverified
+                blogger is not waiting on anybody — they can file, earn and be
+                paid from the day they register — so putting the application in
+                front of them at launch would be a gate where there is none.
+                What it adds is a byline readers can see has been checked, and
+                that is worth going to find.
+              */}
+              {isBlogger ? (
+                <SettingRow
+                  icon="ribbon-outline"
+                  label={t('settings.getVerified')}
+                  value={verified ? t('verify.approved') : undefined}
+                  onPress={() => router.push('/verification/blogger')}
+                />
+              ) : null}
               {/* The anonymity slide is the one people come back for, and until
                   this existed the only route to it was reinstalling. */}
               <SettingRow

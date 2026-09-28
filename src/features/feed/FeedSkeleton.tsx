@@ -3,7 +3,7 @@ import { LEAD_IMAGE_RATIO } from './leadLayout';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { Skeleton } from '@/components/ui';
-import { GnaHomeLogo } from '@/components/Brand';
+import { DawuroWordmark, GnaMark } from '@/components/Brand';
 
 /**
  * The feed while it loads, shaped exactly like what replaces it.
@@ -31,11 +31,11 @@ export function FeedSkeleton() {
         {/*
           The same bar `FeedBar` draws, not an approximation of it.
 
-          This showed `GnaHorizontal` — the full lockup, drums and bells and the
-          "Ghana News Agency" line — while the bar it precedes shows
-          `GnaHomeLogo`, the wordmark and flag triangle alone. So the first thing
-          anybody saw of the app was one logo replaced by a different one the
-          moment the feed landed, which reads as the screen reloading.
+          This has been wrong twice in the same way: it showed a different
+          mark from the one the real bar draws, so the first thing anybody saw
+          of the app was one logo replaced by another the moment the feed
+          landed, which reads as the screen reloading. It is the `DawuroWordmark`
+          at the bar's own size and offset, and it moves by not a pixel.
 
           The mark is not data: it is drawn for real, at the height and offset
           the real bar uses, and the two icon buttons are laid out where the
@@ -46,7 +46,8 @@ export function FeedSkeleton() {
           <View className="h-11 w-11 items-center justify-center">
             <Skeleton className="h-6 w-6 rounded-xs" />
           </View>
-          <GnaHomeLogo height={24} style={{ marginLeft: 8 }} />
+          <GnaMark size={34} reversed style={{ marginLeft: 8 }} />
+          <DawuroWordmark size={22} reversed style={{ marginLeft: 8 }} />
           <View className="flex-1" />
           <View className="h-11 w-11 items-center justify-center">
             <Skeleton className="h-6 w-6 rounded-pill" />

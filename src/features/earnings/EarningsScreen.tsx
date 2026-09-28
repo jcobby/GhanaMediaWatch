@@ -13,7 +13,8 @@ import { accentGradient, categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis, type CommissionStatus, type PayoutStatus } from '@/types/dawuro';
 import { payoutProgress, sumPesewas } from './commission';
-import { toGhanaMsisdn } from './momo';
+import { useEarningsGate } from './EarningsGate';
+import { toGhanaMsisdn } from '@/lib/momo';
 import { toast } from '@/stores/toastStore';
 
 const STATUS_TONE: Record<CommissionStatus, 'neutral' | 'success' | 'accent' | 'danger'> = {
@@ -56,11 +57,29 @@ export function EarningsScreen() {
   const [momoNumber, setMomoNumber] = useState('');
   const [saving, setSaving] = useState(false);
 
-  const { data: earnings } = useEarnings();
+  const earningsQuery = useEarnings();
+  const { data: earnings } = earningsQuery;
   const { data: commissions } = useCommissions();
 
-  // Zero while loading: for a reporter with nothing yet, that is also the
-  // right answer, and `undefined` through `formatCedis` renders "GH₵NaN".
+  /*
+   * The same gate the Earn tab uses, for the same reason.
+   *
+   * `/me/earnings` is refused to a device token, so a guest reaching the wallet
+   * got a fully rendered one reading GH₵0.00 — balance, payout progress,
+   * threshold and an empty ledger, none of it about them. An outage rendered
+   * identically. This screen carries a check that the headline cannot disagree
+   * with the rows beneath it; it should not have been willing to invent both.
+   */
+  const gate = useEarningsGate({
+    isPending: earningsQuery.isPending,
+    isError: earningsQuery.isError,
+    error: earningsQuery.error,
+    refetch: () => void earningsQuery.refetch(),
+  });
+
+  // Zero once the totals have actually arrived: for a reporter with nothing
+  // yet that is the right answer, and `undefined` through `formatCedis`
+  // renders "GH₵NaN".
   const summary = earnings ?? {
     pendingPesewas: 0,
     paidPesewas: 0,
@@ -132,6 +151,37 @@ export function EarningsScreen() {
    * exception is a `Modal`, which that does not reach, and which `Sheet`
    * handles itself.
    */
+
+  /*
+   * No account, no wallet — and the header stays, so there is a way back.
+   *
+   * An early return rather than a branch inside the tree: every section below
+   * is about one account's money — balance, threshold, ledger, payout number —
+   * so with no account behind it there is no half worth rendering. Wrapping the
+   * whole run in a conditional would be a hundred lines held inside a ternary
+   * for a case where none of it applies.
+   */
+  if (gate) {
+    return (
+      <View
+        className="flex-1 bg-canvas"
+        style={{ paddingTop: insets.top + 12, paddingHorizontal: 16 }}
+      >
+        <View className="flex-row items-center gap-3 pb-4">
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityLabel={t('common.back')}
+            className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
+          >
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
+          </Pressable>
+          <Text variant="title-lg">{t('earnings.title')}</Text>
+        </View>
+        {gate}
+      </View>
+    );
+  }
+
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === 'ios' ? 'padding' : undefined}

@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
-import { Glass, Text } from '@/components/ui';
+import { Text } from '@/components/ui';
 import { receiving, useOrganisations } from '@/hooks/useOrganisations';
 import { useColors } from '@/lib/theme';
 import { bestOffer, estimateCommission, sanitiseOffer } from '@/features/earnings/commission';
@@ -110,13 +110,22 @@ export function EarningsEstimate({
 
   return (
     <>
-      {/* Earnings estimate */}
-      <Glass elevation="low" className="flex-row items-center gap-3 rounded-lg p-3.5">
-        <View className="h-10 w-10 items-center justify-center rounded-pill bg-success-wash">
-          <Ionicons name="cash-outline" size={18} color={c.success} />
-        </View>
+      {/*
+        A consequence of the choice above, not a third choice.
+
+        This was a `Glass` card with a 40px circular icon — the same shape and
+        the same icon treatment as the destination options directly above it —
+        so "No payment available yet" read as a third thing you could select,
+        sitting under two you could. It is a statement about the option already
+        chosen.
+
+        Flat, no elevation, a small inline icon and a rule down the left: the
+        vocabulary this app already uses for a note rather than a control.
+      */}
+      <View className="flex-row items-start gap-2.5 rounded-sm bg-canvas-raise px-3.5 py-3">
+        <Ionicons name="cash-outline" size={16} color={c.success} style={{ marginTop: 1 }} />
         <View className="flex-1">
-          <Text variant="body" className="font-sans-semibold">
+          <Text variant="body-sm" className="font-sans-semibold">
             {nobodyIsBuying
               ? t('destination.nobodyBuyingTitle')
               : estimate.reporterPesewas > 0
@@ -135,7 +144,7 @@ export function EarningsEstimate({
                 : t('destination.noEarningHelp')}
           </Text>
         </View>
-      </Glass>
+      </View>
     </>
   );
 }

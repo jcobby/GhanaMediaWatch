@@ -17,7 +17,7 @@ import { toast } from '@/stores/toastStore';
 import { openDirections } from '@/lib/navigation';
 import { shareIncident } from '@/lib/share';
 import { CaptureStamp } from '@/components/CaptureStamp';
-import { GnaHorizontal } from '@/components/Brand';
+import { DawuroWordmark } from '@/components/Brand';
 import { IncidentStage } from './IncidentStage';
 import { CommentList } from '@/features/comments/CommentList';
 import { CommentComposer } from '@/features/comments/CommentComposer';
@@ -255,7 +255,7 @@ export function IncidentDetailScreen({ incidentId }: IncidentDetailScreenProps) 
           <Ionicons name="chevron-back" size={24} color={c.textOnDark} />
         </Pressable>
 
-        <GnaHorizontal height={20} reversed />
+        <DawuroWordmark size={19} reversed />
 
         <View className="flex-1" />
 

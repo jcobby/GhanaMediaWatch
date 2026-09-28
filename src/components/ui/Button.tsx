@@ -73,7 +73,17 @@ export function Button({
 
   const content = (
     <View className={cn('flex-row items-center justify-center gap-2', PADDING[size])}>
-      {loading ? <ActivityIndicator size="small" color={c.textPrimary} /> : leading}
+      {/* The spinner follows the label. On the primary variant that is white on
+          the blue fill; it was `textPrimary` for every variant, which put a
+          near-black spinner on the blue button beside a white label. */}
+      {loading ? (
+        <ActivityIndicator
+          size="small"
+          color={variant === 'primary' ? c.textOnDark : c.textPrimary}
+        />
+      ) : (
+        leading
+      )}
       <Text
         variant={size === 'lg' ? 'title-sm' : 'body'}
         tone={LABEL_TONE[variant]}
@@ -100,13 +110,17 @@ export function Button({
           The primary action is the only element that casts an accent-tinted
           shadow, which is what makes it read as the one thing to press.
 
+          Kept close to the console's `shadow-sm` so the same button looks the
+          same in both products. It was deeper and read as a glow under the
+          control rather than as the control sitting slightly above the page.
+
           The channels are `--color-accent`, written out: `boxShadow` takes a
           string and cannot interpolate a CSS variable through NativeWind, so
           this is the one place the accent is duplicated. It has to move with
           the token — a violet glow under a blue button is how the old palette
           would linger after the rest of it changed.
         */
-        style={{ boxShadow: '0px 4px 14px rgba(11, 95, 209, 0.32)' }}
+        style={{ boxShadow: '0px 2px 10px rgba(11, 95, 209, 0.26)' }}
         {...rest}
       >
         <LinearGradient

@@ -21,8 +21,20 @@ const read = (rel: string) => fs.readFileSync(path.resolve(__dirname, '..', rel)
 const FEATURES = path.resolve(__dirname, '../..');
 const readFeature = (rel: string) => fs.readFileSync(path.join(FEATURES, rel), 'utf8');
 
-/** The success path: everything before the `catch`. */
-const successPath = (src: string) => src.slice(0, src.indexOf('} catch'));
+/**
+ * The success path: everything before the handler that reports the failure.
+ *
+ * The **last** `} catch`, not the first. This sliced at the first one, which
+ * held only while each submit had exactly one `try` in it — the moment
+ * registration grew an inner `try` around saving the payout number, the slice
+ * cut the file off above the toast it was looking for and reported a screen
+ * that announces nothing. The outer handler is the last one in these
+ * functions, so everything before it is the path that succeeded.
+ *
+ * The assertions below name the *success* copy keys as well, so a
+ * `toast.success` sitting in some later catch block could not satisfy them.
+ */
+const successPath = (src: string) => src.slice(0, src.lastIndexOf('} catch'));
 
 test('creating an account is acknowledged', () => {
   const src = successPath(read('SignUpScreen.tsx'));

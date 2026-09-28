@@ -207,7 +207,21 @@ export function ReviewScreen() {
         category,
         description: description.trim(),
         isAnonymous,
-        displayFlags: { showLocation, showAddress, showDate, showTime },
+        /*
+         * `showAddress` can never contradict `showLocation`.
+         *
+         * The preview has always gated one on the other; the payload did not,
+         * so a report could go out saying "hide where this was" and "publish
+         * the street address" at once, and which of the two the server honoured
+         * was left to the server. Belt and braces alongside the store's own
+         * default — this is the line that decides what is actually sent.
+         */
+        displayFlags: {
+          showLocation,
+          showAddress: showLocation && showAddress,
+          showDate,
+          showTime,
+        },
         place: { address: place.address, plusCode: place.plusCode?.full ?? null },
         severity,
         /*
@@ -333,13 +347,22 @@ export function ReviewScreen() {
                   className="h-1 rounded-pill"
                   style={{ backgroundColor: done || here ? c.accent : c.hairline, opacity: done || here ? 1 : 0.18 }}
                 />
+                {/*
+                  The short name, because a third of the screen is what it has.
+
+                  It printed the full one — "1. Capture & description" — on a
+                  single line in a `flex-1` third, so every step but the current
+                  one truncated to "Capture & des…" and the strip stopped being
+                  readable at a glance. The full name is directly above, in the
+                  header, where there is room for it.
+                */}
                 <Text
                   variant="caption"
                   tone={here ? 'primary' : 'muted'}
                   className={here ? 'font-sans-semibold' : undefined}
                   numberOfLines={1}
                 >
-                  {index + 1}. {t(`review.${key}`)}
+                  {index + 1}. {t(`review.${key}Short`)}
                 </Text>
               </Pressable>
             );

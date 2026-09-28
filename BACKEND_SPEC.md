@@ -1,6 +1,6 @@
 # Dawuro Platform — Backend Specification
 
-**Version 2.1 · 2 September 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)**
+**Version 2.3 · 28 September 2026 · supersedes API_CONTRACT v1 (GhanaMediaWatch)**
 
 ---
 
@@ -13,6 +13,44 @@ It is written to be handed to an AI coding assistant in full. It is deliberately
 **Normative language.** **MUST** is a requirement — breaking it is a defect. **SHOULD** is a strong recommendation with room for a documented alternative. **MAY** is genuinely optional.
 
 **Read §4 and §14 before writing any code.** §4 is the trust model, which is the product; §14 is the list of things that must never happen. Everything else is mechanics.
+
+### What changed in 2.3
+
+**§9.5 and §10.4 are built.** Both landed on 28 September, hours after they were asked for,
+and both are connected on the phone. The two sections now describe what the service *does*
+rather than what was wanted, corrected against the live API and a real registration — the
+shapes below were read off the wire, not off the schema, because `PersonApplication` declares
+`steps` as `additionalProperties: true` and promises nothing a client can build on.
+
+Three details came back different from the request, and all three are improvements worth
+knowing:
+
+| Asked for | Shipped | Why it matters to a client |
+| --- | --- | --- |
+| `ONB-IND-000042` | `ONB-PER-FB2036` | Cosmetic, but it is what appears in emails |
+| `missingDocuments` as document types | May name an **alternative group**: `utility_bill_or_premises_proof` | It cannot be read as a list of things to upload without splitting on `_or_` |
+| — | `POST /auth/register` requires an `Idempotency-Key` header | Absent, it answers `VALIDATION_FAILED`; not in the parameter list |
+
+### What changed in 2.2
+
+Two additions since 2.1, both driven by mobile work in the week of 21 September. Neither
+contradicts 2.0 or 2.1. **Both were blocked on the server and both have since shipped** —
+the requests are kept below because the reasoning is still the specification.
+
+| Change | Where | Impact |
+| --- | --- | --- |
+| **A third account kind: `blogger`** — an independent publisher, verified before they publish | §1, §2.2, §9.5 | `accountKind` enum grows. Verification stops being organisation-only. |
+| **A payout *method*, not just a mobile number** — bank **or** mobile money, chosen at registration | §10.3, §10.4 | One new pair of endpoints. `/me/payout-msisdn` becomes a special case of it. |
+
+**Why these are blocking rather than nice to have.** The product asks for registration in three
+groups — individual, blogger, organisation — and for a payout destination to be captured *at
+registration* so a commission is never earned against an account that cannot be paid. Today
+`accountKind` is a closed enum of `user | organisation`, verification hangs off an `orgId`, and
+`PUT /me/payout-msisdn` is the only payout field in the API. The mobile app has shipped the
+half that works — mobile money is now collected on the third step of registration — and has
+deliberately **not** shipped a blogger card that registers as `user` and submits its
+verification nowhere. A choice a person cannot tell from a working one is worse than its
+absence.
 
 ### What changed in 2.1
 
@@ -63,11 +101,14 @@ reporter films  →  provenance sealed at capture  →  auto-routed to matching 
 | Role | Surface | What they do |
 | --- | --- | --- |
 | `reporter` | Mobile only | Films incidents, submits, earns commission. Never uses the console. |
+| `blogger` | Mobile only | A reporter who has been **verified as a publisher** (§9.5). Files and earns exactly as a reporter does; the difference is that their byline has been checked and can be shown as such. Not an institution — one person, no staff, no inbox, no licensing. |
 | `business` | Console only | Receives routed reports, licenses them, assigns to staff, publishes. |
 | `platform_owner` | Console only | Operates the service: onboards institutions, oversees routing, runs payouts. |
 | `editor` | Console only | Decides whether a claim is true. **Deliberately separate from `platform_owner`** — operating the service and adjudicating truth are different jobs. |
 
-A reporter who signs into the console is shown an explanation and no data.
+A reporter who signs into the console is shown an explanation and no data. A blogger is a
+reporter for every purpose in this document except §9.5 and the `verified` flag it sets —
+routing, commission, the trust model and the editorial gate treat the two identically.
 
 ### Why the trust model is the product
 
@@ -94,6 +135,16 @@ Three kinds of credential.
 **Device token.** Issued by `POST /devices` with no prior auth. Identifies an installation, not a person. Sufficient to read the public feed and to submit anonymously. This is what makes anonymous reporting real rather than cosmetic.
 
 **User token.** Issued by the auth endpoints. Identifies a person. Required for earnings, personal history, and anything an account owns.
+
+```ts
+// POST /auth/register
+export type AccountKind = 'user' | 'blogger' | 'organisation';   // default 'user'
+```
+
+`blogger` is **new in 2.2** and is the one change to this enum. It creates an ordinary user
+account plus a verification application (§9.5) — it MUST NOT create an organisation, a
+membership or an inbox. A `blogger` who has not yet been approved is a `user` in every
+respect except that `GET /me` reports the kind and the application exists.
 
 **Organisation context.** A user token carries zero or more organisation memberships. Requests acting on behalf of an institution MUST carry `X-Dawuro-Org: {businessId}`, and the server MUST verify the caller actually holds a membership in that organisation with the required capability (§8.4). Never infer the organisation from anything else.
 
@@ -1337,6 +1388,92 @@ Approval is what grants an organisation access to footage of the public, so it i
 
 Reference format: `ONB-ORG-000042`, quoted in every email about the application.
 
+### 9.5 Verifying a person — **built, 28 September**
+
+**Every blogger, and every representative of an institution, is verified before they
+publish.** The second half of that is §9.1–§9.4. The first half is this section, and it is
+now live: `/me/verification*` mirrors `/org/onboarding/*` exactly, on `/me` rather than
+`/org`, with no scope header.
+
+```
+GET  /me/verification                                 -> PersonApplication
+PUT  /me/verification/steps/{stepId}                  -> PersonApplication
+POST /me/verification/steps/{stepId}/submit           -> PersonApplication
+POST /me/verification/submit                          -> PersonApplication
+POST /me/verification/documents                       -> 201
+PUT  /me/verification/documents/{documentType}/bytes  -> 200
+```
+
+**What a fresh blogger actually gets**, read off the wire on 28 September rather than from
+the schema — which declares `steps` as `additionalProperties: true` and so promises nothing:
+
+```json
+{ "id": "pva_a693bc8b4781", "userId": "usr_f94b9afb2036", "kind": "blogger",
+  "reference": "ONB-PER-FB2036", "steps": {}, "documents": [],
+  "submittedAtIso": null, "approvedAtIso": null, "rejectionReason": null,
+  "screeningRunAtIso": null, "screeningClear": null,
+  "missingDocuments": ["officer_id", "utility_bill_or_premises_proof"] }
+```
+
+Four things a client must know, none of them in the schema:
+
+1. **The application exists from registration.** `POST /auth/register` with
+   `accountKind: "blogger"` creates it; there is nothing to call to open one.
+2. **`steps` is a map keyed by step id, not a list** — matching the organisation's
+   application. `steps.find` is not a function.
+3. **`steps` is empty and `stepId` is a free string**, so the *client* defines the step set.
+   The phone's is `identity`, `presence`, `coverage`, in `types/bloggerVerification.ts`.
+4. **`missingDocuments` may name an alternative group** — `utility_bill_or_premises_proof`
+   — rather than a document type. Split on `_or_` before treating it as a list of uploads.
+
+**A blogger is not an organisation and MUST NOT be modelled as one.** Registering them as a
+one-person institution would work mechanically and be wrong in three ways that surface later:
+they would acquire an inbox, licensing and staff management they have no use for; they would
+appear in the public *organisation* directory (§8.8) beside government agencies; and routing
+(§6) would start delivering other people's reports to them. The data model should say what is
+true — a verified individual — rather than borrow a shape that nearly fits.
+
+**The document enum is the person-appropriate subset of §9.3** — `officer_id`,
+`utility_bill`, `premises_proof` — and no new types were needed: a Ghana Card is `officer_id`
+whether it belongs to a company officer or to a blogger.
+
+The step set the phone sends, which the service stores as given:
+
+| Step | Collects | Documents |
+| --- | --- | --- |
+| `identity` | Legal name, Ghana Card number, phone | `officer_id` |
+| `presence` | Where they publish — site, channel, handle, and its reach | — |
+| `coverage` | Where they report from | `utility_bill` |
+| `documents` | Everything attached, and anything still missing | — |
+
+**What approval sets.** `MeProfile.verified` exists and is false for a fresh blogger —
+confirmed on the wire. The phone reads it from `/me` rather than remembering what it
+registered as, because the account outlives that request.
+
+**One half is still outstanding, and it is the half the public sees.** `Reporter` on every
+incident projection still carries only `kind`, `id`, `displayName` and `avatarUrl` — nothing
+about standing. Until it carries `verified`, a reader cannot tell a checked byline from an
+unchecked one, and verification is an internal fact nobody outside the platform benefits
+from. That is the point of the whole feature.
+
+```ts
+// PublicReporter, on every incident projection — still needed
+verified: boolean;
+```
+
+**And the platform queue.** `GET /platform/applications` returns organisation applications.
+Person applications MUST appear in the same queue, distinguishable by kind, supporting the
+same per-step decide, screening, approve and reject — the console's approval desk is built and
+will read them as they are.
+
+**Invariant.** Approving a blogger grants a verified byline and nothing else. It MUST NOT
+create an organisation, a membership, an inbox, a subscription, or a routing destination. See
+§14.
+
+Reference format: **`ONB-PER-FB2036`** — `ONB-PER-`, not the `ONB-IND-` this section
+originally guessed at. A person's application is never mistaken for an institution's
+(`ONB-ORG-`) in an email or a log.
+
 ---
 
 ## 10. Money
@@ -1495,6 +1632,55 @@ The amount is **fixed at the moment of licensing** and MUST NOT be recomputed la
 
 **Mobile money is how Ghana pays.** Payout destinations will be MTN MoMo, Telecel Cash and AirtelTigo Money. The payout provider integration is not yet specified — see §16.
 
+### 10.4 The payout method — **built, 28 September**
+
+**A commission with no destination behind it is held, not paid**, and the reporter finds out
+weeks later by its absence. So the destination is now collected **at registration** — step
+three of sign-up on mobile — rather than on the earnings screen, which somebody only opens
+after they have already earned something and gone looking for it.
+
+The product asks for **a bank account or mobile money**, and both now exist:
+`GET`/`PUT /me/payout-method`, with `/me/payout-msisdn` still working as the momo case. A
+fresh account answers `{ "kind": null, "momo": null, "bank": null }`.
+
+**The phone still collects mobile money only**, on the third step of registration. That is
+ours to finish, not yours — the endpoint takes the bank body exactly as specified:
+
+```ts
+// GET /me/payout-method  ·  PUT /me/payout-method
+export type PayoutMethod =
+  | { kind: 'momo'; msisdn: string }                 // '+233241234567', E.164
+  | {
+      kind: 'bank';
+      accountName: string;      // as the bank holds it, not as the reporter types their name
+      accountNumber: string;
+      bankCode: string;         // an enum from you, or free text plus a display name
+      branch?: string;          // where the bank needs it
+    };
+
+// GET returns the active method, or null when none is on file.
+{ method: PayoutMethod | null }
+```
+
+Rules:
+
+1. **Exactly one method is active.** A payout run MUST never be ambiguous about where money
+   goes. Setting one replaces the other; `GET` says which is in force.
+2. **`PUT /me/payout-msisdn` keeps working**, as the `momo` case of this. The mobile app calls
+   it today and a break would strand every reporter who has already saved a number.
+3. **Validation of bank details belongs on the server, not the client.** The MSISDN rule is
+   stable and cheap, so the phone checks it — `+233` plus nine digits beginning 2 or 5. Account
+   numbers are per-bank; a client guessing at them produces an accepted number that the bank
+   later rejects, which is a payout that fails silently.
+4. **`heldReason` MUST be able to say the method is missing.** `GET /me/commissions` already
+   carries `payoutStatus: 'held'` and `heldReason`; "No payout method on file" must be one of
+   the reasons it can carry, whichever method is absent.
+
+**Still to confirm, and it is the part no schema can show:** that a released batch actually
+pays to a saved bank account. The endpoint stores one; whether the payout run can settle to it
+is item E's sandbox question, and until a test batch has been released to a test account the
+bank half is a stored value rather than a working payment route.
+
 ---
 
 ## 11. Response and SLA
@@ -1628,6 +1814,10 @@ Endpoints marked **new** do not exist in v1 of this contract and cover everythin
 | POST | `/auth/login` | none |
 | POST | `/auth/refresh` | refresh token |
 | POST | `/auth/google` | none — **new**, currently non-functional in the client |
+| GET | `/me` | user |
+| GET | `/me/verification` | user — **new in 2.2**, §9.5 |
+| PUT | `/me/verification/steps/{stepId}` | user — **new in 2.2** |
+| POST | `/me/verification/submit` | user — **new in 2.2** |
 | POST | `/incidents` | device or user |
 | PUT | `/uploads/{uploadId}/chunks/{index}` | same as init |
 | POST | `/uploads/{uploadId}/complete` | same as init |
@@ -1718,6 +1908,10 @@ Unauthenticated. Reader-facing. Returns `PublicOrganisation`, never `BusinessAcc
 | --- | --- | --- |
 | GET | `/me/earnings` | user |
 | GET | `/me/commissions` | user |
+| GET | `/me/payout-method` | user — **new in 2.2**, §10.4 |
+| PUT | `/me/payout-method` | user — **new in 2.2**, §10.4 |
+| GET | `/me/payout-msisdn` | user — the `momo` case of the above; keep it working |
+| PUT | `/me/payout-msisdn` | user |
 | GET | `/surveys` | user |
 | POST | `/surveys/{id}/responses` | user |
 
@@ -1755,6 +1949,9 @@ Every one of these is a rule the clients already follow and the server MUST enfo
 26. **Never set `assurance` or `verification` on a `newsroom` item.** There is no capture to classify, and a class carried over from a citizen report would lend agency copy a guarantee the platform cannot make. §3.9, §4.
 27. **Never return a capture timestamp or coordinates on a `newsroom` item.** Both are claims about an act of filming that did not happen. §3.9.
 28. **Never publish an incident without a `section`.** The field is non-null on the client; an absent value renders an empty desk rather than an error. §3.8.
+29. **Never let approving a blogger create an organisation.** A verified person gets a byline flag and nothing else — no membership, no inbox, no subscription, no routing destination. Borrowing the organisation shape because it nearly fits is how a solo publisher ends up receiving other people's reports and appearing in the public institution directory. §9.5.
+30. **Never treat a payout destination as optional once a commission has been earned.** Two destinations MUST NOT be active at once, and a commission that cannot be paid MUST be `held` with a `heldReason` that says so rather than `pending` — the reporter can act on the first and not on the second. §10.3, §10.4.
+31. **Never validate a bank account number on the client.** Account formats are per-bank; a client that accepts one the bank will reject has turned a correctable typo into a payout that silently fails weeks later. The MSISDN rule is the exception and is stable. §10.4.
 
 ---
 
@@ -1844,7 +2041,8 @@ These need a decision from the product side before or during implementation. The
 1. **Device clock tolerance.** What gap between `capturedAtIso` and server-received time sets `timeCheckPassed` false? Suggested 5 minutes plus observed upload delay.
 2. **GPS accuracy limits per category.** `GPS_ACCURACY_REJECTED` implies a threshold. Does a `fire` demand a tighter fix than a `sanitation` report?
 3. **Media retention.** How long is media held? The mobile client keeps a metadata row after deleting its local copy, so a reporter's history will eventually point at collected media. What should it show then?
-4. **Payout provider.** MTN MoMo, Telecel Cash, AirtelTigo — which, and through which aggregator? What is `payoutThresholdPesewas` and how often do batches run?
+4. **Payout provider.** MTN MoMo, Telecel Cash, AirtelTigo — which, and through which aggregator? What is `payoutThresholdPesewas` and how often do batches run? **And for the bank half of §10.4, now that the endpoint exists:** is `bankCode` an enum you publish, or free text with a display name? The phone cannot offer a bank picker until it knows, and a free-text bank code typed by a reporter is a failed payout waiting to happen. Is there a settlement route for bank payouts at all, or is mobile money the only one in practice — in which case the product decision is to stop offering the choice rather than to store one that cannot pay.
+11. **Who approves a blogger?** §9.5 puts person applications in the same platform queue as institutions. `platform_owner` operates the service and `editor` adjudicates truth (§1); verifying that a publisher is who they say they are is arguably the second. Confirm which role holds it before the queue is built, because moving it afterwards is a permissions migration.
 5. **Key management.** Where does the server-side integrity signing key live, how is it rotated, and how are historical signatures verified after a rotation?
 6. **Audit ledger.** The proposal calls for a tamper-evident record of every editorial decision. Append-only table, hash chain, or an external service?
 7. **Right of reply and takedown.** Ghana's Data Protection Act (Act 843) applies. What is the process when someone filmed requests removal, and what happens to a report already licensed and published by a third party?

@@ -13,13 +13,13 @@
  */
 
 export const lightColors = {
-  masthead: '#0B3FA8',
+  masthead: '#1A1A1D',
   canvas: '#F4F5FA',
   canvasSoft: '#FFFFFF',
   canvasRaise: '#E9ECF4',
 
   glass: '#FFFFFF',
-  glassMedia: '#0B1020',
+  glassMedia: '#10111A',
   hairline: '#0E1024',
 
   textPrimary: '#0B0C14',

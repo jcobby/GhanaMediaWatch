@@ -3,8 +3,11 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Sheet, Text } from '@/components/ui';
+import { Flag } from '@/components/Flag';
+import { CountryPicker } from './CountryPicker';
+import { HOME_COUNTRY, type Country } from '@/types/countries';
 import { useColors } from '@/lib/theme';
-import { GnaHomeLogo } from '@/components/Brand';
+import { DawuroWordmark, GnaMark } from '@/components/Brand';
 import { OrganisationAvatar } from '@/components/OrganisationAvatar';
 import type { DirectoryOrganisation } from '@/types/dawuro';
 
@@ -34,12 +37,22 @@ export function FeedBar({
   onOpenMap: () => void;
   onOpenSlides: () => void;
   onOpenBusinesses: () => void;
-  /** The organisation whose homepage this is, or null for the GNA homepage. */
+  /** The organisation whose homepage this is, or null for Dawuro's own. */
   organisation: DirectoryOrganisation | null;
   onExitOrganisation: () => void;
 }) {
   const { t } = useTranslation();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [countryOpen, setCountryOpen] = useState(false);
+  /*
+   * Ghana, and nothing else is selectable yet.
+   *
+   * Local rather than a store: there is exactly one covered country, so there
+   * is no choice to persist across launches. When the service can filter by
+   * country this becomes the thing worth remembering, and lifting it out is a
+   * smaller change than pretending to remember one answer today.
+   */
+  const [country, setCountry] = useState<Country>(HOME_COUNTRY);
 
   /** Close the menu first, so the next screen is not opened underneath it. */
   const choose = (action: () => void) => () => {
@@ -52,15 +65,15 @@ export function FeedBar({
       <View className="flex-row items-center px-2" style={{ height: 56 }}>
         {organisation ? (
           <>
-            {/* Back to the GNA homepage. */}
+            {/* Back to Dawuro's homepage. */}
             <Pressable
               onPress={onExitOrganisation}
-              accessibilityLabel={t('feed.backToGna')}
+              accessibilityLabel={t('feed.backHome')}
               className="h-11 w-11 items-center justify-center rounded-pill"
             >
               <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
             </Pressable>
-            {/* The organisation's mark where GNA's was. */}
+            {/* The organisation's mark where Dawuro's name was. */}
             <View style={{ marginLeft: 4 }}>
               <OrganisationAvatar name={organisation.name} logoUrl={organisation.logoUrl} size={32} />
             </View>
@@ -87,18 +100,26 @@ export function FeedBar({
               <Ionicons name="menu" size={26} color="#FFFFFF" />
             </Pressable>
             {/*
-              The supplied mark, straight on the bar.
+              The mark and the name, as one lockup.
 
-              The wordmark and the flag triangle and nothing else — no drums, no
-              bells, no arc. Its lettering is recoloured for a dark ground (see
-              `GnaHomeLogo`), so it needs no white tile behind it.
+              Two corrections, in order. It was the GNA wordmark alone, which
+              said who stands behind the reports and never what the app is
+              called — the name was in `app.json` and in no place a user could
+              see it. Then it was the name alone, which dropped the mark from
+              the one screen everybody opens: the symbol was on the launch
+              screen and the introduction, both of which are over in seconds.
 
-              24 rather than 30: with no second and third line of type under the
-              mark, the letters carry it, and a wordmark that size sits level
-              with the icons either side of it instead of crowding the bar.
+              The symbol is reversed here because the bar is black and the
+              gong-gong in the supplied artwork is drawn in near-neutral black.
+              The standard file would lose it entirely, silently, and it is the
+              part of the mark the app is named after.
+
+              22 rather than 30 on the wordmark: with no second and third line
+              of type under it, the letters carry it, and a wordmark that size
+              sits level with the icons either side instead of crowding the bar.
             */}
-            <GnaHomeLogo height={24} style={{ marginLeft: 8 }} />
-            {/* The mark alone. A word beside it said what the screen already is. */}
+            <GnaMark size={34} reversed style={{ marginLeft: 8 }} />
+            <DawuroWordmark size={22} reversed style={{ marginLeft: 8 }} />
             <View className="flex-1" />
           </>
         )}
@@ -112,6 +133,29 @@ export function FeedBar({
           nobody looked. A magnifier for reports and a building for institutions
           says which is which before either is tapped.
         */}
+        {/*
+          The country, immediately left of search.
+
+          A flag rather than a word: the bar is already carrying a mark, a
+          wordmark and two icons, and "Ghana" spelled out would be the widest
+          thing on it. Drawn rather than emoji — Android renders regional
+          indicators as bare letters on a great many handsets, which would put
+          "GH" in the masthead on exactly the phones this app is for.
+
+          Only on Dawuro's own homepage. An organisation's page is that
+          organisation's reports wherever they are from, and a country filter
+          over the top of it would be a second scope arguing with the first.
+        */}
+        {!organisation ? (
+          <Pressable
+            onPress={() => setCountryOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('feed.country')}: ${country.name}`}
+            className="h-11 w-11 items-center justify-center rounded-pill"
+          >
+            <Flag design={country.flag} size={24} />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={onOpenSearch}
           accessibilityLabel={t('search.reportsTitle')}
@@ -137,6 +181,13 @@ export function FeedBar({
           </Pressable>
         ) : null}
       </View>
+
+      <CountryPicker
+        visible={countryOpen}
+        onClose={() => setCountryOpen(false)}
+        selected={country}
+        onSelect={setCountry}
+      />
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} title={t('app.name')}>
         <View className="gap-1">

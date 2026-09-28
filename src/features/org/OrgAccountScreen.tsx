@@ -4,13 +4,14 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Badge, Glass, Skeleton, Text } from '@/components/ui';
+import { Badge, Button, Glass, Skeleton, Text } from '@/components/ui';
 import { SettingRow } from '@/components/SettingRow';
 import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { AccountSettings } from '@/features/profile/AccountSettings';
 import { useOrgDashboard, useOrgMembers } from '@/hooks/useOrg';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
+import { describeApiError } from '@/lib/apiErrorCopy';
 import { accentGradient, useColors } from '@/lib/theme';
 import { formatDate } from '@/lib/format';
 import { SUBSCRIPTION_PLANS, downloadCharge, formatCedis, isUnlimited } from '@/types/dawuro';
@@ -38,7 +39,7 @@ export function OrgAccountScreen() {
   const profile = useAuthStore((s) => s.profile);
   const signOut = useAuthStore((s) => s.signOut);
 
-  const { data: dashboard, isPending } = useOrgDashboard();
+  const { data: dashboard, isPending, isError, error, refetch } = useOrgDashboard();
   const { data: members } = useOrgMembers();
 
   const subscription = dashboard?.subscription ?? null;
@@ -75,7 +76,8 @@ export function OrgAccountScreen() {
             justifyContent: 'center',
           }}
         >
-          <Text variant="display-md" className="font-display">
+          {/* White on the blue gradient, like the reporter's avatar. */}
+          <Text variant="display-md" tone="on-dark" className="font-display">
             {(profile?.orgName ?? '?').charAt(0).toUpperCase()}
           </Text>
         </LinearGradient>
@@ -112,6 +114,35 @@ export function OrgAccountScreen() {
             <View className="gap-3 p-4">
               <Skeleton className="h-4 w-1/2" />
               <Skeleton className="h-4 w-1/3" />
+            </View>
+          ) : isError ? (
+            /*
+              An outage said "Not stated" six times over.
+
+              Every row below falls back to that when a field is missing, which
+              is right for a service that did not send one — and wrong for a
+              service that did not answer at all. The two read identically, so a
+              dead connection looked like an organisation whose plan nobody had
+              filled in.
+            */
+            <View className="gap-3 p-4">
+              <Text variant="body" className="font-sans-medium">
+                {describeApiError(error, t, {
+                  title: t('org.planUnavailableTitle'),
+                  body: t('org.planUnavailableBody'),
+                }).title}
+              </Text>
+              <Text variant="body-sm" tone="muted">
+                {describeApiError(error, t, {
+                  title: t('org.planUnavailableTitle'),
+                  body: t('org.planUnavailableBody'),
+                }).body}
+              </Text>
+              <Button
+                label={t('common.retry')}
+                variant="glass"
+                onPress={() => void refetch()}
+              />
             </View>
           ) : (
             <>

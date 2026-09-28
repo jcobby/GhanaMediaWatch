@@ -283,6 +283,20 @@ export interface Incident {
   viewerHasReacted: boolean;
   /** Metres from the viewer. Present only when the query passed `near`. */
   distanceM?: number;
+
+  /**
+   * An editor has pinned this to lead the feed.
+   *
+   * The service computes it — "true only while the editorial lead pin is
+   * active (false if expired)" — so the phone never has to decide whether a
+   * lead has run out. Set on the Leading desk in the console.
+   *
+   * Absent on a service that does not send it, which is why every reader
+   * defaults it to false: a missing flag must mean "not led", never "led".
+   */
+  lead?: boolean;
+  leadAt?: string | null;
+  leadUntil?: string | null;
 }
 
 /** The author's own view — adds everything the public must not see. */

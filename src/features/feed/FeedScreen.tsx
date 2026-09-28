@@ -126,8 +126,48 @@ export function FeedScreen() {
    * are the top of the order the server returned.
    */
   const { count: topStoryCount } = useTopStorySettings();
-  const leading = useMemo(() => visible.slice(0, topStoryCount), [visible, topStoryCount]);
-  const rows = useMemo(() => visible.slice(leading.length), [leading, visible]);
+
+  /*
+   * What leads: the editor's choice first, then the newest to fill the slots.
+   *
+   * **This was `visible.slice(0, topStoryCount)`** — the newest N reports, and
+   * nothing else. Which meant the Leading desk in the console, where an editor
+   * pins a story to the front page, changed nothing at all on the phone: the
+   * slides were whatever had arrived most recently, and a deliberate editorial
+   * decision was silently overruled by the clock.
+   *
+   * `lead` is the service's own answer and it expires on its own — "true only
+   * while the editorial lead pin is active" — so a pin that has run out simply
+   * stops counting here without the phone reasoning about `leadUntil`.
+   *
+   * Most recently pinned first, because that is the order an editor builds a
+   * running order in. The newest reports then top it up rather than replace it:
+   * a desk with one pinned story still gets a full rotation, and a desk with
+   * none behaves exactly as it did before.
+   */
+  const leading = useMemo(() => {
+    const pinned = visible
+      .filter((incident) => incident.lead)
+      .sort((a, b) => (b.leadAt ?? '').localeCompare(a.leadAt ?? ''));
+
+    if (pinned.length >= topStoryCount) return pinned.slice(0, topStoryCount);
+
+    const already = new Set(pinned.map((incident) => incident.id));
+    const filler = visible.filter((incident) => !already.has(incident.id));
+    return [...pinned, ...filler.slice(0, topStoryCount - pinned.length)];
+  }, [visible, topStoryCount]);
+
+  /*
+   * Everything not in the top slot, in the feed's own order.
+   *
+   * Computed by exclusion rather than by `slice(leading.length)`: a pinned
+   * story can come from anywhere in the list, so dropping a prefix would both
+   * repeat it further down and hide an unrelated report behind it.
+   */
+  const rows = useMemo(() => {
+    const led = new Set(leading.map((incident) => incident.id));
+    return visible.filter((incident) => !led.has(incident.id));
+  }, [leading, visible]);
 
   const { width } = useWindowDimensions();
 

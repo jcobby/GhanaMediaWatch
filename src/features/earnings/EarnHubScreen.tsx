@@ -6,13 +6,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Badge, Button, Glass, Pressable, ProgressBar, Text } from '@/components/ui';
-import { receiving, useOrganisations } from '@/hooks/useOrganisations';
 import { useSurveys } from '@/hooks/useSurveys';
+import { useEarningsGate } from './EarningsGate';
 import { useCommissions, useEarnings } from '@/hooks/useEarnings';
 import { accentGradient, categoryHue, useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
 import { formatCedis } from '@/types/dawuro';
-import { useBusinessStore } from '@/stores/organisationStore';
 import { payoutProgress } from './commission';
 import { isAcceptingResponses } from '@/features/surveys/surveyLogic';
 
@@ -24,8 +23,10 @@ import { isAcceptingResponses } from '@/features/surveys/surveyLogic';
  * with the balance, then with the two ways to add to it: film something an
  * organisation wants, or answer a paid question.
  *
- * "Who is looking for what" sits directly beneath, because the most common
- * reason a reporter earns nothing is filming something nobody asked for.
+ * A guest sees everything but the balance. That is deliberate: the ways to earn
+ * and what other people have earned are the argument for making an account, and
+ * withholding them would leave a signed-out reporter looking at a sign-in
+ * prompt with no reason to accept it.
  */
 export function EarnHubScreen() {
   const c = useColors();
@@ -33,16 +34,33 @@ export function EarnHubScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
-  const { data: earnings } = useEarnings();
+  const earningsQuery = useEarnings();
+  const { data: earnings } = earningsQuery;
   const { data: ledger } = useCommissions();
 
   /*
-   * Zero, not undefined, while the request is in flight.
+   * Asked before the balance is drawn: is there an account behind this at all?
    *
-   * A reporter with no earnings and a reporter whose totals have not loaded
-   * see the same thing — which is correct, because the honest reading of both
-   * is "nothing here yet". Rendering `undefined` through `formatCedis` would
-   * put "GH₵NaN" on the money screen.
+   * `/me/earnings` answers 403 to a device token, so a guest's query *fails* —
+   * and with only `data` read, that failure fell into the zeroed default below
+   * and rendered as "GH₵0.00 available" with a payout bar under it. A person
+   * who has not signed up was being told a fact about an account they do not
+   * have, on the screen whose job is to persuade them to make one.
+   */
+  const gate = useEarningsGate({
+    isPending: earningsQuery.isPending,
+    isError: earningsQuery.isError,
+    error: earningsQuery.error,
+    refetch: () => void earningsQuery.refetch(),
+  });
+
+  /*
+   * Zero once the request has actually succeeded.
+   *
+   * Still defaulted, because `undefined` through `formatCedis` renders
+   * "GH₵NaN" — but it is now only reachable for a signed-in reporter whose
+   * totals came back, where zero is the true answer rather than a stand-in for
+   * three different situations.
    */
   const summary = earnings ?? {
     pendingPesewas: 0,
@@ -69,12 +87,7 @@ export function EarnHubScreen() {
    */
   const clearsThreshold = summary.pendingPesewas >= summary.payoutThresholdPesewas;
 
-  // Reads through the same overrides the organisation account screen writes, so
-  // an organisation narrowing its interests shows up here as less demand.
-  const overrides = useBusinessStore((s) => s.interestOverrides);
-
   const { data: surveys } = useSurveys();
-  const { data: directory } = useOrganisations();
 
   const openSurveys = useMemo(
     () => (surveys ?? []).filter((s) => isAcceptingResponses(s)),
@@ -83,27 +96,22 @@ export function EarnHubScreen() {
   const recent = (ledger ?? []).slice(0, 3);
 
   /*
-   * What organisations are actively buying, derived from their declared
-   * interests. A reporter who knows NADMO wants flood footage films the right
-   * thing; one who does not films a sunset and earns nothing.
+   * "What organisations are looking for" was here, and it could never show
+   * anything.
+   *
+   * It tallied each organisation's declared interests — except the public
+   * directory does not carry interests, so the tally fell back to
+   * `organisationStore`'s overrides, which only the organisation account screen
+   * ever wrote. That screen left the phone for the web console. The store has
+   * been permanently empty ever since, so the section rendered its empty state
+   * on every launch, for every reporter, saying "no organisations are buying
+   * right now" over a directory that might be full of them.
+   *
+   * A wrong answer delivered confidently is worse than no section, and there is
+   * no endpoint that answers the question honestly — `GET /organisations`
+   * returns id, name, sector, verified, logo and two counts, and nothing about
+   * what anyone wants. It comes back when the service can say.
    */
-  const demand = useMemo(() => {
-    const counts = new Map<string, number>();
-    /*
-      Only what the newsroom itself has told this phone.
-
-      This tallied `b.interests` from the directory, which never carries them —
-      so every organisation contributed an undefined list and the tally was
-      built entirely on locally stored overrides while appearing to summarise
-      the platform. An organisation with no override contributes nothing, which
-      is the honest answer: the phone does not know what it is looking for
-      until `GET /organisations` says.
-    */
-    receiving(directory).forEach((b) =>
-      (overrides[b.id] ?? []).forEach((c) => counts.set(c, (counts.get(c) ?? 0) + 1)),
-    );
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, 6);
-  }, [directory, overrides]);
 
   return (
     <ScrollView
@@ -114,7 +122,18 @@ export function EarnHubScreen() {
     >
       <Text variant="display-md">{t('earn.title')}</Text>
 
+      {/*
+        The balance, or the reason there isn't one.
+
+        Everything below the gate — the ways to earn, the recent rows — is
+        still worth seeing while signed out: it is the answer to "why would I
+        make an account". Only the figure itself is withheld, because only the
+        figure requires one.
+      */}
+      {gate}
+
       {/* Balance */}
+      {gate ? null : (
       <LinearGradient
         colors={[...accentGradient]}
         start={{ x: 0, y: 0 }}
@@ -147,6 +166,7 @@ export function EarnHubScreen() {
           onPress={() => router.push('/earnings')}
         />
       </LinearGradient>
+      )}
 
       {/* The two ways to earn. Filming leads — it is the product. */}
       <View className="gap-2">
@@ -202,53 +222,6 @@ export function EarnHubScreen() {
             <Ionicons name="chevron-forward" size={16} color={c.textFaint} />
           </Glass>
         </Pressable>
-      </View>
-
-      {/* What organisations want right now */}
-      <View className="gap-2">
-        <Text variant="label" tone="muted">
-          {t('earn.inDemand')}
-        </Text>
-        <Glass elevation="low" className="gap-3 rounded-lg p-4">
-          <Text variant="caption" tone="muted">
-            {t('earn.inDemandHelp')}
-          </Text>
-          {/*
-            No organisations means no demand, and saying so is the point.
-
-            An empty row of chips reads as a rendering fault. What it actually
-            means is that nobody is currently buying footage — which is the
-            single most useful thing this screen can tell somebody deciding
-            whether to go and film something.
-          */}
-          {demand.length === 0 ? (
-            <Text variant="body-sm" tone="muted">
-              {t('earn.noDemand')}
-            </Text>
-          ) : null}
-
-          <View className="flex-row flex-wrap gap-2">
-            {demand.map(([category, count]) => (
-              <View
-                key={category}
-                className="flex-row items-center gap-2 rounded-pill bg-canvas-raise px-3 py-1.5"
-              >
-                <View
-                  style={{
-                    width: 7,
-                    height: 7,
-                    borderRadius: 4,
-                    backgroundColor: categoryHue(category),
-                  }}
-                />
-                <Text variant="body-sm">{t(`category.${category}`)}</Text>
-                <Text variant="caption" tone="accent" className="font-sans-semibold">
-                  {count}
-                </Text>
-              </View>
-            ))}
-          </View>
-        </Glass>
       </View>
 
       {/* Recent activity */}

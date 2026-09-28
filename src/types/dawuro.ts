@@ -28,7 +28,16 @@ import type { IncidentCategory } from './api';
  * It *is* written to the keychain, which is why `hydrate` accepts the old
  * spelling — see `migrateProfile`.
  */
-export type AccountType = 'reporter' | 'organisation' | 'platform_owner';
+/**
+ * Which experience an account sees.
+ *
+ * `blogger` is a reporter with a verification application attached: the same
+ * app, the same routes, the same earnings, plus a byline a reader can see has
+ * been checked. It is deliberately **not** an organisation — no inbox, no
+ * licensing, no staff — and modelling it as a one-person institution would put
+ * it in the public organisation directory beside government agencies.
+ */
+export type AccountType = 'reporter' | 'blogger' | 'organisation' | 'platform_owner';
 
 // ─── where a submission goes ───────────────────────────────────────────────
 

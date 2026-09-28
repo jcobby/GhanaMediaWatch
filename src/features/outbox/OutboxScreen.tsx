@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { GnaMark } from '@/components/Brand';
+import { DawuroWordmark } from '@/components/Brand';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -74,8 +74,10 @@ function OutboxRow({
           queue look like a gallery of published work, and on a failed row it
           makes a report that never left the phone look like one that ran.
 
-          The GNA mark on a plain ground says what it actually is: something
-          this app is carrying on the reporter's behalf.
+          The app's own name on a plain ground says what it actually is:
+          something Dawuro is carrying on the reporter's behalf. It was the GNA
+          mark, which claimed rather more — the agency has not seen this file
+          and may never; it has not left the phone.
         */}
         {/* Explicit size: the tile used to be sized by the image inside it, and
             NativeWind will not compile an arbitrary `w-[60px]`. */}
@@ -83,7 +85,7 @@ function OutboxRow({
           className="items-center justify-center overflow-hidden rounded-sm bg-canvas-raise"
           style={{ width: 60, height: 60 }}
         >
-          <GnaMark size={34} />
+          <DawuroWordmark size={11} />
         </View>
 
         <View className="flex-1 gap-1.5">

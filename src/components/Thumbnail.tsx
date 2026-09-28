@@ -2,52 +2,92 @@ import { useState } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
 import { Image, type ImageSource } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
+import { Skeleton } from '@/components/ui';
 import { categoryIcon } from '@/lib/categoryIcon';
+import { categoryHue } from '@/lib/theme';
 import type { Poster } from '@/lib/videoPoster';
 import type { IncidentCategory } from '@/types/api';
 
 /**
- * A report's image, with a fallback that always renders.
+ * A report's image, and the two honest things to show when there isn't one.
  *
- * Two problems this exists to solve, both of which showed up as an empty feed:
+ * **What this replaced, and why it had to go.** Twelve bundled PNGs — one per
+ * category — each a dusk landscape: a soft glow over a hill silhouette, tinted
+ * by category. They were painted underneath every thumbnail unconditionally and
+ * a real image faded over them, which meant all three of these looked identical:
  *
- * 1. **`expo-image` cannot render an SVG data URI on native.** The fixtures
- *    generate one per report — no network, deterministic, fine on web — and
- *    every thumbnail silently came back blank on a device. There is no error
- *    to catch; the image simply never paints.
+ *   - an image that is still downloading
+ *   - a report that has no still at all
+ *   - an image whose URL failed
  *
- * 2. A real `posterUrl` can 404 or time out on a bad connection, which is the
- *    normal case in the field rather than the exception.
+ * A reader could not tell any of them from a photograph, which on this product
+ * is not a matter of taste. Dawuro's whole claim is that it can say where a file
+ * came from; a synthetic landscape sitting in the image slot of a real report
+ * quietly breaks that claim, and the reader has no way to know. It was also
+ * twelve variations on one composition, so a column of them read as clip-art,
+ * and they were near-black on a light page.
  *
- * So: a bundled PNG per category is the floor, and a real URL is drawn over it
- * when there is one and it loads. The floor is a local asset, so it cannot
- * fail — there is no state in which this component shows nothing.
+ * So the three states are now three different things:
+ *
+ * | State | What is drawn |
+ * | --- | --- |
+ * | Loading | A tonal block with the standard pulse. No content, real or invented. |
+ * | No image | A flat field in the category's hue with its glyph — graphic, obviously not a photograph. |
+ * | Failed | The same field. There is nothing to show and pretending otherwise is the bug. |
+ *
+ * The floor is still a local view rather than a remote asset, so there is no
+ * state in which this component renders nothing.
+ *
+ * Videos keep their real frame: `lib/videoPoster` cuts one from the clip,
+ * because the service generates no poster for video. That is strictly better
+ * than anything here and runs before this falls back.
  */
-
-/**
- * `require` needs a literal path, so the map is written out rather than built.
- * Adding a category without adding a scene here falls back to `other`, which
- * is the right failure: a plain block, never a missing one.
- */
-const SCENES: Record<string, number> = {
-  fire: require('../../assets/placeholders/fire.png'),
-  accident: require('../../assets/placeholders/accident.png'),
-  disorder: require('../../assets/placeholders/disorder.png'),
-  infrastructure: require('../../assets/placeholders/infrastructure.png'),
-  utility: require('../../assets/placeholders/utility.png'),
-  corruption: require('../../assets/placeholders/corruption.png'),
-  whistleblower: require('../../assets/placeholders/corruption.png'),
-  environment: require('../../assets/placeholders/environment.png'),
-  wildlife: require('../../assets/placeholders/wildlife.png'),
-  flood: require('../../assets/placeholders/flood.png'),
-  crime: require('../../assets/placeholders/crime.png'),
-  health: require('../../assets/placeholders/health.png'),
-  other: require('../../assets/placeholders/other.png'),
-};
 
 /** True for the fixture-generated URIs that native cannot draw. */
 function isUnrenderable(uri: string | undefined): boolean {
   return !uri || uri.startsWith('data:image/svg');
+}
+
+/**
+ * Two alpha suffixes on the category hue.
+ *
+ * Hex rather than `rgba(...)` because `categoryHue` returns `#RRGGBB` and an
+ * eight-digit hex is the cheapest way to add alpha without parsing it. `12` is
+ * about 7% — a tint the eye reads as "this block is about fire" rather than as
+ * a coloured card competing with the headline beside it.
+ */
+const FIELD_ALPHA = '12';
+const GLYPH_ALPHA = '66';
+
+/**
+ * The honest empty state: a tint and a glyph, flat and unmistakably drawn.
+ *
+ * The glyph is the part that earns its place. A plain tinted rectangle says only
+ * "no picture"; the glyph says what kind of report this is, which is readable
+ * before a word of the headline and is the reason the feed can be scanned.
+ */
+function CategoryField({
+  category,
+  glyphSize,
+}: {
+  category: IncidentCategory;
+  glyphSize: number;
+}) {
+  const hue = categoryHue(category);
+  return (
+    <View
+      style={{
+        position: 'absolute',
+        width: '100%',
+        height: '100%',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: `${hue}${FIELD_ALPHA}`,
+      }}
+    >
+      <Ionicons name={categoryIcon[category]} size={glyphSize} color={`${hue}${GLYPH_ALPHA}`} />
+    </View>
+  );
 }
 
 export function Thumbnail({
@@ -78,11 +118,11 @@ export function Thumbnail({
   /**
    * A frame the phone cut from the clip itself.
    *
-   * The service sends no poster for a video, and the alternative on screen is a
-   * drawing of the category — a column of raindrops where a column of scenes
-   * should be. Wins over `uri` and skips the unrenderable check below: there is
-   * no URL to inspect, because this is either a path we wrote or a native image
-   * reference `expo-image` takes as a source directly. See `lib/videoPoster`.
+   * The service sends no poster for a video, and the alternative on screen is
+   * the category field below — which is honest, but a real frame from the thing
+   * somebody filmed is better. Wins over `uri` and skips the unrenderable check:
+   * there is no URL to inspect, because this is either a path we wrote or a
+   * native image reference `expo-image` takes as a source directly.
    */
   poster?: Poster | null;
   category: IncidentCategory;
@@ -91,53 +131,70 @@ export function Thumbnail({
   /** Scaled by the caller — a full-bleed slide needs a larger mark than a row. */
   glyphSize?: number;
 }) {
-  const [failed, setFailed] = useState(false);
+  /**
+   * `idle` means the bytes are on their way, not that nothing is happening.
+   *
+   * Tracked rather than inferred, because "we have a URL" and "the picture is
+   * on screen" are different facts and the gap between them is exactly the
+   * moment this component exists to handle well.
+   */
+  const [state, setState] = useState<'idle' | 'loaded'>('idle');
+  /** The id of the source that failed, so a different one is still tried. */
+  const [failedFor, setFailedFor] = useState<string | null>(null);
 
-  const scene = SCENES[category] ?? SCENES.other;
   const source: ImageSource | Poster | null =
     poster ?? (isUnrenderable(uri) ? null : { uri, cacheKey });
-  const showReal = source !== null && !failed;
+
+  /*
+   * A failure is remembered against the thing that failed, not against the row.
+   *
+   * A plain `failed` boolean is a latch: a video's `uri` 404s, the flag sticks,
+   * and when `lib/videoPoster` finishes cutting a frame from the clip a moment
+   * later — the whole reason that module exists — the new source is never
+   * mounted. The row keeps showing the category field for a report that has a
+   * real frame sitting ready.
+   *
+   * Naming which source failed makes recovery fall out of the render instead of
+   * needing an effect to unstick it: the poster arriving changes `sourceId`, so
+   * the old failure no longer matches and the image mounts. A second failure
+   * records the new id.
+   */
+  const sourceId = poster ? `poster:${cacheKey ?? ''}` : isUnrenderable(uri) ? null : (uri ?? null);
+  const expecting = source !== null && failedFor !== sourceId;
+  // Downloading: a pulse, and nothing that could be mistaken for the picture.
+  const pulsing = expecting && state !== 'loaded';
+  // Nothing is coming, or nothing arrived. Say so in a way no one misreads.
+  const empty = !expecting;
 
   return (
     <View style={style} className="overflow-hidden bg-canvas-raise">
-      {/* The scene sits underneath rather than instead of, so a slow real
-          image fades in over something rather than over an empty box. */}
-      <Image
-        source={scene}
-        style={{ position: 'absolute', width: '100%', height: '100%' }}
-        contentFit="cover"
-        transition={0}
-      />
+      {empty ? <CategoryField category={category} glyphSize={glyphSize} /> : null}
 
       {/*
-        The category glyph, over the placeholder only.
-        A synthetic gradient says nothing on its own — six of them in a column
-        read as six loading states. The glyph turns each into a statement of
-        what kind of report it is, readable before a word of the headline.
+        The pulse is the whole loading state, deliberately.
 
-        It is deliberately not drawn over a real photograph: there it would be
-        clutter obscuring the thing the reader came to see.
+        It fills the frame rather than sitting in a corner, so the block reads as
+        "this is becoming a picture" — the same language the feed's own skeleton
+        speaks while the list arrives, so the two do not look like different
+        kinds of waiting. `Skeleton` already honours reduced motion.
       */}
-      {!showReal ? (
-        <View
-          style={{
-            position: 'absolute',
-            width: '100%',
-            height: '100%',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          <Ionicons name={categoryIcon[category]} size={glyphSize} color="rgba(255,255,255,0.32)" />
+      {pulsing ? (
+        <View style={{ position: 'absolute', width: '100%', height: '100%' }}>
+          <Skeleton fill className="rounded-none" />
         </View>
       ) : null}
 
-      {showReal ? (
+      {expecting ? (
         <Image
           source={source}
           style={{ position: 'absolute', width: '100%', height: '100%' }}
           contentFit={contentFit}
-          transition={160}
+          /*
+            Long enough to read as an arrival rather than a flash. It fades over
+            the pulse, which is a tonal block of the same family, so the change
+            is one surface resolving into another.
+          */
+          transition={220}
           /*
             Decoded frames stay in memory as well as on disk. The default keeps
             only the file, so scrolling a feed back up re-decoded every image it
@@ -151,7 +208,8 @@ export function Thumbnail({
             a fast scroll shows the wrong photograph against the right headline.
           */
           recyclingKey={cacheKey}
-          onError={() => setFailed(true)}
+          onLoad={() => setState('loaded')}
+          onError={() => setFailedFor(sourceId)}
         />
       ) : null}
     </View>

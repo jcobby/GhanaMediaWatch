@@ -47,6 +47,22 @@ interface CaptureState {
    * more than most people expect. Nobody can withhold either now.
    */
   showLocation: boolean;
+  /**
+   * Publish the full street address rather than the locality and plus code.
+   *
+   * **Defaults to false, and matching the service's own default is the point.**
+   * `DisplayFlags.showAddress` is declared `default: false` on the wire; this
+   * defaulted to `true` and there is no control for it anywhere in the app, so
+   * every report was asking the platform to publish the reporter's street
+   * address on the strength of a choice nobody was ever offered. On a product
+   * whose premise is that people at risk can file safely, the unasked default
+   * has to be the quieter one.
+   *
+   * With it false the preview and the payload carry `street · plus code`, which
+   * still says where — just not to the doorstep. Give it a switch on the review
+   * screen and this becomes a real choice; until then it is a promise the app
+   * does not make.
+   */
   showAddress: boolean;
   showDate: boolean;
   showTime: boolean;
@@ -85,7 +101,7 @@ const DEFAULTS = {
   posterAtMs: null,
   consent: EMPTY_CONSENT,
   showLocation: true,
-  showAddress: true,
+  showAddress: false,
   showDate: true,
   showTime: true,
   /*

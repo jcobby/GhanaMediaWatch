@@ -39,6 +39,12 @@ import type {
 import { formatReportId } from '@/types/context';
 import { ASSIGNMENT_STATUSES } from '@/types/org';
 import { normaliseOnboarding } from './onboardingShape';
+import { normaliseVerification } from './verificationShape';
+import type {
+  BloggerApplication,
+  BloggerDocumentId,
+  BloggerStepId,
+} from '@/types/bloggerVerification';
 import type {
   DocumentId,
   OnboardingApplication,
@@ -820,6 +826,10 @@ export class HttpApiClient implements ApiClient {
       userId: res.userId ?? null,
       orgId: res.orgId ?? null,
       role: res.role ?? null,
+      accountKind: res.accountKind ?? null,
+      // Absent means not verified. The cautious reading is the only safe one
+      // here: a byline shown as checked when it has not been is the failure.
+      verified: res.verified === true,
       memberships: res.memberships ?? [],
     };
   }
@@ -953,11 +963,21 @@ export class HttpApiClient implements ApiClient {
   }
 
   /**
-   * The routed inbox, with each item's licence state.
+   * The routed inbox, with each item's licence state — all of it.
    *
-   * `limit=50` because the default is 20 on every collection this API serves
-   * and the inbox is the screen an officer scrolls looking for the report they
-   * were pushed about. Fifty is under the documented ceiling of 100.
+   * **Every page, not the first.** It asked once with `limit=50` and rendered
+   * the answer as the whole inbox, which the inbox itself survives — an officer
+   * scrolls the newest fifty and that is the job. The Licences screen does not:
+   * it is built from the `licensed` flags on these same items, so a licence
+   * that had scrolled past fifty simply vanished from the list of what the
+   * organisation had paid for. A screen called Licences cannot be a sample.
+   *
+   * Bounded at ten pages. A cursor the service never stops returning would
+   * otherwise spin forever on a screen that shows a spinner, and 500 routed
+   * reports is far past what anyone reads on a phone — past it, the counts on
+   * the dashboard are the honest figures.
+   *
+   * `limit=100` is the documented ceiling for this route; the default is 20.
    *
    * `licensed` and `licensedAt` are named in the endpoint's description but not
    * in its schema, so they are read off the raw record and defaulted. False and
@@ -967,10 +987,26 @@ export class HttpApiClient implements ApiClient {
    * charge twice anyway.
    */
   async getOrgInbox(orgId: string): Promise<Page<OrgInboxItem>> {
-    const page = await this.request<Page<RawIncident & RawLicenceFields>>('/org/inbox?limit=50', {
-      orgId,
-    });
-    return { ...page, items: (page.items ?? []).map(toOrgInboxItem) };
+    const items: OrgInboxItem[] = [];
+    let cursor: string | null = null;
+
+    for (let page = 0; page < 10; page += 1) {
+      const query: string = cursor
+        ? `/org/inbox?limit=100&cursor=${encodeURIComponent(cursor)}`
+        : '/org/inbox?limit=100';
+      const answer: Page<RawIncident & RawLicenceFields> = await this.request<
+        Page<RawIncident & RawLicenceFields>
+      >(query, { orgId });
+
+      items.push(...(answer.items ?? []).map(toOrgInboxItem));
+
+      // `hasMore` alone is not enough: a service that sets it true without a
+      // cursor would loop on the same first page forever.
+      cursor = answer.hasMore && answer.nextCursor ? answer.nextCursor : null;
+      if (!cursor) break;
+    }
+
+    return { items, nextCursor: cursor, hasMore: cursor !== null };
   }
 
   async getOrgIncident(orgId: string, incidentId: string): Promise<OrgInboxItem> {
@@ -1212,6 +1248,106 @@ export class HttpApiClient implements ApiClient {
         body: {},
         orgId,
       }),
+    );
+  }
+
+  // ─── a blogger's own verification ───────────────────────────────────────
+  //
+  // The same five calls as the organisation's application above, on `/me/*`
+  // rather than `/org/*` — so no `orgId`, and no scope header. That is the
+  // whole difference, and it is the reason these are separate methods rather
+  // than the org ones with an optional organisation: a blogger has no
+  // organisation to omit, and a helper that took `orgId?: string` would make
+  // "no organisation" and "forgot the organisation" the same call.
+
+  async getVerification(): Promise<BloggerApplication> {
+    return normaliseVerification(await this.request<unknown>('/me/verification'));
+  }
+
+  async saveVerificationStep(
+    stepId: BloggerStepId,
+    payload: Record<string, unknown>,
+  ): Promise<BloggerApplication> {
+    return normaliseVerification(
+      await this.request<unknown>(`/me/verification/steps/${encodeURIComponent(stepId)}`, {
+        method: 'PUT',
+        body: payload,
+      }),
+    );
+  }
+
+  async submitVerificationStep(stepId: BloggerStepId): Promise<BloggerApplication> {
+    return normaliseVerification(
+      await this.request<unknown>(
+        `/me/verification/steps/${encodeURIComponent(stepId)}/submit`,
+        { method: 'POST', body: {} },
+      ),
+    );
+  }
+
+  async attachVerificationDocument(input: {
+    documentType: BloggerDocumentId;
+    fileName: string;
+    sha256: string;
+    mimeType: string;
+    byteSize: number;
+  }): Promise<void> {
+    await this.request<unknown>('/me/verification/documents', { method: 'POST', body: input });
+  }
+
+  /** The file itself. Raw octet-stream, so it bypasses `request()` as above. */
+  async uploadVerificationDocumentBytes(
+    documentType: BloggerDocumentId,
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<void> {
+    await this.ensureToken();
+    const stored = await session.read();
+
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), CHUNK_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(
+        `${this.baseUrl}/me/verification/documents/${encodeURIComponent(documentType)}/bytes`,
+        {
+          method: 'PUT',
+          headers: {
+            'Content-Type': mimeType,
+            'X-Tunnel-Skip-AntiPhishing-Page': 'true',
+            ...(stored ? { Authorization: `Bearer ${stored.accessToken}` } : {}),
+          },
+          body: bytes as unknown as BodyInit,
+          signal: controller.signal,
+        },
+      );
+
+      if (!response.ok) {
+        const text = await response.text().catch(() => '');
+        let parsed: unknown = null;
+        try {
+          parsed = text ? JSON.parse(text) : null;
+        } catch {
+          parsed = null;
+        }
+        throw toApiError(response.status, parsed);
+      }
+    } catch (cause) {
+      if (cause instanceof ApiError) throw cause;
+      throw new ApiError({
+        code: 'NETWORK_UNAVAILABLE',
+        status: 0,
+        message: cause instanceof Error ? cause.message : 'Document upload failed',
+        retryable: true,
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async submitVerification(): Promise<BloggerApplication> {
+    return normaliseVerification(
+      await this.request<unknown>('/me/verification/submit', { method: 'POST', body: {} }),
     );
   }
 }
@@ -1589,6 +1725,15 @@ function normaliseOrigin(raw: string | undefined): ItemOrigin {
 function normaliseIncident(raw: RawIncident): Incident {
   return {
     ...raw,
+    /*
+     * Whether an editor has this leading the feed.
+     *
+     * The service computes it and drops it when the pin expires, so the phone
+     * never has to reason about `leadUntil`. Defaulted to false: a service that
+     * does not send the field must mean "not led", and the other way round
+     * would put an arbitrary report at the top of the front page.
+     */
+    lead: raw.lead === true,
     capturedAtPrecision: derivePrecision(raw),
 
     /*

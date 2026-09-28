@@ -144,8 +144,17 @@ export function DestinationPicker({
                   />
                 </View>
                 <View className="flex-1 gap-0.5">
-                  <View className="flex-row items-center gap-2">
-                    <Text variant="body" className="font-sans-semibold">
+                  {/*
+                    Wraps, so the badge cannot be pushed off the card.
+
+                    The title and the badge sat on one unwrapping row with the
+                    title free to take the whole width — and "Send to GNA and
+                    specific organisations" does, so "No buyers yet" was cut off
+                    at the edge of the screen. The one option that needed a
+                    warning was the one whose title was long enough to hide it.
+                  */}
+                  <View className="flex-row flex-wrap items-center gap-x-2 gap-y-1">
+                    <Text variant="body" className="shrink font-sans-semibold">
                       {t(`destination.${option.value}.title`)}
                     </Text>
                     {inert ? (
@@ -169,7 +178,7 @@ export function DestinationPicker({
                     what it implies.
                   */}
                   {option.value === 'directed' && active ? (
-                    <View className="mt-1.5 flex-row items-center gap-2">
+                    <View className="mt-2 flex-row items-center gap-2">
                       {selected.length > 0 ? (
                         <>
                           {/* Their faces, overlapping, the way a group chat shows members. */}

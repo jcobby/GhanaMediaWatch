@@ -66,7 +66,7 @@ test('every enumerated value has words for it', () => {
 test('each endpoint is the one the service documents', () => {
   const http = code('api/http.ts');
   expect(http).toMatch(/this\.request<[^>]*>\('\/org\/dashboard', \{ orgId \}\)/);
-  expect(http).toMatch(/'\/org\/inbox\?limit=50'/);
+  expect(http).toMatch(/'\/org\/inbox\?limit=100'/);
   expect(http).toMatch(/\/org\/incidents\/\$\{encodeURIComponent\(incidentId\)\}\/license/);
   expect(http).toMatch(/\/org\/incidents\/\$\{encodeURIComponent\(incidentId\)\}\/response/);
   expect(http).toMatch(/\/org\/incidents\/\$\{encodeURIComponent\(incidentId\)\}\/status/);
@@ -115,6 +115,23 @@ test('the desk is chosen, never defaulted', () => {
   const screen = code('features/org/OrgReportScreen.tsx');
   expect(screen).toMatch(/NEWS_SECTIONS\.map\(\(section\) =>/);
   expect(screen).not.toMatch(/section: 'ghana'/);
+});
+
+test('the inbox is read to the end, not one page deep', () => {
+  /*
+   * The inbox survives being sampled — an officer scrolls the newest and that
+   * is the job. The Licences screen does not: it is derived from the `licensed`
+   * flags on these same items, so a licence that had scrolled past the first
+   * page was absent from the list of what the organisation had paid for.
+   *
+   * Bounded, because a service that returns a cursor forever would otherwise
+   * spin on a screen showing a spinner.
+   */
+  const http = code('api/http.ts');
+  const inbox = http.slice(http.indexOf('async getOrgInbox'), http.indexOf('async getOrgIncident'));
+  expect(inbox).toMatch(/for \(let page = 0; page < 10; page \+= 1\)/);
+  // `hasMore` alone would loop on the same page if the cursor were absent.
+  expect(inbox).toMatch(/answer\.hasMore && answer\.nextCursor \? answer\.nextCursor : null/);
 });
 
 test('licences are the service’s record of them', () => {

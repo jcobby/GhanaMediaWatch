@@ -13,6 +13,16 @@ import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 interface SkeletonProps {
   className?: string;
+  /**
+   * Fill the parent instead of being sized by the class.
+   *
+   * The animated wrapper has no dimensions of its own, so a `h-full` on the
+   * block inside it resolves against a parent of zero height and the skeleton
+   * renders as nothing. Callers that want a block the size of the box it sits
+   * in — an image frame waiting for its picture — say so here rather than
+   * discovering that the hard way.
+   */
+  fill?: boolean;
 }
 
 /**
@@ -22,7 +32,7 @@ interface SkeletonProps {
  * The pulse uses an animated style (StyleSheet-shaped) because NativeWind
  * cannot drive a Reanimated shared value; the static box uses classes.
  */
-export function Skeleton({ className }: SkeletonProps) {
+export function Skeleton({ className, fill = false }: SkeletonProps) {
   const reducedMotion = useReducedMotion();
   const opacity = useSharedValue(0.5);
 
@@ -43,11 +53,11 @@ export function Skeleton({ className }: SkeletonProps) {
 
   return (
     <Animated.View
-      style={animatedStyle}
+      style={fill ? [animatedStyle, { flex: 1 }] : animatedStyle}
       accessibilityElementsHidden
       importantForAccessibility="no-hide-descendants"
     >
-      <View className={cn('rounded-sm bg-hairline/[0.10]', className)} />
+      <View className={cn('rounded-sm bg-hairline/[0.10]', fill && 'h-full w-full', className)} />
     </Animated.View>
   );
 }

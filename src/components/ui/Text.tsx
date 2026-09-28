@@ -1,5 +1,6 @@
 import { Text as RNText, type TextProps as RNTextProps } from 'react-native';
 import { cn } from '@/lib/cn';
+import { colors } from '@/lib/theme';
 
 export type TextVariant =
   | 'display-xl'
@@ -52,7 +53,22 @@ const TONE_CLASS: Record<TextTone, string> = {
   secondary: 'text-text-secondary',
   muted: 'text-text-muted',
   faint: 'text-text-faint',
-  'on-dark': 'text-text-on-dark',
+  /*
+   * `text-white`, and deliberately not `text-text-on-dark`.
+   *
+   * That token is real in `tailwind.config.js` and compiled to nothing:
+   * NativeWind builds this project's stylesheet from the class names present in
+   * `src` when Metro boots, and no file had ever used it. A class that resolves
+   * to nothing leaves the label with no colour at all, so it fell back to the
+   * platform default — **black writing on the blue button**, the exact thing
+   * this tone was added to prevent.
+   *
+   * `text-white` is the same colour and is already used a few lines below for
+   * media overlays, so it is in the stylesheet on every build. This is the
+   * mechanism the rest of this file already trusts to colour text; the fix is
+   * to use it rather than to invent a second one.
+   */
+  'on-dark': 'text-white',
   accent: 'text-accent',
   success: 'text-success',
   warning: 'text-warning',
@@ -106,6 +122,15 @@ export function Text({
               textShadowRadius: 6,
             }
           : null,
+        /*
+          The same white again, as a value.
+
+          Belt and braces on the one tone whose failure mode is invisible: if
+          the class ever goes missing from the stylesheet the label stays white
+          instead of falling back to black, and a caller's own `style` still
+          wins because it comes last.
+        */
+        tone === 'on-dark' && !onMedia ? { color: colors.textOnDark } : null,
         style,
       ]}
       {...rest}

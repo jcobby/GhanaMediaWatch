@@ -199,10 +199,23 @@ describe('what the reporter is promised before they submit', () => {
      * on the directed one. Both reports then sat in review, and nothing that
      * had been said accounted for the wait — or for the editor who decides.
      */
-    const copy = en.destination as unknown as Record<string, { body: string } | undefined>;
-    const unreviewed = ['public', 'marketplace', 'directed', 'both'].filter(
-      (k) => !/editor/i.test(copy[k]?.body ?? ''),
+    /*
+     * Driven off the options the picker actually draws, not a list written here.
+     *
+     * This named four destinations; two of them — `public` and `marketplace` —
+     * were removed when the set was cut to two, so the test failed on copy for
+     * choices nobody can make while `directed`, which somebody *can* choose,
+     * quietly stopped mentioning the editor at all and was never caught.
+     */
+    const picker = fs.readFileSync(
+      path.resolve(__dirname, '../../capture/DestinationPicker.tsx'),
+      'utf8',
     );
+    const options = [...picker.matchAll(/value: '(\w+)'/g)].map((m) => m[1]!);
+    expect(options.length).toBeGreaterThan(1);
+
+    const copy = en.destination as unknown as Record<string, { body: string } | undefined>;
+    const unreviewed = options.filter((k) => !/editor/i.test(copy[k]?.body ?? ''));
     expect(unreviewed).toEqual([]);
   });
 });

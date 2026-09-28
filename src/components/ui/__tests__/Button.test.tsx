@@ -1,5 +1,6 @@
 import fs from 'fs';
 import path from 'path';
+import { StyleSheet } from 'react-native';
 import { render, screen, fireEvent } from '@testing-library/react-native';
 import { Button } from '../Button';
 
@@ -22,6 +23,26 @@ describe('Button', () => {
     await render(<Button label="Submit" loading onPress={jest.fn()} />);
     expect(screen.getByLabelText('Submit')).toBeBusy();
     expect(screen.getByLabelText('Submit')).toBeDisabled();
+  });
+
+  it('writes the primary label in white, on the blue fill', async () => {
+    /*
+     * This shipped black, twice over.
+     *
+     * First by design — the label was `textPrimary` on a violet gradient at
+     * 3.19:1. Then by accident: the fix used `text-text-on-dark`, a token no
+     * file in this project had ever used, and NativeWind builds the stylesheet
+     * from the class names present in `src` when Metro boots. The class
+     * compiled to nothing, the label took no colour at all, and fell back to
+     * the platform default — black, on the blue button.
+     *
+     * Asserted on the rendered colour rather than on the class name, because
+     * the class name is exactly what was wrong the second time.
+     */
+    await render(<Button label="Create account" onPress={jest.fn()} />);
+    const label = screen.getByText('Create account');
+    const flat = StyleSheet.flatten(label.props.style) as { color?: string };
+    expect(String(flat.color).toLowerCase()).toBe('#ffffff');
   });
 });
 

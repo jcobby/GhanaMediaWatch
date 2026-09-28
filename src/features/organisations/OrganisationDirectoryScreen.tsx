@@ -6,7 +6,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { EmptyState, Glass, Pressable, Text } from '@/components/ui';
-import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { receiving, useOrganisations } from '@/hooks/useOrganisations';
 import { useSurveys } from '@/hooks/useSurveys';
 import { useFeed } from '@/hooks/useIncidents';
@@ -67,11 +66,28 @@ export function OrganisationDirectoryScreen() {
   return (
     <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
       <View className="gap-3 px-4 pb-3 pt-1">
-        <View>
-          <Text variant="title-lg">{t('organisations.title')}</Text>
-          <Text variant="body-sm" tone="muted" className="mt-0.5">
-            {t('organisations.subtitle')}
-          </Text>
+        {/*
+          A way back.
+
+          This screen was built as a tab and is now pushed from the feed's menu,
+          which left it with no exit at all — nothing on screen, and on Android
+          only the hardware key. The title moved beside the arrow rather than
+          above it, so the row reads as one header.
+        */}
+        <View className="flex-row items-center gap-3">
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityLabel={t('common.back')}
+            className="h-10 w-10 items-center justify-center rounded-pill bg-canvas-raise"
+          >
+            <Ionicons name="chevron-back" size={20} color={c.textPrimary} />
+          </Pressable>
+          <View className="flex-1">
+            <Text variant="title-lg">{t('organisations.title')}</Text>
+            <Text variant="body-sm" tone="muted" className="mt-0.5">
+              {t('organisations.subtitle')}
+            </Text>
+          </View>
         </View>
 
         <Glass elevation="low" className="flex-row items-center gap-2.5 rounded-lg px-3">
@@ -112,9 +128,16 @@ export function OrganisationDirectoryScreen() {
         keyboardDismissMode="on-drag"
         data={listed}
         keyExtractor={(b) => b.id}
+        /*
+          No tab bar on this route, so no clearance for one.
+
+          It reserved `TAB_SCROLL_CLEARANCE` from when this was a tab — 96
+          points of empty space under the last organisation on a screen that is
+          now pushed over the feed.
+        */
         contentContainerStyle={{
           paddingHorizontal: 16,
-          paddingBottom: insets.bottom + TAB_SCROLL_CLEARANCE,
+          paddingBottom: insets.bottom + 24,
         }}
         ItemSeparatorComponent={() => <View className="h-2.5" />}
         renderItem={({ item }) => (

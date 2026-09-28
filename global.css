@@ -22,18 +22,13 @@
  *      "dark mode"; it is the only thing legible over an arbitrary photo, and
  *      every photo-led app does the same.
  *
- * ONE THEME. A blue masthead over a white page, and no way to change it.
+ * ONE THEME. A black masthead over a white page, and no way to change it.
  *
- * It was a black masthead and a violet accent — blue and black. The two
- * identity colours are now blue and white: the chrome carries the brand blue,
- * the page under it stays white, and the accent is a blue rather than a violet
- * so the whole app reads as one colour rather than two that nearly rhyme.
- *
- * Two dark values deliberately survive that change, and neither is brand:
- * `--color-glass-media` and `--color-text-primary`. The first is what makes
- * white text legible over arbitrary photography and the second is body copy on
- * a white page. "Blue and white" is about the surfaces people recognise the app
- * by, not an instruction to put white text on white.
+ * The accent was a violet and is now a blue, so the app's controls read as blue
+ * and white — a blue fill with a white label. That change is scoped to the
+ * accent: the masthead, the media panels and body copy stay as they were.
+ * Turning the masthead blue as well was a step further than was asked for, and
+ * it replaced the publication's own bar with a brand surface.
  *
  * A dark/light switch was built here and taken back out. It gave one question
  * — what colour is this app — three answers that disagreed: a value stored on
@@ -64,10 +59,9 @@
     /* Frosted panel fill on light surfaces. Painted at high alpha over a blur. */
     --color-glass: 255 255 255;
     /* Frosted panel fill over media. Dark, so white text survives any frame.
-       Tinted towards the brand blue rather than neutral, but it stays dark:
-       this value exists for legibility over an arbitrary photograph, and a
-       white panel there would put white text on a bright sky. */
-    --color-glass-media: 11 16 32;
+       Neutral: this value exists for legibility over an arbitrary photograph,
+       not to carry the brand. */
+    --color-glass-media: 16 17 26;
 
     /* Hairlines are dark on light ground, and light over media. */
     --color-hairline: 14 16 36;
@@ -102,14 +96,14 @@
 
     /* Live / urgent — reserved for active incidents only. */
     --color-live: 200 18 56;
-    /* The masthead: the page belongs to the reader, the bar belongs to the
-       publication.
+    /* The masthead. Identical in both themes: the page belongs to the reader,
+       the bar belongs to the publication.
 
-       The brand blue, deep enough to carry the reversed artwork and white icons
-       at AAA — it was near-black, which made the app read as blue and black. A
-       *white* bar was the other way to read "blue and white" and is worse here:
-       it would vanish into the page it sits on, and the supplied home wordmark
-       exists only in the near-white form drawn for a dark bar. */
-    --color-masthead: 11 63 168;
+       Neutral rather than a blue — above a white page a blue-cast bar reads as
+       a theme leaking in at the top rather than as a masthead. It was turned
+       blue when the accent moved off violet, which was a step further than the
+       change called for: the accent and the controls it fills are the brand
+       surfaces, and the GNA bar is the publication's. */
+    --color-masthead: 26 26 29;
   }
 }

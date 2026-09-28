@@ -34,6 +34,11 @@ import type {
   OnboardingStepId,
 } from '@/types/onboarding';
 import type {
+  BloggerApplication,
+  BloggerDocumentId,
+  BloggerStepId,
+} from '@/types/bloggerVerification';
+import type {
   ApiClient,
   AuthTokens,
   Caller,
@@ -198,7 +203,12 @@ export class MockApiClient implements ApiClient {
    * organisation would skip straight to the inbox and the wizard would be
    * unreachable without a backend.
    */
-  private registered: { email: string; orgName: string | null } | null = null;
+  private registered: {
+    email: string;
+    orgName: string | null;
+    /** What they registered as, so `getCaller` answers the same thing `/me` would. */
+    accountKind: 'user' | 'blogger' | 'organisation';
+  } | null = null;
 
   /**
    * A Google identity, treated as a registration for an unknown address.
@@ -208,15 +218,22 @@ export class MockApiClient implements ApiClient {
    * `/auth/google` takes no organisation.
    */
   signInWithGoogle(input: { email: string }): Promise<AuthTokens> {
-    this.registered = { email: input.email, orgName: null };
+    this.registered = { email: input.email, orgName: null, accountKind: 'user' };
     return this.signIn({ email: input.email, password: 'google' });
   }
 
   register(input: RegisterRequest): Promise<AuthTokens> {
     this.registered =
       input.accountKind === 'organisation' && input.organisation
-        ? { email: input.email, orgName: input.organisation.name }
-        : { email: input.email, orgName: null };
+        ? { email: input.email, orgName: input.organisation.name, accountKind: 'organisation' }
+        : {
+            email: input.email,
+            orgName: null,
+            // A blogger registered here is unverified, which is the state the
+            // verification screen is written around — an approved one would
+            // never see it, and the flow would be unreachable without a backend.
+            accountKind: input.accountKind === 'blogger' ? 'blogger' : 'user',
+          };
     // Same envelope as signing in — the difference is on the server.
     return this.signIn({ email: input.email, password: input.password });
   }
@@ -299,31 +316,49 @@ export class MockApiClient implements ApiClient {
      * to an inbox that would be empty for a reason nothing on screen explains.
      */
     if (this.registered?.email === this.signedInEmail) {
-      const { orgName } = this.registered;
+      const { orgName, accountKind } = this.registered;
       return this.simulate(
         orgName
           ? {
               userId: 'usr_applicant',
               orgId: 'org_pending',
               role: 'owner',
+              accountKind: 'organisation',
+              verified: false,
               memberships: [
                 { orgId: 'org_pending', role: 'owner', name: orgName, verified: false },
               ],
             }
-          : { userId: 'usr_new', orgId: null, role: null, memberships: [] },
+          : {
+              userId: 'usr_new',
+              orgId: null,
+              role: null,
+              accountKind,
+              verified: false,
+              memberships: [],
+            },
       );
     }
 
     const login = this.signedInEmail ? findDemoLogin(this.signedInEmail) : undefined;
 
     if (login?.accountType !== 'organisation' || !login.businessId) {
-      return this.simulate({ userId: 'usr_demo', orgId: null, role: null, memberships: [] });
+      return this.simulate({
+        userId: 'usr_demo',
+        orgId: null,
+        role: null,
+        accountKind: 'user',
+        verified: false,
+        memberships: [],
+      });
     }
 
     return this.simulate({
       userId: 'usr_demo',
       orgId: login.businessId,
       role: 'admin',
+      accountKind: 'organisation',
+      verified: true,
       memberships: [
         {
           orgId: login.businessId,
@@ -597,6 +632,96 @@ export class MockApiClient implements ApiClient {
       submittedAtIso: new Date().toISOString(),
     };
     return this.simulate({ ...this.application });
+  }
+
+  // ─── a blogger's own verification ───────────────────────────────────────
+
+  /**
+   * Held in the same shape the screen reads, so the wizard is usable with no
+   * backend at all — which is the point of this client. `missingDocuments` is
+   * maintained as documents arrive, because the screen trusts the service's
+   * list over its own reading and a mock that never updated it would leave the
+   * submit button disabled forever.
+   */
+  private verification: BloggerApplication = {
+    id: 'pva_mock',
+    reference: 'ONB-PER-MOCK01',
+    steps: {},
+    documents: [],
+    missingDocuments: ['officer_id', 'utility_bill_or_premises_proof'],
+    submittedAtIso: null,
+    approvedAtIso: null,
+    rejectionReason: null,
+    screeningClear: null,
+  };
+
+  getVerification(): Promise<BloggerApplication> {
+    return this.simulate({ ...this.verification });
+  }
+
+  saveVerificationStep(
+    stepId: BloggerStepId,
+    payload: Record<string, unknown>,
+  ): Promise<BloggerApplication> {
+    const values: Record<string, string> = {};
+    for (const [key, value] of Object.entries(payload)) {
+      if (typeof value === 'string') values[key] = value;
+    }
+    this.verification = {
+      ...this.verification,
+      steps: {
+        ...this.verification.steps,
+        [stepId]: { status: 'in_progress', values, rejectionReason: null },
+      },
+    };
+    return this.simulate({ ...this.verification });
+  }
+
+  submitVerificationStep(stepId: BloggerStepId): Promise<BloggerApplication> {
+    const held = this.verification.steps[stepId];
+    this.verification = {
+      ...this.verification,
+      steps: {
+        ...this.verification.steps,
+        [stepId]: { status: 'submitted', values: held?.values ?? {}, rejectionReason: null },
+      },
+    };
+    return this.simulate({ ...this.verification });
+  }
+
+  attachVerificationDocument(input: {
+    documentType: BloggerDocumentId;
+    fileName: string;
+  }): Promise<void> {
+    const { documentType, fileName } = input;
+    this.verification = {
+      ...this.verification,
+      documents: [
+        ...this.verification.documents.filter((d) => d.id !== documentType),
+        { id: documentType, fileName },
+      ],
+      missingDocuments: this.verification.missingDocuments.filter((missing) =>
+        /*
+         * A group entry is cleared by any of its members. The service names the
+         * address requirement `utility_bill_or_premises_proof`, so a literal
+         * comparison would leave it outstanding after a perfectly good upload.
+         */
+        missing.includes('_or_') ? !missing.split('_or_').includes(documentType) : missing !== documentType,
+      ),
+    };
+    return this.simulate(undefined);
+  }
+
+  uploadVerificationDocumentBytes(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  submitVerification(): Promise<BloggerApplication> {
+    this.verification = {
+      ...this.verification,
+      submittedAtIso: new Date().toISOString(),
+    };
+    return this.simulate({ ...this.verification });
   }
 }
 

@@ -172,6 +172,11 @@ export default function RootLayout() {
               {/* The application a pending organisation works through. Outside
                   `(org)` because that shell is four tabs it may not use yet. */}
               <Stack.Screen name="onboarding/organisation" />
+              {/* A blogger's own application. Reached from the profile rather
+                  than forced at launch: unlike a pending organisation, an
+                  unverified blogger has a working app and is not waiting on
+                  anybody to use it. */}
+              <Stack.Screen name="verification/blogger" />
               {/* Presented as a card over the tabs so the feed stays mounted
                 behind it and returns to the same scroll position. */}
               <Stack.Screen name="incident/[id]" options={{ presentation: 'card' }} />

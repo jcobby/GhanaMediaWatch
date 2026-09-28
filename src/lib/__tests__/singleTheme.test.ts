@@ -73,15 +73,15 @@ test('nothing picks brand artwork by asking the theme', () => {
   expect(brand).toMatch(/reversed/);
 });
 
-test('the masthead is the brand blue and the news ground is white', () => {
+test('the masthead is black and the news ground is white', () => {
   /*
-   * Blue and white, pinned so a token rename cannot quietly undo it.
+   * Pinned so a token change cannot quietly undo it — in either direction.
    *
-   * It was black — the app read as blue and black — and the masthead is the
-   * surface that decided that, because it is the one large area of colour on
-   * the screen the reader opens onto.
+   * The accent moving from violet to blue took the masthead with it for a
+   * while. That was wider than the change called for: the blue belongs to the
+   * accent and the controls it fills, and this bar belongs to the publication.
    */
-  expect(lightColors.masthead.toLowerCase()).toBe('#0b3fa8');
+  expect(lightColors.masthead.toLowerCase()).toBe('#1a1a1d');
   expect(lightColors.canvasSoft.toLowerCase()).toBe('#ffffff');
 
   /*
@@ -105,7 +105,7 @@ test('nothing brand-coloured is still violet', () => {
    * two close together. Checked on the tokens themselves rather than by
    * grepping for one hex, so a *different* violet cannot slip in.
    */
-  for (const token of ['accent', 'accentAlt', 'accentBright', 'masthead'] as const) {
+  for (const token of ['accent', 'accentAlt', 'accentBright'] as const) {
     const [r, , b] = parseHex(lightColors[token]);
     expect([token, b > r + 40]).toEqual([token, true]);
   }

@@ -7,7 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { Thumbnail } from '@/components/Thumbnail';
-import { GnaHorizontal } from '@/components/Brand';
+import { DawuroWordmark } from '@/components/Brand';
 import { CaptureStamp } from '@/components/CaptureStamp';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { categoryHue, useColors } from '@/lib/theme';
@@ -165,7 +165,7 @@ export function SlidesViewer({
               <Ionicons name="chevron-back" size={24} color="#FFFFFF" />
             </RNPressable>
 
-            <GnaHorizontal height={22} reversed />
+            <DawuroWordmark size={20} reversed />
 
             <View className="flex-1" />
 

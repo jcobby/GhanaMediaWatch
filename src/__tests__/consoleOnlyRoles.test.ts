@@ -86,12 +86,50 @@ test('every organisation call names the organisation it is for', () => {
    * the client takes an `orgId`.
    */
   const client = code('api/client.ts');
-  const orgSection = client.slice(client.indexOf('getOrgDashboard'));
+
+  /*
+   * Bounded at both ends.
+   *
+   * This used to slice from `getOrgDashboard` to the end of the file, which
+   * held only while the org methods were last. They are not: a blogger's
+   * `/me/verification/*` calls sit after them and take no organisation, because
+   * a blogger has none — and the rule immediately failed them for it.
+   *
+   * The boundary is the first personal method rather than the section comment
+   * above it, because `code()` strips comments before this ever sees them. It
+   * is asserted rather than assumed: a rename would otherwise silently return
+   * this to scanning the whole tail again and pass by finding nothing.
+   */
+  const ORG_START = 'getOrgDashboard';
+  const PERSONAL_START = 'getVerification(';
+  expect(client).toContain(ORG_START);
+  expect(client).toContain(PERSONAL_START);
+
+  const orgSection = client.slice(client.indexOf(ORG_START), client.indexOf(PERSONAL_START));
   const methods = [...orgSection.matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]!);
   expect(methods.length).toBeGreaterThan(5);
   for (const method of methods) {
     const signature = orgSection.slice(orgSection.indexOf(`${method}(`));
     expect([method, /^\w+\(\s*orgId: string/.test(signature)]).toEqual([method, true]);
+  }
+
+  /*
+   * And the other half of the same rule: a `/me/*` call must **not** take one.
+   *
+   * "Has no organisation" and "forgot to pass the organisation" must not be the
+   * same call. A blogger method that accepted an optional `orgId` would make
+   * them indistinguishable, and the org rule above would be satisfied by a
+   * signature that sends the header for an account that has no right to one.
+   */
+  const personalSection = client.slice(client.indexOf(PERSONAL_START));
+  const personal = [...personalSection.matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]!);
+  expect(personal.length).toBeGreaterThan(3);
+  for (const method of personal) {
+    const signature = personalSection.slice(personalSection.indexOf(`${method}(`));
+    expect([method, /orgId/.test(signature.slice(0, signature.indexOf(')')))]).toEqual([
+      method,
+      false,
+    ]);
   }
 
   // And the header actually goes out.

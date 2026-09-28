@@ -114,19 +114,48 @@ test('the client never names a role or an organisation', () => {
   expect(code('stores/authStore.ts')).toMatch(/const org = await describeOrg\(\)/);
 });
 
-test('the button is not offered when it cannot work', () => {
+test('a release build does not offer a button that cannot work', () => {
   /*
-   * The client ids live in the environment and cannot be committed. A button
-   * that opens a picker and then fails on an empty audience is worse than no
-   * button — nobody can tell that apart from their account being refused.
+   * The client ids live in the environment and cannot be committed. Shipping a
+   * picker that fails on an empty audience is a feature that lies — a reporter
+   * cannot tell it from their account being refused.
+   *
+   * Development is the other half of that trade and it was got wrong first:
+   * hiding it there too made the button invisible on the only device anyone was
+   * looking at, with no way to tell "not built" from "not configured". So the
+   * guard is `!isGoogleConfigured && !__DEV__`, and both halves matter.
    */
-  expect(code('features/auth/GoogleButton.tsx')).toMatch(
-    /if \(!isGoogleConfigured\) return null;/,
-  );
-  // And the flag is the web client id, which is the audience the service checks.
+  const button = code('features/auth/GoogleButton.tsx');
+  expect(button).toMatch(/if \(!isGoogleConfigured && !__DEV__\) return null;/);
+  // And in development it says so on the screen, not only when pressed.
+  expect(button).toMatch(/\{!isGoogleConfigured \? \(/);
+
+  // The flag is the web client id, which is the audience the service checks.
   expect(code('services/googleSignIn.ts')).toMatch(
     /isGoogleConfigured = WEB_CLIENT_ID\.length > 0/,
   );
+});
+
+test('the env files name the variables the button needs', () => {
+  /*
+   * `.env.example` is the one that must always name them: it is tracked, and it
+   * is what somebody cloning this repo copies.
+   *
+   * **`.env` is checked only if it is there.** It is gitignored
+   * (`.gitignore:44`), so on a fresh clone or in CI it does not exist and
+   * `readFileSync` threw — failing the entire Google suite for a reason that
+   * has nothing to do with the button, on precisely the machines least able to
+   * diagnose it. Where a developer does have one, a missing variable in it is
+   * still worth catching: documented-and-absent is the same as not written down
+   * at all.
+   */
+  const example = fs.readFileSync(path.join(ROOT, '.env.example'), 'utf8');
+  expect(example).toContain('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+
+  const local = path.join(ROOT, '.env');
+  if (fs.existsSync(local)) {
+    expect(fs.readFileSync(local, 'utf8')).toContain('EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID');
+  }
 });
 
 test('cancelling is not reported as a failure', () => {

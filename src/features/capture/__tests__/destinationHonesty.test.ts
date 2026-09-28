@@ -45,8 +45,14 @@ test('an empty directory is not mistaken for a failed one', () => {
 });
 
 test('no commission is quoted when nothing can be licensed', () => {
-  const estimate = ESTIMATE.slice(ESTIMATE.indexOf('{/* Earnings estimate */}'));
-  expect(estimate).toMatch(/nobodyIsBuying\s*\?\s*t\('destination\.nobodyBuyingTitle'\)/);
+  /*
+   * Sliced from the marker comment that used to head this block; the component
+   * was restyled from a Glass card to a flat note and the comment went with it,
+   * so the slice returned nothing and the assertion passed on an empty string.
+   * The whole file is searched instead — there is only one estimate in it.
+   */
+  const estimate = ESTIMATE;
+  expect(estimate).toMatch(/nobodyIsBuying[\s\S]{0,40}t\('destination\.nobodyBuyingTitle'\)/);
   // The quote is still reachable for when organisations exist.
   expect(estimate).toMatch(/destination\.estimatedEarning/);
 
@@ -66,19 +72,32 @@ test('no commission is quoted when nothing can be licensed', () => {
   expect(PICKER).not.toMatch(/const nobodyIsBuying = (false|true);/);
 });
 
-test('the three inert choices are marked, not hidden', () => {
+test('a choice that cannot work is marked, not hidden', () => {
   /*
-   * Hiding them would misrepresent the product — footage can be sold, and a
-   * reporter should know that. Leaving them unmarked lets somebody pick one
-   * and get nothing. Marked is the only honest middle.
+   * Hiding it would misrepresent the product — footage can be sold, and a
+   * reporter should know that. Leaving it unmarked lets somebody pick it and
+   * get nothing. Marked is the only honest middle.
+   *
+   * **Four destinations became two**, deliberately: every report reaches Dawuro
+   * either way now, so the only question left is whether particular
+   * institutions also receive it directly. These assertions named `public`,
+   * which has not been an option since — so they failed on the name of a choice
+   * that no longer exists while the rule itself held.
    */
-  expect(PICKER).toMatch(/const inert = nobodyIsBuying && option\.value !== 'public'/);
+  expect(PICKER).toMatch(/const inert = nobodyIsBuying && option\.value === 'directed'/);
   expect(PICKER).toMatch(/destination\.notAvailableYet/);
 });
 
-test('the public feed is never marked unavailable', () => {
-  // It is the one destination that works with no organisations at all.
-  expect(PICKER).toMatch(/option\.value !== 'public'/);
+test('the destination that always works is never marked unavailable', () => {
+  /*
+   * `both` reaches Dawuro with no organisation on the platform at all, so it
+   * can never be inert. The rule is the same one the `public` assertion used to
+   * make; only the name of the base choice changed.
+   */
+  const options = PICKER.slice(PICKER.indexOf('const OPTIONS'), PICKER.indexOf('/**', PICKER.indexOf('const OPTIONS')));
+  expect(options).toMatch(/value: 'both'/);
+  expect(PICKER).toMatch(/option\.value === 'directed'/);
+  expect(PICKER).not.toMatch(/inert = nobodyIsBuying;/);
 });
 
 test('the wording says why, and what still works', () => {

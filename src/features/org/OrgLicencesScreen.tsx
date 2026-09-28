@@ -31,11 +31,15 @@ import { OrgHeader } from './OrgHeader';
  * the licensed set in browser memory, so a page reload lost every licence an
  * organisation had bought that session, along with any way to act on one.
  *
- * The consequence of that derivation is worth being honest about rather than
- * papering over: this lists licensed reports that are **still in the inbox
- * page**. It is the same set the console shows and the same set the service
- * exposes. A dedicated endpoint would be better, and when one lands only
- * `useOrgLicences` changes.
+ * That derivation used to carry a real hole: the inbox was fetched one page
+ * deep, so a licence that had scrolled past the newest fifty reports was simply
+ * absent from the list of what this organisation had bought. `getOrgInbox` now
+ * follows the cursor to the end (bounded at ten pages), which is what makes
+ * this screen a record rather than a sample.
+ *
+ * A dedicated endpoint would still be better — it would let the service answer
+ * "what have we licensed" without reading everything routed to us — and when
+ * one lands only `useOrgLicences` changes.
  */
 export function OrgLicencesScreen() {
   const c = useColors();

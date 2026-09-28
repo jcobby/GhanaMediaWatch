@@ -6,6 +6,10 @@ const validSignUp = {
   accountKind: 'reporter' as const,
   displayName: 'Ama Kufuor',
   email: 'ama@example.gh',
+  // Where commissions land. Required of a reporter and asked for on the third
+  // step, because a commission with no wallet behind it is held rather than
+  // paid — see the payout block at the foot of this file.
+  payoutMsisdn: '024 123 4567',
   password: 'correct horse battery',
   confirmPassword: 'correct horse battery',
   acceptedTerms: true as const,
@@ -71,7 +75,14 @@ describe('sign up', () => {
      * without one has nothing to review. A reporter never sees the field, and a
      * blanket rule would block them on something they were never shown.
      */
-    const asOrg = { ...validSignUp, accountKind: 'organisation' as const };
+    /*
+     * And no payout number: an organisation pays for subscriptions rather than
+     * receiving commissions, so the field is not on its form at all. Dropped
+     * here so the assertion below is about the organisation's name and not
+     * quietly passing because a number happened to be present.
+     */
+    const { payoutMsisdn: _ignored, ...orgBase } = validSignUp;
+    const asOrg = { ...orgBase, accountKind: 'organisation' as const };
     expect(signUpSchema.safeParse(asOrg).success).toBe(false);
     expect(
       signUpSchema.safeParse({ ...asOrg, organisationName: 'Accra Metropolitan Assembly' }).success,
@@ -123,5 +134,58 @@ describe('password strength', () => {
       expect(s).toBeGreaterThanOrEqual(0);
       expect(s).toBeLessThanOrEqual(3);
     });
+  });
+});
+
+describe('where commissions are paid', () => {
+  /*
+   * **A commission with no wallet behind it is held, not paid.** The number
+   * was collected on the earnings screen, which somebody opens *after* they
+   * have earned something and wondered where it went — so it is asked for
+   * while the account is being made instead.
+   *
+   * Validated with `toGhanaMsisdn`, the same function the earnings screen and
+   * the API client use, so a number this accepts is one the service accepts. A
+   * typo that gets through registration surfaces weeks later as a payout that
+   * never arrived, by which time nobody remembers typing it.
+   */
+  it.each(['024 123 4567', '0241234567', '+233 24 123 4567', '233241234567', '241234567'])(
+    'accepts %s — every way a Ghanaian number is written',
+    (payoutMsisdn) => {
+      expect(signUpSchema.safeParse({ ...validSignUp, payoutMsisdn }).success).toBe(true);
+    },
+  );
+
+  it.each(['', '024 123 456', '0301234567', 'not a number'])('rejects %s', (payoutMsisdn) => {
+    // Too short, a landline, and nothing at all. The last one matters most:
+    // an empty field must not pass as "they will add it later".
+    expect(signUpSchema.safeParse({ ...validSignUp, payoutMsisdn }).success).toBe(false);
+  });
+
+  it('says what to do rather than naming the rule', () => {
+    const result = signUpSchema.safeParse({ ...validSignUp, payoutMsisdn: '' });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      const issue = result.error.issues.find((i) => i.path[0] === 'payoutMsisdn');
+      expect(issue?.message).toBe(
+        'Enter the mobile money number that should receive your commissions',
+      );
+    }
+  });
+
+  it('is never asked of an organisation', () => {
+    /*
+     * It pays for subscriptions through the checkout rather than receiving
+     * commissions, and the service has nothing to attach a payment method to
+     * before the organisation exists. A blanket requirement would block it on
+     * a field its form does not render.
+     */
+    const asOrg = {
+      ...validSignUp,
+      accountKind: 'organisation' as const,
+      organisationName: 'Accra Metropolitan Assembly',
+      payoutMsisdn: '',
+    };
+    expect(signUpSchema.safeParse(asOrg).success).toBe(true);
   });
 });

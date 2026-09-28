@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { toGhanaMsisdn } from '@/lib/momo';
 
 /**
  * Form validation for the auth screens.
@@ -43,12 +44,26 @@ export const signInSchema = z.object({
 /**
  * What kind of account is being created.
  *
- * Not a preference — the two produce different things on the service. A
- * `reporter` gets an account and can file immediately; an `organisation` gets a
- * *pending* organisation that a platform administrator has to approve before it
- * can reach anything.
+ * Not a preference — the three produce different things on the service.
+ *
+ * - `reporter` gets an account and can file immediately.
+ * - `blogger` gets the same account **plus a verification application**. They
+ *   can file from the moment they register; what verification adds is a byline
+ *   a reader can see has been checked. Crucially they are not blocked while it
+ *   is pending — `/me` returns `kind: "user"` for them, so every route a
+ *   reporter may call, they may call.
+ * - `organisation` gets a *pending* organisation that a platform administrator
+ *   has to approve before it can reach anything at all.
+ *
+ * That last difference is the one that shapes the routing: a pending
+ * organisation gets `403 check: "org_pending"` from every `/org/*` route but
+ * onboarding, so it must be sent to its application. An unverified blogger has
+ * a working app and is sent to it.
+ *
+ * The order is the order of the cards, and it is deliberate: most people
+ * signing up are individuals, and the least common choice should not be first.
  */
-export const ACCOUNT_KINDS = ['reporter', 'organisation'] as const;
+export const ACCOUNT_KINDS = ['reporter', 'blogger', 'organisation'] as const;
 export type SignUpKind = (typeof ACCOUNT_KINDS)[number];
 
 export const signUpSchema = z
@@ -84,6 +99,20 @@ export const signUpSchema = z
       .enum(['government', 'media', 'utility', 'insurance', 'ngo', 'research', 'other'])
       .optional(),
     email: emailSchema,
+    /**
+     * Where commissions are paid, asked for while the account is being made.
+     *
+     * A reporter earns the moment an organisation licenses their footage, and
+     * a commission with no wallet behind it is held rather than paid — so the
+     * number was being collected on the earnings screen, which somebody visits
+     * *after* they have already earned something and wondered where it went.
+     *
+     * Optional in the schema and required by the refinement below, because an
+     * organisation is never shown the field: it pays for subscriptions rather
+     * than receiving commissions, and a blanket requirement would block it on
+     * something it was never asked.
+     */
+    payoutMsisdn: z.string().trim().optional(),
     password: passwordSchema,
     confirmPassword: z.string(),
     // zod v4 takes `message` directly; `errorMap` was removed.
@@ -98,6 +127,21 @@ export const signUpSchema = z
     {
       message: 'Enter the name of the organisation',
       path: ['organisationName'],
+    },
+  )
+  /*
+   * Checked on the phone, where it can still be corrected.
+   *
+   * `toGhanaMsisdn` is the same function the earnings screen and the API
+   * client use, so a number accepted here is one the service will accept. A
+   * mistyped wallet that passes registration surfaces weeks later as a payout
+   * that never arrived, and by then nobody remembers typing it.
+   */
+  .refine(
+    (data) => data.accountKind === 'organisation' || toGhanaMsisdn(data.payoutMsisdn ?? '') !== null,
+    {
+      message: 'Enter the mobile money number that should receive your commissions',
+      path: ['payoutMsisdn'],
     },
   );
 

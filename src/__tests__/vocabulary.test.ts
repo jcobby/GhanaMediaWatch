@@ -120,6 +120,15 @@ describe('the word a reporter reads', () => {
         .replace(/'business(-outline)?'/g, ' ')
         .replace(/"business(-outline)?"/g, ' ')
         .replace(/'directed_business_ids'/g, ' ')
+        /*
+         * A company's registered name, not the product's vocabulary.
+         *
+         * "Softmasters Business Solutions" is who built this, and it appears as
+         * the accessibility label on their lockup. The rule below is about
+         * never calling an *organisation* a business to a reporter; renaming a
+         * real company to satisfy it would be the rule eating its own purpose.
+         */
+        .replace(/Softmasters Business Solutions/g, ' ')
         // `/org/dashboard` wraps the organisation under its own key.
         .replace(/business\?: \{ id\?: string; name\?: string \}/g, ' ')
         .replace(/dashboard\.business/g, ' ');

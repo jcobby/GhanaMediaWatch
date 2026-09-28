@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Animated, Easing, View } from 'react-native';
-import { useTranslation } from 'react-i18next';
-import { GnaLogo } from '@/components/Brand';
-import { Text } from '@/components/ui';
+import { DawuroWordmark, GnaMark, ProvidedBy } from '@/components/Brand';
 import { useColors } from '@/lib/theme';
 
 /**
@@ -17,13 +15,18 @@ import { useColors } from '@/lib/theme';
  * This fills the gap with the same mark the splash carries, so the transition
  * is a fade between two identical images rather than a flash of nothing.
  *
+ * **It is also the only place the app says its own name at launch.** It used to
+ * show the GNA lockup and a line reading "Developed by Softmasters" — so the
+ * first thing a new user saw named the agency and the contractor, and never the
+ * product they had just installed. Dawuro leads now, with both organisations
+ * credited under it: the name first, then who stands behind it.
+ *
  * It also solves a practical problem: **Expo Go does not reliably show the
  * splash configured in app.json** — it has its own. In Expo Go this component
  * is the only place the logo appears at launch, which matters because the
  * demo is run in Expo Go.
  */
 export function BootScreen() {
-  const { t } = useTranslation();
   const c = useColors();
   /*
    * Created once, without reading a ref during render.
@@ -52,16 +55,25 @@ export function BootScreen() {
     // splash was painted in, or the handover between them shows as a flash of a
     // slightly different ground.
     <View className="flex-1 items-center justify-center" style={{ backgroundColor: c.canvas }}>
-      <Animated.View style={{ opacity: fade }}>
-        <GnaLogo width={230} />
+      <Animated.View style={{ opacity: fade }} className="items-center">
+        <DawuroWordmark size={46} />
       </Animated.View>
 
-      {/* The people who built it, kept quiet and kept at the foot. A credit
-          that competes with the client's own mark is not a credit. */}
-      <Animated.View style={{ opacity: fade }} className="absolute bottom-14">
-        <Text variant="caption" tone="faint">
-          {t('app.developedBy')}
-        </Text>
+      {/*
+        Both organisations, at the foot, under the name.
+
+        The GNA mark sits with the words rather than above them: the agency is
+        what makes this credible, and a stranger reading "Ghana News Agency"
+        should see the mark they already recognise beside it. Kept small and
+        kept low, because a credit that competes with the product's own name
+        stops being a credit.
+      */}
+      <Animated.View
+        style={{ opacity: fade }}
+        className="absolute bottom-14 items-center gap-2.5 px-8"
+      >
+        <GnaMark size={40} />
+        <ProvidedBy />
       </Animated.View>
     </View>
   );

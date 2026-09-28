@@ -27,8 +27,22 @@ export interface Profile {
   id: string;
   email: string;
   displayName: string;
-  /** Which of the three experiences this account sees. */
+  /** Which of the experiences this account sees. */
   accountType: AccountType;
+  /**
+   * Whether this **person** has been verified as a publisher.
+   *
+   * Only meaningful for a `blogger`; false for everyone else. Distinct from
+   * `orgVerified`, which is about an organisation's application — a blogger is
+   * never blocked by this, it only decides whether their byline can be shown
+   * as checked.
+   *
+   * Optional, because a profile written before this field existed has no value
+   * for it, and an absent one must read as *not* verified: a byline shown as
+   * checked when it has not been is the failure this whole flag exists to
+   * prevent.
+   */
+  verified?: boolean;
   orgId: string | null;
   orgName: string | null;
   role: Role;
@@ -70,6 +84,12 @@ interface AuthState {
     email: string;
     password: string;
     displayName: string;
+    /**
+     * `blogger` creates the same account a reporter gets plus a verification
+     * application. Omitted for a plain reporter; ignored when `organisation`
+     * is present, which the service reads as an organisation registration.
+     */
+    accountKind?: 'blogger';
     organisation?: { name: string; sector: OrganisationSector };
   }) => Promise<void>;
   signOut: () => Promise<void>;
@@ -126,14 +146,60 @@ interface AuthState {
  * error worth surfacing — it simply makes them a reporter, which is the common
  * case and the right default.
  */
-async function describeOrg(): Promise<{
+/**
+ * What the account is, beside whatever organisation it belongs to.
+ *
+ * Read from `/me` rather than remembered from the registration request,
+ * because the account outlives that request: somebody signs in on a second
+ * device, or a platform owner verifies their blogger application while the app
+ * is closed. The phone's memory of what it asked for is a guess about the past.
+ */
+/**
+ * `/me`, read once and survivable.
+ *
+ * A `try` rather than `.catch()`: an api client without `getCaller` — a partial
+ * mock, an older build — throws a synchronous TypeError, which a promise catch
+ * never sees. Returning null makes every caller below fall back to its own
+ * read, which is the behaviour they had before this shared it.
+ */
+async function readCaller(): Promise<Awaited<ReturnType<typeof api.getCaller>> | null> {
+  try {
+    return await api.getCaller();
+  } catch {
+    return null;
+  }
+}
+
+async function describeSelf(
+  cached?: Awaited<ReturnType<typeof api.getCaller>>,
+): Promise<{ accountKind: string | null; verified: boolean }> {
+  try {
+    const me = cached ?? (await api.getCaller());
+    return { accountKind: me.accountKind, verified: me.verified };
+  } catch {
+    // The same failure `describeOrg` swallows, and for the same reason: an
+    // unreachable `/me` makes somebody a plain reporter, which is the common
+    // case and the safe default. It must never make them a *verified* one.
+    return { accountKind: null, verified: false };
+  }
+}
+
+/** `reporter` unless the service says this account is something else. */
+function accountTypeFor(accountKind: string | null, org: unknown): AccountType {
+  if (org) return 'organisation';
+  return accountKind === 'blogger' ? 'blogger' : 'reporter';
+}
+
+async function describeOrg(
+  cached?: Awaited<ReturnType<typeof api.getCaller>>,
+): Promise<{
   id: string;
   name: string;
   role: Role;
   verified: boolean;
 } | null> {
   try {
-    const me = await api.getCaller();
+    const me = cached ?? (await api.getCaller());
 
     /*
      * The default membership first, then any membership.
@@ -267,20 +333,31 @@ export const useAuthStore = create<AuthState>((set) => ({
      * device. The password was checked upstream, but the *role* was not: the
      * client granted it to itself from a fixture.
      *
-     * The API exposes nothing that describes the caller — there is no `/me`,
-     * and the token carries no organisation or role — so the honest substitute
-     * is to ask what this account can actually reach. Everyone else is a
-     * reporter, which is the right default: the public does not apply for an
-     * account type.
+     * `/me` answers all of it: the organisation this account belongs to, what
+     * the account itself was registered as, and whether the person has been
+     * verified as a publisher. Everyone the service says nothing special about
+     * is a reporter, which is the right default — the public does not apply
+     * for an account type.
+     *
+     * **One round trip, genuinely.** This was `Promise.all([describeOrg(),
+     * describeSelf()])` under a comment claiming exactly that — and each of
+     * those calls `/me` itself, so sign-in sent the request twice, in parallel,
+     * on the slowest moment of the app. `/me` is read once here and both
+     * readings are derived from the answer.
      */
-    const org = await describeOrg();
+    const me = await readCaller();
+    const [org, self] = [
+      me ? await describeOrg(me) : await describeOrg(),
+      me ? await describeSelf(me) : await describeSelf(),
+    ];
     const name = org?.name ?? email.split('@')[0]!;
 
     const profile: Profile = {
       id: email,
       email,
       displayName: name,
-      accountType: org ? 'organisation' : 'reporter',
+      accountType: accountTypeFor(self.accountKind, org),
+      verified: self.verified,
       orgId: org?.id ?? null,
       orgName: org?.name ?? null,
       role: org?.role ?? null,
@@ -291,7 +368,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ profile });
   },
 
-  register: async ({ email, password, displayName, organisation }) => {
+  register: async ({ email, password, displayName, accountKind, organisation }) => {
     /*
      * A real account creation, not a sign-in that happens to create one.
      *
@@ -307,7 +384,9 @@ export const useAuthStore = create<AuthState>((set) => ({
       displayName,
       ...(organisation
         ? { accountKind: 'organisation' as const, organisation }
-        : {}),
+        : accountKind === 'blogger'
+          ? { accountKind: 'blogger' as const }
+          : {}),
     });
     await session.save(tokens);
 
@@ -332,7 +411,13 @@ export const useAuthStore = create<AuthState>((set) => ({
       displayName,
       // The public does not apply for an account type — but an institution does,
       // and this is that application.
-      accountType: org ? 'organisation' : 'reporter',
+      //
+      // No `/me` round trip for the kind here: this is the one moment the phone
+      // does know, because it is what it just asked for. A fresh blogger is
+      // unverified by definition — the application is created alongside the
+      // account and nobody has reviewed it yet.
+      accountType: accountTypeFor(accountKind ?? null, org),
+      verified: false,
       orgId: org?.id ?? null,
       orgName: org?.name ?? null,
       role: org?.role ?? null,
@@ -357,14 +442,20 @@ export const useAuthStore = create<AuthState>((set) => ({
      * agency signing in with their work address is the common case — and
      * assuming "Google means reporter" would put them in the wrong app.
      */
-    const org = await describeOrg();
+    /* One `/me`, shared by both readings — see the note on the sign-in path. */
+    const me = await readCaller();
+    const [org, self] = [
+      me ? await describeOrg(me) : await describeOrg(),
+      me ? await describeSelf(me) : await describeSelf(),
+    ];
     const name = org?.name ?? identity.displayName;
 
     const profile: Profile = {
       id: identity.email,
       email: identity.email,
       displayName: identity.displayName,
-      accountType: org ? 'organisation' : 'reporter',
+      accountType: accountTypeFor(self.accountKind, org),
+      verified: self.verified,
       orgId: org?.id ?? null,
       orgName: org?.name ?? null,
       role: org?.role ?? null,
@@ -386,7 +477,26 @@ export const useAuthStore = create<AuthState>((set) => ({
    */
   refreshMembership: async () => {
     const current = useAuthStore.getState().profile;
-    if (!current || current.accountType !== 'organisation') return;
+    if (!current) return;
+
+    /*
+     * A blogger's approval, which nothing else was ever going to notice.
+     *
+     * This returned early for anything that was not an organisation, and
+     * `verified` was written once at sign-in and never again — so a blogger
+     * whose application an administrator approved a week later, on a phone that
+     * had not been signed out of, stayed unverified on screen forever. The flag
+     * the whole feature is justified by could only change by signing out.
+     */
+    if (current.accountType === 'blogger') {
+      const self = await describeSelf();
+      const profile: Profile = { ...current, verified: self.verified };
+      await SecureStore.setItemAsync(PROFILE_KEY, JSON.stringify(profile));
+      set({ profile });
+      return;
+    }
+
+    if (current.accountType !== 'organisation') return;
 
     const org = await describeOrg();
     if (!org) return;

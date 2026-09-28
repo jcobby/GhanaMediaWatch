@@ -13,6 +13,11 @@ import type {
   OnboardingStepId,
 } from '@/types/onboarding';
 import type {
+  BloggerApplication,
+  BloggerDocumentId,
+  BloggerStepId,
+} from '@/types/bloggerVerification';
+import type {
   LicenceResult,
   OrgAssignment,
   OrgDashboard,
@@ -130,7 +135,16 @@ export interface RegisterRequest {
    * account may reach — every other `/org/*` route answers
    * `403 check: "org_pending"`.
    */
-  accountKind?: 'user' | 'organisation';
+  /**
+   * `user`, `blogger` or `organisation`; the service defaults an absent value
+   * to `user`.
+   *
+   * `blogger` creates an ordinary user account **and** a verification
+   * application — `GET /me/verification` answers with one from the moment
+   * registration returns. It does not create an organisation, a membership or
+   * an inbox.
+   */
+  accountKind?: 'user' | 'blogger' | 'organisation';
   /** Required when `accountKind` is `organisation`. Sector defaults to `other`. */
   organisation?: { name: string; sector?: OrganisationSector };
 }
@@ -148,6 +162,24 @@ export interface Caller {
   /** The account's default organisation, or null for a plain reporter. */
   orgId: string | null;
   role: string | null;
+  /**
+   * What the account was registered as: `user`, `blogger` or `organisation`.
+   *
+   * Read rather than remembered. The phone knows what it asked for at
+   * registration, but the account outlives that request — somebody can sign in
+   * on a second device, or be made a blogger by a platform owner — and the
+   * server is the only thing that knows the answer now.
+   */
+  accountKind: string | null;
+  /**
+   * Whether **this person** has been verified as a publisher.
+   *
+   * Distinct from `memberships[].verified`, which is about an organisation's
+   * application. A blogger is not blocked while this is false: `/me` returns
+   * `kind: "user"` for them and every reporter route works. What it gates is
+   * the byline — a reader can see that a verified publisher has been checked.
+   */
+  verified: boolean;
   /**
    * `verified` is how `/me` says whether the platform has approved the
    * organisation. It is false for an applicant part-way through onboarding, and
@@ -579,6 +611,35 @@ export interface ApiClient {
 
   /** Send the whole application for review. */
   submitOnboarding(orgId: string): Promise<OnboardingApplication>;
+
+  // ─── a blogger's own verification ───────────────────────────────────────
+  //
+  // The same five calls on `/me/*` rather than `/org/*`: no organisation to
+  // name and no scope header. Separate methods rather than the org ones with
+  // an optional `orgId`, because "has no organisation" and "forgot to pass the
+  // organisation" must not be the same call.
+
+  /** The signed-in blogger's application. Exists from the moment they register. */
+  getVerification(): Promise<BloggerApplication>;
+  saveVerificationStep(
+    stepId: BloggerStepId,
+    payload: Record<string, unknown>,
+  ): Promise<BloggerApplication>;
+  submitVerificationStep(stepId: BloggerStepId): Promise<BloggerApplication>;
+  attachVerificationDocument(input: {
+    documentType: BloggerDocumentId;
+    fileName: string;
+    sha256: string;
+    mimeType: string;
+    byteSize: number;
+  }): Promise<void>;
+  uploadVerificationDocumentBytes(
+    documentType: BloggerDocumentId,
+    bytes: Uint8Array,
+    mimeType: string,
+  ): Promise<void>;
+  /** Send the whole verification for review. */
+  submitVerification(): Promise<BloggerApplication>;
 }
 
 /** Narrowed here so the client interface does not re-export the whole union. */

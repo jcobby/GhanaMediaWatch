@@ -19,12 +19,19 @@ import { toast } from '@/stores/toastStore';
  * signs it in when it is not. Two buttons would be a choice nobody can answer
  * correctly about an account they may or may not already have.
  *
- * **Renders nothing when Google is not configured.** The client ids are created
- * per app in the Google console and live in the environment, so on a build
- * without them this button would open a picker and fail on an empty audience —
- * and the person has no way to tell that from their account being refused. A
- * missing button is a feature that is not offered; a broken one is a feature
- * that is lying.
+ * **Shown in development whether or not it is configured; in a release build
+ * only when it is.**
+ *
+ * The client ids are created per app in the Google console and live in the
+ * environment, so on a build without them the picker fails on an empty
+ * audience. Shipping that to a reporter is a feature that lies — they cannot
+ * tell it from their account being refused, so a release build hides it.
+ *
+ * Hiding it in development was the wrong half of that trade, and it cost a
+ * round trip: the button was built, placed on three screens, and invisible on
+ * the only device anyone was looking at. There was no way to tell "not built"
+ * from "not configured". So in development it is always on screen, and tapping
+ * it unconfigured says exactly which variable is missing.
  */
 export function GoogleButton({ onDone }: { onDone?: () => void }) {
   const c = useColors();
@@ -33,7 +40,7 @@ export function GoogleButton({ onDone }: { onDone?: () => void }) {
   const signIn = useAuthStore((s) => s.signInWithGoogle);
   const [busy, setBusy] = useState(false);
 
-  if (!isGoogleConfigured) return null;
+  if (!isGoogleConfigured && !__DEV__) return null;
 
   const run = async () => {
     setBusy(true);
@@ -69,7 +76,12 @@ export function GoogleButton({ onDone }: { onDone?: () => void }) {
               ? // The native module is not in this binary — Expo Go, or a
                 // development build made before the package was added.
                 t('auth.googleUnavailable')
-              : t('auth.googleNoToken')
+              : cause.reason === 'not_configured'
+                ? // Only reachable in development, where the button is shown
+                  // regardless. Names the variable, because "not configured" on
+                  // its own sends you looking through the wrong files.
+                  t('auth.googleNotConfigured')
+                : t('auth.googleNoToken')
           : cause instanceof Error
             ? cause.message
             : t('common.unknownErrorHelp');
@@ -99,6 +111,16 @@ export function GoogleButton({ onDone }: { onDone?: () => void }) {
         onPress={() => void run()}
         leading={<Ionicons name="logo-google" size={18} color={c.textPrimary} />}
       />
+      {/*
+        Said at a glance, not only on tap, and only in development. Otherwise
+        the button looks finished and the missing configuration is a surprise
+        held until somebody presses it.
+      */}
+      {!isGoogleConfigured ? (
+        <Text variant="caption" tone="warning" className="text-center">
+          {t('auth.googleNotConfigured')}
+        </Text>
+      ) : null}
     </View>
   );
 }

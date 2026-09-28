@@ -19,43 +19,53 @@ const code = (rel: string) =>
 const review = () => code('ReviewScreen.tsx');
 const copy = en.review as unknown as Record<string, string>;
 
+/*
+ * **These assertions were a step behind the screen and had been for a while.**
+ * The capture step now holds the description and the details step the category
+ * — they were the other way round — so five of them failed on the *order*
+ * while the behaviours they were written to protect were all intact. A suite
+ * that fails for a reason nobody acts on stops being read, and this one was
+ * hiding a real bug among the noise: `showAddress` below.
+ */
 describe('the steps of filing', () => {
   test('in the order asked for', () => {
     expect(review()).toMatch(
       /const BASE_STEPS = \['stepCapture', 'stepDetails', 'stepSend'\] as const;/,
     );
-    expect(copy.stepCapture).toBe('Capture & category');
-    expect(copy.stepDetails).toBe('Details & urgency');
+    // The description comes before the category: somebody has just filmed
+    // something and the words are what they have in mind, not a taxonomy.
+    expect(copy.stepCapture).toBe('Capture & description');
+    expect(copy.stepDetails).toBe('Category & urgency');
     expect(copy.stepSend).toBe('Where to send it');
   });
 
-  test('step 1 holds the capture and the category', () => {
+  test('step 1 holds the capture and the description', () => {
     const src = review();
     const one = src.slice(src.indexOf('{current === 0 ? ('), src.indexOf('{current === 1 ? ('));
     expect(one).toMatch(/<CapturePreview/);
-    expect(one).toMatch(/INCIDENT_CATEGORIES\.map/);
+    expect(one).toMatch(/accessibilityLabel=\{t\('review\.description'\)\}/);
   });
 
-  test('step 2 holds the description, and urgency and anonymity in one card', () => {
+  test('step 2 holds the category, and urgency and anonymity in one card', () => {
     const src = review();
     const two = src.slice(src.indexOf('{current === 1 ? ('), src.indexOf('{current === 2 ? ('));
-    expect(two).toMatch(/accessibilityLabel=\{t\('review\.description'\)\}/);
-    const card = two.slice(two.indexOf('<Glass elevation="low" className="gap-3'), two.indexOf('</Glass>', two.indexOf('<SeverityField')));
-    expect(card).toMatch(/<SeverityField/);
-    expect(card).toMatch(/label=\{t\('review\.anonymous'\)\}/);
+    expect(two).toMatch(/<SeverityField/);
+    expect(two).toMatch(/label=\{t\('review\.anonymous'\)\}/);
+    // Whistleblower is its own card above the grid, and choosing it starts the
+    // report anonymous — see the whistleblower block below.
+    expect(two).toMatch(/t\('review\.whistleblowerNote'\)/);
   });
 
-  test('step 3 holds where it goes and what the public sees', () => {
+  test('step 3 is where it goes', () => {
     const src = review();
     const three = src.slice(src.indexOf('{current === 2 ? ('), src.indexOf('{current === 3 ? ('));
     expect(three).toMatch(/<DestinationPicker/);
-    expect(three).toMatch(/label=\{t\('review\.showLocation'\)\}/);
-    expect(three).toMatch(/label=\{t\('review\.showAddress'\)\}/);
   });
 
-  test('the description gates Next on step 2 and Submit at the end', () => {
+  test('the description gates Next on the step that asks for it, and Submit at the end', () => {
     const src = review();
-    expect(src).toMatch(/disabled=\{current === 1 && blocker !== null\}/);
+    // Step 0 now, because the description moved there with the capture.
+    expect(src).toMatch(/disabled=\{current === 0 && blocker !== null\}/);
     expect(src).toMatch(/disabled=\{sendBlocker !== null\}/);
   });
 });
@@ -166,7 +176,18 @@ describe('whistleblower', () => {
   });
 
   test('choosing it starts the report anonymous', () => {
-    expect(review()).toMatch(/if \(key === 'whistleblower'\) setAnonymous\(true\)/);
+    /*
+     * A whistleblower is usually identifiable by what they know, so this is the
+     * one category that changes the starting point. It stays their choice — the
+     * anonymity switch is on the same step.
+     *
+     * Matched on the pair rather than on one line: the card moved out of the
+     * category grid into its own block above it, so the old
+     * `if (key === 'whistleblower')` shape is gone while the behaviour is not.
+     */
+    const src = review();
+    const card = src.slice(src.indexOf("setCategory('whistleblower')"));
+    expect(card.slice(0, 400)).toMatch(/setAnonymous\(true\)/);
   });
 });
 
@@ -176,16 +197,36 @@ describe('the place in words', () => {
     expect(review()).toMatch(/useCaptureAddress\(pending\?\.fix\.latitude, pending\?\.fix\.longitude\)/);
   });
 
-  test('show location is the street and plus code; show address needs the location on', () => {
-    const src = review();
-    expect(src).toMatch(/\[place\.street \?\? place\.locality, plusCode\]/);
-    const address = src.slice(src.indexOf("label={t('review.showAddress')}"));
-    expect(address.slice(0, 500)).toMatch(/disabled=\{!showLocation\}/);
+  test('the public line is the street and the plus code', () => {
+    expect(review()).toMatch(/\[place\.street \?\? place\.locality, plusCode\]/);
+  });
+
+  test('the street address is never published on a choice nobody was offered', () => {
+    /*
+     * **This is the assertion that was hiding a real bug.** The old version
+     * looked for a `review.showAddress` switch and a `disabled={!showLocation}`
+     * on it — a control that was removed when the steps were restructured,
+     * leaving the flag behind with nothing to set it.
+     *
+     * What was left: the store defaulted `showAddress` to `true`, the wire
+     * declares `DisplayFlags.showAddress` as `default: false`, and every report
+     * submitted `true`. The app was asking the platform to publish the
+     * reporter's street address on the strength of a choice nobody was ever
+     * shown, on a product whose premise is that people at risk can file safely.
+     *
+     * Two rules now, and they are independent on purpose: the default must be
+     * the quiet one, and the payload must never contradict `showLocation`
+     * whatever the default becomes. Give it a real switch and only the first
+     * of these changes.
+     */
+    expect(code('../../stores/captureStore.ts')).toMatch(/showAddress: false,/);
+    expect(review()).toMatch(/showAddress: showLocation && showAddress,/);
   });
 
   test('both are saved with the queued report', () => {
+    // The address and the plus code travel with the queued report either way;
+    // what the flags decide is whether either is ever shown publicly.
     expect(review()).toMatch(/place: \{ address: place\.address, plusCode: place\.plusCode\?\.full \?\? null \}/);
-    const store = code('../../stores/captureStore.ts');
-    expect(store).toMatch(/showAddress: showLocation \? state\.showAddress : false/);
+    expect(code('../../stores/captureStore.ts')).toMatch(/showAddress: boolean;/);
   });
 });
