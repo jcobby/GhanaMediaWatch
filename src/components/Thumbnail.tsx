@@ -93,6 +93,7 @@ function CategoryField({
 export function Thumbnail({
   uri,
   poster,
+  pending = false,
   cacheKey,
   category,
   style,
@@ -125,6 +126,22 @@ export function Thumbnail({
    * native image reference `expo-image` takes as a source directly.
    */
   poster?: Poster | null;
+  /**
+   * A frame is being cut for this report right now, so do not say there is none.
+   *
+   * **The state that was missing, and the one a reader actually sees most.**
+   * The service sends no poster for video, so `lib/videoPoster` opens the clip
+   * and takes a frame — one report at a time, over the network, up to eight
+   * seconds each. Until that finished there was no frame and no URL, which
+   * reads here as "nothing is coming", so a video row drew the flat category
+   * field immediately: a finished-looking state, showing a glyph, while work
+   * was still going on. Then the frame arrived and replaced it without warning.
+   *
+   * Given this, the row pulses for as long as the frame is genuinely on its
+   * way, and falls back to the field only once the attempt has settled with
+   * nothing to show.
+   */
+  pending?: boolean;
   category: IncidentCategory;
   style?: StyleProp<ViewStyle>;
   contentFit?: 'cover' | 'contain';
@@ -161,10 +178,19 @@ export function Thumbnail({
    */
   const sourceId = poster ? `poster:${cacheKey ?? ''}` : isUnrenderable(uri) ? null : (uri ?? null);
   const expecting = source !== null && failedFor !== sourceId;
-  // Downloading: a pulse, and nothing that could be mistaken for the picture.
-  const pulsing = expecting && state !== 'loaded';
+  /*
+   * Two ways to be waiting, and they must look the same.
+   *
+   * One is bytes on the wire for a picture we have the address of. The other is
+   * a frame being cut from a clip, where there is no address yet and will not
+   * be one for several seconds. To a reader those are the same event — the
+   * picture has not arrived — so drawing the first as a pulse and the second as
+   * a finished "no picture" field was the bug: the second is the commoner case,
+   * because every video on the feed goes through it.
+   */
+  const pulsing = (expecting && state !== 'loaded') || (!expecting && pending);
   // Nothing is coming, or nothing arrived. Say so in a way no one misreads.
-  const empty = !expecting;
+  const empty = !expecting && !pending;
 
   return (
     <View style={style} className="overflow-hidden bg-canvas-raise">

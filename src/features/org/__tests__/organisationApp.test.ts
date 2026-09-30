@@ -117,21 +117,45 @@ test('the desk is chosen, never defaulted', () => {
   expect(screen).not.toMatch(/section: 'ghana'/);
 });
 
-test('the inbox is read to the end, not one page deep', () => {
+test('the record is read to the end; the queue is not', () => {
   /*
    * The inbox survives being sampled — an officer scrolls the newest and that
    * is the job. The Licences screen does not: it is derived from the `licensed`
    * flags on these same items, so a licence that had scrolled past the first
    * page was absent from the list of what the organisation had paid for.
    *
-   * Bounded, because a service that returns a cursor forever would otherwise
-   * spin on a screen showing a spinner.
+   * **The depth belongs to the caller, and it did not used to.** Draining to
+   * the end inside the shared fetch fixed the record by taxing the queue: an
+   * officer with six hundred routed reports waited on six sequential round
+   * trips before the inbox drew anything, and again every fifteen seconds, on
+   * data they pay for. One page by default, ten where the history is the point.
+   *
+   * Still bounded, because a service that returns a cursor forever would
+   * otherwise spin on a screen showing a spinner.
    */
   const http = code('api/http.ts');
   const inbox = http.slice(http.indexOf('async getOrgInbox'), http.indexOf('async getOrgIncident'));
-  expect(inbox).toMatch(/for \(let page = 0; page < 10; page \+= 1\)/);
+  expect(inbox).toMatch(/options: \{ pages\?: number \} = \{\}/);
+  expect(inbox).toMatch(/const limit = Math\.max\(1, options\.pages \?\? 1\)/);
+  expect(inbox).toMatch(/for \(let page = 0; page < limit; page \+= 1\)/);
   // `hasMore` alone would loop on the same page if the cursor were absent.
   expect(inbox).toMatch(/answer\.hasMore && answer\.nextCursor \? answer\.nextCursor : null/);
+
+  /*
+   * And the two callers ask for what they actually need. The licences hook is
+   * the one that must not be a sample; the queue must not pay for that.
+   */
+  const hooks = code('hooks/useOrg.ts');
+  expect(hooks).toMatch(/api\.getOrgInbox\(orgId!, \{ pages: 10 \}\)/);
+  expect(hooks).toMatch(/queryFn: \(\) => api\.getOrgInbox\(orgId!\),/);
+  /*
+   * The deep query hangs off the inbox key rather than a sibling, so every
+   * existing `invalidateQueries({ queryKey: orgKeys.inbox(orgId) })` — react-
+   * query matches by prefix — refreshes it too. A separate key would need each
+   * of those call sites updating, and the one forgotten would leave the
+   * licences screen showing a report as unbought after it was paid for.
+   */
+  expect(hooks).toMatch(/\[\.\.\.orgKeys\.inbox\(orgId \?\? ''\), 'all'\]/);
 });
 
 test('licences are the service’s record of them', () => {
@@ -194,4 +218,28 @@ test('nothing in the organisation app invents its own data', () => {
     const src = fs.readFileSync(path.join(dir, file), 'utf8');
     expect([file, /@\/api\/(fixtures|mockData|dawuroData)/.test(src)]).toEqual([file, false]);
   }
+});
+
+test('the phone says where the way back is, before the one-way door', () => {
+  /*
+   * An organisation can ask an editor to run a report from the phone and
+   * cannot take it down again: `/org/incidents/{id}/unpublish` is called from
+   * the web console and from nowhere on this device.
+   *
+   * The asymmetry is defensible — withdrawing something already public is
+   * takedown-adjacent and belongs on a surface with a reason field and an audit
+   * trail. Finding out afterwards is not: that is an officer scrolling four
+   * tabs for a control that was never here.
+   *
+   * So it is said on the publish sheet, which is the last moment before the
+   * request goes. If `unpublish` ever arrives on the phone, this rule should
+   * fail — the note would then be wrong.
+   */
+  expect(code('api/http.ts')).not.toMatch(/unpublish/);
+  expect(code('features/org/OrgReportScreen.tsx')).toMatch(/t\('org\.withdrawNote'\)/);
+
+  const copy = (en.org as unknown as Record<string, string>).withdrawNote;
+  expect(copy).toMatch(/console/i);
+  // Names where it *is* done, not merely that it is not done here.
+  expect(copy).not.toMatch(/^You cannot/i);
 });

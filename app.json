@@ -8,11 +8,11 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
-    "backgroundColor": "#F4F5FA",
+    "backgroundColor": "#FFFFFF",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#F4F5FA"
+      "backgroundColor": "#FFFFFF"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -104,7 +104,7 @@
           "image": "./assets/splash-icon.png",
           "imageWidth": 300,
           "resizeMode": "contain",
-          "backgroundColor": "#F4F5FA"
+          "backgroundColor": "#FFFFFF"
         }
       ],
       [

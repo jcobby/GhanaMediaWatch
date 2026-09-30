@@ -75,22 +75,30 @@ export function OrgInboxScreen() {
         From `GET /org/dashboard` rather than counted off the page in hand: the
         inbox is one page of fifty, and a count derived from it would quietly
         say "fifty" forever on a busy organisation.
+
+        **An em dash where the figure is unknown, never a 0.** These read zero
+        on every organisation for as long as they existed, because the client
+        asked that endpoint for three counters it does not return and a missing
+        field coerced to 0 — so "0 INBOX" sat above a list with a report in it.
+        A tile cannot show the difference between none and not-known unless it
+        is drawn differently, and to somebody deciding whether to open the app
+        those mean opposite things.
       */}
       <View className="flex-row gap-3 px-4 pb-4">
         <Stat
           icon="download-outline"
           label={t('org.statInbox')}
-          value={dashboard ? String(dashboard.inboxCount) : '—'}
+          value={figure(dashboard?.inboxCount)}
         />
         <Stat
           icon="megaphone-outline"
           label={t('org.statPublished')}
-          value={dashboard ? String(dashboard.publishedCount) : '—'}
+          value={figure(dashboard?.publishedCount)}
         />
         <Stat
           icon="navigate-outline"
           label={t('org.statDispatch')}
-          value={dashboard ? String(dashboard.openAssignments) : '—'}
+          value={figure(dashboard?.openAssignments)}
         />
       </View>
 
@@ -152,6 +160,17 @@ export function OrgInboxScreen() {
       </View>
     </ScrollView>
   );
+}
+
+/**
+ * A counter, or an em dash when the service did not give one.
+ *
+ * `null` and `0` must not draw the same. The dash says "not known"; a zero is
+ * a claim that there is nothing, and this screen made that claim wrongly on
+ * every organisation for as long as the tiles existed.
+ */
+function figure(value: number | null | undefined): string {
+  return typeof value === 'number' ? String(value) : '—';
 }
 
 function Stat({

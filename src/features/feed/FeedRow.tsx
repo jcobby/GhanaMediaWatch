@@ -53,7 +53,7 @@ export const FeedRow = memo(function FeedRow({
    * The work behind it is queued one job at a time and kept on disk, so twenty
    * rows are not twenty downloads; see `lib/videoPoster`.
    */
-  const poster = useVideoPoster({
+  const { poster, pending } = useVideoPoster({
     id: incident.id,
     kind: incident.media.kind,
     url: incident.media.url,
@@ -65,10 +65,25 @@ export const FeedRow = memo(function FeedRow({
    * Only that branch of the publisher union has a name worth showing here — a
    * citizen report is not given an institution it does not have.
    */
+  /*
+   * Who to credit, and whether that credit has been checked.
+   *
+   * An organisation leads when one released the report — a named institution is
+   * a different claim from a citizen's clip. Otherwise the reporter's own name
+   * shows, **but only when they are a verified blogger**: an ordinary account's
+   * display name is not a masthead and putting it here would read as one.
+   *
+   * That second branch is the entire visible payoff of blogger verification.
+   * The service has sent `reporter.verified` since it shipped and nothing read
+   * it, so an approved blogger's byline looked exactly like an unapproved
+   * account's and approval produced nothing a reader could see.
+   */
   const source =
     incident.publisher.kind === 'organisation'
       ? { name: incident.publisher.displayName, verified: incident.publisher.verified }
-      : null;
+      : incident.reporter.kind === 'user' && incident.reporter.verified
+        ? { name: incident.reporter.displayName, verified: true }
+        : null;
 
   const when = formatRelativeTime(incident.publishedAt);
   // Where it happened, or — when the reporter withheld that — what it is.
@@ -86,6 +101,7 @@ export const FeedRow = memo(function FeedRow({
           uri={still}
           cacheKey={incident.id}
           poster={poster}
+          pending={pending}
           category={incident.category}
           style={{ width: thumbWidth, height: thumbHeight, borderRadius: 2 }}
         />

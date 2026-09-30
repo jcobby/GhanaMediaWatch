@@ -27,6 +27,7 @@ import type {
   OrgDashboard,
   OrgInboxItem,
   OrgMember,
+  OrgMembershipRequest,
 } from '@/types/org';
 import type {
   DocumentId,
@@ -548,6 +549,49 @@ export class MockApiClient implements ApiClient {
 
   getOrgMembers(): Promise<OrgMember[]> {
     return this.simulate(MOCK_MEMBERS);
+  }
+
+  /*
+   * Two people waiting, because an empty queue is the one state that teaches
+   * nothing. The screen exists to be decided on, and a fixture that is always
+   * empty means the deciding half is never seen without a backend.
+   */
+  private requests: OrgMembershipRequest[] = [
+    {
+      id: 'mrq_1',
+      displayName: 'Akosua Mensah',
+      email: 'akosua@example.com',
+      statedRole: 'Reporter, Northern desk',
+      note: 'I filed the Tamale market fire last week and Kwame asked me to join.',
+      status: 'pending',
+      requestedAtIso: new Date(Date.now() - 3 * 3600_000).toISOString(),
+    },
+    {
+      id: 'mrq_2',
+      displayName: 'Yaw Boateng',
+      email: 'yaw.boateng@example.com',
+      statedRole: null,
+      note: null,
+      status: 'pending',
+      requestedAtIso: new Date(Date.now() - 26 * 3600_000).toISOString(),
+    },
+  ];
+
+  requestMembership(): Promise<void> {
+    return this.simulate(undefined);
+  }
+
+  getMembershipRequests(): Promise<OrgMembershipRequest[]> {
+    return this.simulate(this.requests);
+  }
+
+  decideMembershipRequest(
+    _orgId: string,
+    requestId: string,
+    decision: 'approved' | 'rejected',
+  ): Promise<void> {
+    this.requests = this.requests.map((r) => (r.id === requestId ? { ...r, status: decision } : r));
+    return this.simulate(undefined);
   }
 
   // ─── becoming an organisation ────────────────────────────────────────────

@@ -166,7 +166,27 @@ export interface PreciseLocation extends PublicLocation {
  */
 export type Reporter =
   | { kind: 'anonymous' }
-  | { kind: 'user'; id: string; displayName: string; avatarUrl: string | null };
+  | {
+      kind: 'user';
+      id: string;
+      displayName: string;
+      avatarUrl: string | null;
+      /**
+       * Whether this person has been verified as a publisher.
+       *
+       * **The only reason blogger verification exists.** An account works
+       * identically either way — a blogger files, earns and is paid from the
+       * day they register — so the single thing approval produces is a byline a
+       * reader can see has been checked. Without this rendered somewhere, the
+       * whole application is an internal fact nobody outside the platform
+       * benefits from, and the phone was ignoring it while the service sent it.
+       *
+       * Absent on an older payload and on an unverified account, and a missing
+       * value must read as *not* verified: a byline shown as checked when it
+       * has not been is the failure this exists to prevent.
+       */
+      verified: boolean;
+    };
 
 export type Publisher =
   | Reporter

@@ -401,7 +401,16 @@ export const SAMPLE_INCIDENTS: Incident[] = SEEDS.map((s, i) => {
  */
 function reporterFor(i: number, anonymous: boolean): Reporter {
   if (anonymous) return { kind: 'anonymous' };
-  return { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null };
+  return {
+    kind: 'user',
+    id: `usr_${i}`,
+    displayName: NAMES[i % NAMES.length]!,
+    avatarUrl: null,
+    // A minority are verified bloggers, so the seeded feed shows both bylines
+    // side by side — a badge that only ever appears is one nobody can read as
+    // meaning anything.
+    verified: i % 4 === 1,
+  };
 }
 
 function publisherFor(i: number, anonymous: boolean): Publisher {
@@ -426,5 +435,11 @@ function publisherFor(i: number, anonymous: boolean): Publisher {
     };
   }
   if (anonymous) return { kind: 'anonymous' };
-  return { kind: 'user', id: `usr_${i}`, displayName: NAMES[i % NAMES.length]!, avatarUrl: null };
+  return {
+    kind: 'user',
+    id: `usr_${i}`,
+    displayName: NAMES[i % NAMES.length]!,
+    avatarUrl: null,
+    verified: i % 4 === 1,
+  };
 }

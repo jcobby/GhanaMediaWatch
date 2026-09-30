@@ -82,8 +82,71 @@ test('loading draws a pulse and nothing that could pass for the picture', () => 
    * waiting for a list and waiting for an image do not look like different
    * kinds of waiting.
    */
-  expect(THUMB).toMatch(/const pulsing = expecting && state !== 'loaded'/);
+  expect(THUMB).toMatch(/const pulsing = \(expecting && state !== 'loaded'\)/);
   expect(THUMB).toMatch(/<Skeleton fill/);
+});
+
+test('a frame still being cut is waiting, not "no picture"', () => {
+  /*
+   * **The state that was missing, and the one most rows on this feed are in.**
+   *
+   * The service sends no poster for video, so `lib/videoPoster` opens the clip
+   * and takes a frame itself — one report at a time, over the network, with an
+   * eight-second ceiling each. Until that settles there is no poster and no
+   * URL, which this component could only read as "nothing is coming". So a
+   * video row drew the finished category field straight away, glyph and all,
+   * while work was still going on, and the real frame replaced it seconds
+   * later with no warning. Nothing anywhere said the app was busy.
+   *
+   * `pending` separates "no frame yet" from "no frame at all", and the two
+   * expressions below are the whole fix: pulse while one is coming, fall back
+   * only once the attempt has settled.
+   */
+  expect(THUMB).toMatch(/\|\| \(!expecting && pending\)/);
+  expect(THUMB).toMatch(/const empty = !expecting && !pending/);
+  // Defaulted, so every caller that does not know about posters is unaffected.
+  expect(THUMB).toMatch(/pending = false/);
+});
+
+test('the pending flag reaches the thumbnail from every list that shows clips', () => {
+  /*
+   * Four lists render video rows, and a row left out of this is a row that
+   * keeps the old silent behaviour. They are checked together because the
+   * failure is per-screen and invisible: the feed would pulse correctly while
+   * an organisation's inbox went on showing a finished-looking empty field.
+   */
+  const lists = [
+    'features/feed/FeedRow.tsx',
+    'features/feed/FeedLead.tsx',
+    'features/org/OrgReportRow.tsx',
+    'features/profile/ReportGrid.tsx',
+  ];
+  for (const rel of lists) {
+    const src = read(rel);
+    expect(src).toMatch(/const \{ poster, pending \} = useVideoPoster\(/);
+    expect(src).toMatch(/pending=\{pending\}/);
+  }
+});
+
+test('"a frame is coming" is a fact the store holds, not one a row guesses', () => {
+  /*
+   * `peekPoster` returns null three different ways — untried, queued, and
+   * tried-and-failed — so no caller can tell them apart from the frame alone.
+   * The store knows, because it writes an entry on both terminal paths.
+   */
+  const lib = read('lib/videoPoster.ts');
+  expect(lib).toMatch(/export function posterPending/);
+  expect(lib).toMatch(/return !known\.has\(incidentId\)/);
+
+  /*
+   * Two subscriptions rather than one snapshot returning an object.
+   * `useSyncExternalStore` compares by identity, so a getter that builds
+   * `{ poster, pending }` hands back a new object on every check and React
+   * re-renders without end.
+   */
+  const hook = read('hooks/useVideoPoster.ts');
+  expect((hook.match(/useSyncExternalStore\(subscribeToPosters/g) ?? []).length).toBe(2);
+  expect(hook).toMatch(/return \{ poster, pending \}/);
 });
 
 test('an absent image is shown as a drawing, in the category hue', () => {

@@ -1,13 +1,16 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, View } from 'react-native';
+import { ScrollView, TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { Badge, Button, ErrorState, Glass, Pressable, Text } from '@/components/ui';
+import { Badge, Button, ErrorState, Glass, Pressable, Sheet, Text } from '@/components/ui';
 import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { Thumbnail } from '@/components/Thumbnail';
 import { useOrganisations } from '@/hooks/useOrganisations';
+import { useRequestMembership } from '@/hooks/useOrg';
+import { useAuthStore } from '@/stores/authStore';
+import { toast } from '@/stores/toastStore';
 import { useSurveys } from '@/hooks/useSurveys';
 import { useFeed } from '@/hooks/useIncidents';
 import { formatRelativeTime } from '@/lib/format';
@@ -34,6 +37,22 @@ export function OrganisationProfileScreen({ businessId }: { businessId: string }
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const [tab, setTab] = useState<Tab>('reports');
+  const [asking, setAsking] = useState(false);
+  const [statedRole, setStatedRole] = useState('');
+  const [note, setNote] = useState('');
+
+  const requestMembership = useRequestMembership();
+  const accountType = useAuthStore((s) => s.profile?.accountType);
+  /*
+   * Offered to a signed-in reporter and to nobody else.
+   *
+   * An organisation account asking to join another organisation is not a thing
+   * the service models, and a signed-out visitor has no identity to attach the
+   * request to — the service answers 401, which would be a button that exists
+   * only to refuse. A blogger is a reporter with a checked byline, so both
+   * ask the same way.
+   */
+  const mayAsk = accountType === 'reporter' || accountType === 'blogger';
 
   const { data: directory, isPending: dirPending, isError: dirFailed } = useOrganisations();
   const { data: surveyList } = useSurveys();
@@ -180,7 +199,130 @@ export function OrganisationProfileScreen({ businessId }: { businessId: string }
         ) : null}
 
         {tab === 'about' ? <About organisation={organisation} /> : null}
+
+        {/*
+          Asking to join, from the page you are already looking at.
+
+          **The reporter's half of joining, which the phone could not do at
+          all.** `POST /membership-requests` has been live throughout; no
+          client on this device called it, so somebody who films for an
+          institution had no way to say so from the app they film in.
+
+          Here rather than buried in settings: this is the screen where a
+          person has just established that their employer is on Dawuro, which
+          is the moment the question occurs to them. Anywhere else and they
+          have to already know the feature exists.
+        */}
+        {mayAsk ? (
+          <View className="px-4 pt-2">
+            <Button
+              label={t('organisations.askToJoin')}
+              variant="glass"
+              fullWidth
+              onPress={() => setAsking(true)}
+              leading={<Ionicons name="person-add-outline" size={18} color={c.textPrimary} />}
+            />
+          </View>
+        ) : null}
       </ScrollView>
+
+      <Sheet
+        visible={asking}
+        onClose={() => setAsking(false)}
+        title={t('organisations.askTitle', { name: organisation.name })}
+      >
+        <Text variant="body-sm" tone="secondary">
+          {t('organisations.askBody')}
+        </Text>
+
+        <View className="mt-4 gap-3">
+          <View className="gap-1.5">
+            <Text variant="label" tone="muted">
+              {t('organisations.askRole')}
+            </Text>
+            <Glass elevation="low" className="rounded-lg px-3 py-3">
+              <TextInput
+                value={statedRole}
+                onChangeText={setStatedRole}
+                placeholder={t('organisations.askRolePlaceholder')}
+                placeholderTextColor={c.textFaint}
+                maxLength={64}
+                accessibilityLabel={t('organisations.askRole')}
+                style={{
+                  color: c.textPrimary,
+                  fontFamily: 'Inter_400Regular',
+                  fontSize: 15,
+                  padding: 0,
+                }}
+              />
+            </Glass>
+          </View>
+
+          <View className="gap-1.5">
+            <Text variant="label" tone="muted">
+              {t('organisations.askNote')}
+            </Text>
+            <Glass elevation="low" className="rounded-lg px-3 py-3">
+              <TextInput
+                value={note}
+                onChangeText={setNote}
+                placeholder={t('organisations.askNotePlaceholder')}
+                placeholderTextColor={c.textFaint}
+                multiline
+                maxLength={500}
+                accessibilityLabel={t('organisations.askNote')}
+                style={{
+                  color: c.textPrimary,
+                  minHeight: 64,
+                  textAlignVertical: 'top',
+                  fontFamily: 'Inter_400Regular',
+                  fontSize: 15,
+                  padding: 0,
+                }}
+              />
+            </Glass>
+          </View>
+
+          <Button
+            label={t('organisations.askSend')}
+            fullWidth
+            loading={requestMembership.isPending}
+            onPress={() => {
+              /*
+               * Closed and cleared only once the service has taken it. A sheet
+               * that dismisses on tap tells somebody their request exists
+               * before anything has said so — and this one cannot be checked
+               * afterwards from this account, so a false confirmation here is
+               * one nothing later corrects.
+               */
+              requestMembership.mutate(
+                {
+                  orgId: organisation.id,
+                  ...(statedRole.trim() ? { statedRole: statedRole.trim() } : {}),
+                  ...(note.trim() ? { note: note.trim() } : {}),
+                },
+                {
+                  onSuccess: () => {
+                    setAsking(false);
+                    setStatedRole('');
+                    setNote('');
+                    toast.success(
+                      t('organisations.askSentTitle', { name: organisation.name }),
+                      t('organisations.askSentBody'),
+                    );
+                  },
+                  onError: (cause) => {
+                    toast.error(
+                      t('organisations.askFailedTitle'),
+                      cause instanceof Error ? cause.message : t('common.unknownErrorHelp'),
+                    );
+                  },
+                },
+              );
+            }}
+          />
+        </View>
+      </Sheet>
     </View>
   );
 }

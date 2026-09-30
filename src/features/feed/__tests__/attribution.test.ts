@@ -26,10 +26,48 @@ test('a feed row names the organisation first', () => {
   expect(row).toMatch(/\{source \? \(/);
 });
 
-test('the top story names it too', () => {
+test('the top story names it too, by the same rule', () => {
+  /*
+   * Derived once into `credit` rather than branching inside the JSX, so the
+   * lead and the rows below it can never credit the same report differently —
+   * which they would the moment one of the two learned a new rule and the
+   * other did not.
+   */
   const lead = code('features/feed/FeedLead.tsx');
-  expect(lead).toMatch(/incident\.publisher\.kind === 'organisation' \? \(/);
+  expect(lead).toMatch(/const credit =/);
+  expect(lead).toMatch(/incident\.publisher\.kind === 'organisation'/);
   expect(lead).toMatch(/incident\.publisher\.displayName/);
+  expect(lead).toMatch(/\{credit \? \(/);
+});
+
+test('a verified blogger is credited; an ordinary account is not', () => {
+  /*
+   * **The only visible payoff of blogger verification.** An account files,
+   * earns and is paid identically whether or not it is verified — the single
+   * thing approval produces is a byline a reader can see has been checked. The
+   * service has sent `reporter.verified` since it shipped and both screens
+   * ignored it, so an approved blogger looked exactly like anybody else and
+   * approval produced nothing at all.
+   *
+   * And only a *verified* one. An ordinary account's display name in the
+   * position where an institution's masthead goes reads as a masthead, which is
+   * the opposite failure and the more damaging of the two.
+   */
+  for (const file of ['features/feed/FeedRow.tsx', 'features/feed/FeedLead.tsx']) {
+    const src = code(file);
+    expect([file, /incident\.reporter\.kind === 'user' && incident\.reporter\.verified/.test(src)]).toEqual([
+      file,
+      true,
+    ]);
+  }
+
+  /*
+   * Absent reads as not verified, at the boundary, once. A byline shown as
+   * checked when it has not been is the failure the whole flag exists to
+   * prevent, and `undefined` is falsy — so without this coercion the badge
+   * would simply never appear and nothing would say why.
+   */
+  expect(code('api/http.ts')).toMatch(/verified: raw\.verified === true/);
 });
 
 test('a report with no publisher cannot crash a desk', () => {

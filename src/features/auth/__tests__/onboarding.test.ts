@@ -87,10 +87,33 @@ test('the outcome promise names real institutions', () => {
   expect(copy.reaches!.body).toMatch(/Assembly|NADMO|utility/);
 });
 
-test('anonymity is explained with its limit, not just offered', () => {
-  // Offering anonymity without saying what is still recorded is the kind of
-  // half-truth that costs a platform its credibility exactly once.
-  expect(copy.anonymous!.body).toMatch(/device|identifier|abuse/i);
+test('anonymity is explained with its limit, where somebody is about to rely on it', () => {
+  /*
+   * **The limit moved; it was not dropped.** The introduction used to carry
+   * "a device identifier is still recorded so abuse can be traced — we will not
+   * pretend otherwise", and now says "Publish without registering. We protect
+   * your identity."
+   *
+   * That promise is only safe because the qualification is still made, at the
+   * moment it actually bears on a decision: `review.anonymitySheetDevice`, on
+   * the sheet shown when somebody files anonymously. A caveat read once during
+   * an introduction and a caveat read while choosing to file anonymously are
+   * not the same caveat, and the second is the one that matters.
+   *
+   * So this now guards the sheet rather than the slide. If the disclosure ever
+   * leaves `ReviewScreen` too, the app is making a privacy promise it does not
+   * keep — which is what this test exists to prevent, and the reason it is
+   * pointed at the copy *and* at the screen that renders it.
+   */
+  const limit = (en.review as unknown as Record<string, string>).anonymitySheetDevice;
+  expect(limit).toMatch(/device|identifier|abuse/i);
+  expect(limit).toMatch(/not untraceable|not overstate/i);
+
+  const review = fs.readFileSync(
+    path.resolve(__dirname, '../../capture/ReviewScreen.tsx'),
+    'utf8',
+  );
+  expect(review).toMatch(/t\('review\.anonymitySheetDevice'\)/);
 });
 
 test('the app names itself, and names who is behind it', () => {
@@ -107,8 +130,22 @@ test('the app names itself, and names who is behind it', () => {
   expect(SCREEN).toMatch(/<DawuroWordmark/);
   expect(SCREEN).toMatch(/<GnaMark/);
   expect(SCREEN).toMatch(/<ProvidedBy/);
-  expect(en.app.providedBy).toMatch(/Ghana News Agency/);
-  expect(en.app.providedBy).toMatch(/Softmasters/);
+  /*
+   * Four separate strings, because each label sits on its own line beside that
+   * organisation's logo and a single sentence cannot hold that.
+   *
+   * Both labels are capitalised. They read as two lines of a credit rather
+   * than as one sentence wrapped, so a lowercase "powered by" under a capital
+   * "Sponsored by" looked like a continuation that had lost its first half.
+   *
+   * The two names stay pinned even though neither is drawn as text any more —
+   * the accessibility label still reads the whole credit aloud, and that is
+   * the only place a screen reader hears who stands behind the app.
+   */
+  expect(en.app.gna).toBe('GNA');
+  expect(en.app.softmasters).toBe('Softmasters');
+  expect(en.app.sponsoredBy).toBe('Sponsored by');
+  expect(en.app.poweredBy).toBe('Powered by');
 });
 
 /**
@@ -177,11 +214,13 @@ describe('getting back', () => {
    */
   test('there is a back control, and it is not only a gesture', () => {
     expect(SCREEN).toMatch(/accessibilityLabel=\{t\('common\.back'\)\}/);
-    expect(SCREEN).toMatch(/onPress=\{\(\) => goTo\(index - 1\)\}/);
+    // Through `goToManually`, which also stops the automatic pacing — see
+    // "the introduction reads itself" below.
+    expect(SCREEN).toMatch(/onPress=\{\(\) => goToManually\(index - 1\)\}/);
   });
 
   test('the dots move between slides', () => {
-    expect(SCREEN).toMatch(/onPress=\{\(\) => goTo\(i\)\}/);
+    expect(SCREEN).toMatch(/onPress=\{\(\) => goToManually\(i\)\}/);
     // Named, so a screen reader announces the slide rather than "button".
     expect(SCREEN).toMatch(/accessibilityLabel=\{t\(`onboarding\.\$\{slide\.key\}\.title`\)\}/);
   });
@@ -196,8 +235,10 @@ describe('getting back', () => {
     const goTo = SCREEN.slice(SCREEN.indexOf('const goTo ='), SCREEN.indexOf('const finish ='));
     expect(goTo).toMatch(/scrollTo\(\{ x: clamped \* width/);
     expect(goTo).not.toMatch(/setIndex/);
-    // Next uses it too, rather than a second copy of the arithmetic.
-    expect(SCREEN).toMatch(/onPress=\{\(\) => goTo\(index \+ 1\)\}/);
+    // Next uses it too, rather than a second copy of the arithmetic — via
+    // `goToManually`, which wraps it and stops the timer.
+    expect(SCREEN).toMatch(/onPress=\{\(\) => goToManually\(index \+ 1\)\}/);
+    expect(SCREEN).toMatch(/const goToManually = \(i: number\) => \{[\s\S]{0,120}goTo\(i\);/);
   });
 
   test('leaving the sign-up it opens is not a dead button', () => {
@@ -248,4 +289,174 @@ test('the slide about filming warns people not to get hurt doing it', () => {
   const safety = en.safety as unknown as Record<string, string>;
   expect(safety.dontRisk).toMatch(/risk/i);
   expect(safety.emergencyFirst).toMatch(/112/);
+});
+
+test('each provider is named in bold with its own mark beside it', () => {
+  /*
+   * The credit used to be one sentence with the names bolded inside it, and a
+   * row of two lockups underneath. The lockups have moved into the line: a mark
+   * sits directly against the name it belongs to, which is what makes it read
+   * as a credit to two organisations rather than as a caption above a logo bar.
+   *
+   * Laid out as flex rows rather than as images nested in `<Text>`. React
+   * Native permits the nesting, and it is the obvious way to write it, but the
+   * image's vertical alignment is fixed to the text baseline and cannot be
+   * nudged — a square mark sits low against lowercase type. A row lets every
+   * piece centre on the same line.
+   */
+  const brand = fs.readFileSync(path.resolve(__dirname, '../../../components/Brand.tsx'), 'utf8');
+  /*
+   * The agency's *logo*, not its symbol.
+   *
+   * `GnaMark` is the gong-gong, which Dawuro borrows as its own mark and shows
+   * at 176pt at the top of this very slide. Crediting the agency with it put
+   * the same drums on one screen twice and read as the app crediting itself.
+   * The wordmark is the agency's identity and has no drums in it.
+   */
+  expect(brand).toMatch(/<GnaWordmark height=\{gnaLogo\} \/>/);
+  /*
+   * And Softmasters' full lockup, not its grid mark.
+   *
+   * The mark carries no lettering, so the name had to be typed beside it in
+   * Inter Bold — putting "Softmasters" in a different face from its own logo,
+   * on the line directly under one where the agency appeared as artwork only.
+   * Two names, two treatments, and the pair stopped reading as one credit.
+   */
+  expect(brand).toMatch(/<SoftmastersLogo height=\{softmastersLogo\} \/>/);
+  /*
+   * Two rows, one organisation each, sharing one row style.
+   *
+   * A single wrapping row broke wherever the width ran out — "Sponsored by GNA
+   * powered by" then "Softmasters" alone — which separated a mark from the
+   * name it belongs to. One shared `row` rather than two style objects, so the
+   * two lines cannot drift apart the way they did when each was written out.
+   */
+  expect((brand.match(/<View style=\{row\}>/g) ?? []).length).toBe(2);
+  expect(brand).toMatch(/const row = \{/);
+
+  /*
+   * Words before artwork, in both rows.
+   *
+   * The mark used to sit between "Sponsored by" and "GNA", interrupting the
+   * phrase it illustrates. Order is the whole point of this line, so it is
+   * asserted rather than left to a reading of the file.
+   */
+  const sponsored = brand.indexOf("t('app.sponsoredBy')", brand.indexOf('const row'));
+  const gnaLogo = brand.indexOf('<GnaWordmark height={gnaLogo}');
+  expect(sponsored).toBeGreaterThan(0);
+  expect(gnaLogo).toBeGreaterThan(sponsored);
+
+  const powered = brand.indexOf("t('app.poweredBy')", brand.indexOf('const row'));
+  const smLogo = brand.indexOf('<SoftmastersLogo height={softmastersLogo}');
+  expect(powered).toBeGreaterThan(0);
+  expect(smLogo).toBeGreaterThan(powered);
+
+  /*
+   * Neither name is typed beside a logo that already sets it.
+   *
+   * Both lockups are lettering: the agency's reads GNA / GHANA NEWS AGENCY,
+   * Softmasters' reads SOFTMASTERS / BUSINESS SOLUTIONS. Setting either name
+   * again in Inter Bold is the word twice, inches apart, in two faces — and
+   * doing it on one row but not the other is what stopped the pair reading as
+   * one credit at all.
+   *
+   * Both keys stay in use by the accessibility label, which reads the credit
+   * as one sentence and so must still say both names aloud.
+   */
+  const rows = brand.slice(brand.indexOf('const row'));
+  expect(rows).not.toMatch(/<RNText style=\{name\}>/);
+  /*
+   * The label is a ternary now, because the launch screen renders only the
+   * build credit — GNA's full lockup is already the largest thing on that
+   * screen, so crediting it again underneath was the same organisation twice
+   * in one glance. The label has to follow what is drawn: telling a screen
+   * reader about a sponsor line that is not on the page is worse than the
+   * duplication it was added to avoid.
+   *
+   * The introduction keeps both, and that branch is what this pins.
+   */
+  expect(brand).toMatch(
+    /`\$\{t\('app\.sponsoredBy'\)\} \$\{t\('app\.gna'\)\}, \$\{t\('app\.poweredBy'\)\} \$\{t\('app\.softmasters'\)\}`/,
+  );
+  expect(brand).toMatch(/: `\$\{t\('app\.poweredBy'\)\} \$\{t\('app\.softmasters'\)\}`/);
+  expect(SCREEN).not.toMatch(/credits=/);
+
+  /*
+   * Spacing as a number, not `gap-x-1.5`.
+   *
+   * That class compiled to nothing — no other row in the app uses the `gap-x-`
+   * form, and NativeWind builds the stylesheet from the class names it finds,
+   * so there was no rule to apply. The credit shipped as "Sponsored by▪GNA"
+   * with the mark against the words on both sides, and nothing errored.
+   */
+  // Comments stripped first: the block explaining *why* `gap-x-` went names it,
+  // and a rule that reads its own rationale as a violation fails on prose.
+  const brandCode = brand.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+  expect(brandCode).not.toMatch(/gap-x-/);
+  expect(brandCode).toMatch(/const gutter = Math\.round\(size \* 0\.42\)/);
+
+  /*
+   * A named face, and one `_layout.tsx` actually loads.
+   *
+   * This used to pin `Inter_700Bold`, which the typed company names were set
+   * in. Both names are artwork now, so the only type left in this component is
+   * the two labels — but the rule behind the assertion is unchanged and still
+   * worth holding: React Native cannot synthesise weight for a named family,
+   * so a `fontWeight` here would be ignored on Android and unreliable on iOS,
+   * and a face the layout never registers falls back to the system font
+   * silently, with no error anywhere.
+   */
+  expect(brand).toMatch(/fontFamily: 'Inter_500Medium' as const/);
+  expect(brandCode).not.toMatch(/fontWeight:/);
+  const layout = fs.readFileSync(path.resolve(__dirname, '../../../app/_layout.tsx'), 'utf8');
+  expect(layout).toMatch(/Inter_500Medium/);
+
+  // One label for a screen reader, rather than four fragments read in sequence.
+  // A ternary now — see the note above on why the launch screen drops the
+  // sponsor line — so this pins the attribute, and the branches are pinned
+  // separately.
+  expect(brand).toMatch(/accessibilityLabel=\{\s*credits === 'both'/);
+});
+
+describe('the introduction reads itself', () => {
+  test('each slide holds for five seconds', () => {
+    expect(SCREEN).toMatch(/const AUTO_ADVANCE_MS = 5000;/);
+    expect(SCREEN).toMatch(/setTimeout\(\(\) => goTo\(index \+ 1\), AUTO_ADVANCE_MS\)/);
+  });
+
+  test('the clock restarts per slide rather than running free', () => {
+    /*
+     * Keyed on `index`. A single interval drifts out of step the moment a
+     * scroll takes longer than it does, and then starts skipping slides — the
+     * timer fires while the previous animation is still settling.
+     */
+    expect(SCREEN).toMatch(/\}, \[autoAdvance, isLast, reducedMotion, index, goTo\]\)/);
+  });
+
+  test('it stops on the last slide, where a choice is waiting', () => {
+    // Sliding away from three buttons while somebody is deciding between them
+    // is worse than a screen that waits.
+    expect(SCREEN).toMatch(/if \(!autoAdvance \|\| isLast \|\| reducedMotion\) return;/);
+  });
+
+  test('any deliberate move hands the pacing over for good', () => {
+    /*
+     * A carousel that keeps advancing under a reader's thumb is the most
+     * irritating version of this: they swipe back to re-read something and it
+     * slides away again five seconds later.
+     */
+    expect(SCREEN).toMatch(/onScrollBeginDrag=\{\(\) => setAutoAdvance\(false\)\}/);
+    expect(SCREEN).toMatch(/const goToManually = \(i: number\) => \{\s*setAutoAdvance\(false\);/);
+    // Back, Next and the dots all go through it; nothing calls `goTo` directly.
+    expect(SCREEN).toMatch(/goToManually\(index - 1\)/);
+    expect(SCREEN).toMatch(/goToManually\(index \+ 1\)/);
+    expect(SCREEN).toMatch(/goToManually\(i\)/);
+    expect(SCREEN).not.toMatch(/onPress=\{\(\) => goTo\(/);
+  });
+
+  test('a reader who asked for less motion gets none', () => {
+    // An animation nobody asked for is exactly what that system setting is
+    // about, and this one moves the whole screen.
+    expect(SCREEN).toMatch(/const reducedMotion = useReducedMotion\(\)/);
+  });
 });

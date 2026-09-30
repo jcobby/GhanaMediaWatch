@@ -58,6 +58,7 @@ import type {
   OrgInboxItem,
   OrgIncidentStatus,
   OrgMember,
+  OrgMembershipRequest,
   OrgMemberRole,
   OrgResponseAction,
   OrgSubscriptionDetail,
@@ -952,13 +953,48 @@ export class HttpApiClient implements ApiClient {
    * profile hydrates fails at the type level rather than on the wire.
    */
 
+  /**
+   * The three figures on the organisation's home, and its plan.
+   *
+   * **Two requests, because one endpoint does not hold both.** This read
+   * `/org/dashboard` for the counters *and* the subscription, and that
+   * endpoint carries neither: its response is `counts`, `dailyTrend` and
+   * `recentHighPriority`. Every absent field coerced to 0, so the tiles said
+   * "0 INBOX" over a list with a report in it — and `subscription` came back
+   * null, which is why the licence footer said it could not confirm the price.
+   * One wrong assumption, two symptoms, no error anywhere.
+   *
+   * The plan lives at `/org/subscription`, which returns `tier`. The counters
+   * are derived from `counts.byState` where the service gives it, and are
+   * `null` — not 0 — where it does not.
+   *
+   * The subscription is fetched alongside rather than in series: a failure
+   * there must not empty the counters, and a failure in the counters must not
+   * hide the plan, so each is caught on its own.
+   */
   async getOrgDashboard(orgId: string): Promise<OrgDashboard> {
-    const res = await this.request<RawOrgDashboard>('/org/dashboard', { orgId });
+    const [dash, sub] = await Promise.all([
+      this.request<RawOrgDashboard>('/org/dashboard', { orgId }).catch(() => null),
+      this.request<RawSubscription>('/org/subscription', { orgId }).catch(() => null),
+    ]);
+
+    const byState = dash?.counts?.byState;
+    /*
+     * Sum the states that mean "waiting on us".
+     *
+     * The service names its own states and this client must not invent them,
+     * so an unknown key is counted rather than dropped — a total that ignores
+     * a state it has not seen before is worse than one that includes it, since
+     * the figure exists to say "there is work here".
+     */
+    const total = (states: Record<string, number> | undefined): number | null =>
+      states ? Object.values(states).reduce((sum, n) => sum + (Number(n) || 0), 0) : null;
+
     return {
-      inboxCount: count(res.inboxCount),
-      publishedCount: count(res.publishedCount),
-      openAssignments: count(res.openAssignments),
-      subscription: res.subscription ? normaliseSubscription(res.subscription) : null,
+      inboxCount: dash?.inboxCount ?? total(byState),
+      publishedCount: dash?.publishedCount ?? (byState?.published ?? null),
+      openAssignments: dash?.openAssignments ?? null,
+      subscription: sub ? normaliseSubscription(sub) : null,
     };
   }
 
@@ -986,11 +1022,25 @@ export class HttpApiClient implements ApiClient {
    * idempotency key on the report means a re-licence of the same report cannot
    * charge twice anyway.
    */
-  async getOrgInbox(orgId: string): Promise<Page<OrgInboxItem>> {
+  async getOrgInbox(orgId: string, options: { pages?: number } = {}): Promise<Page<OrgInboxItem>> {
+    /*
+     * One page unless the caller says otherwise.
+     *
+     * This drained to the end on every call, for every caller — the licences
+     * screen needed the whole history, and fixing it here taxed the screen that
+     * did not. The inbox is a queue somebody watches with a 15-second stale
+     * window, so an officer with six hundred routed reports was waiting on six
+     * awaited round trips of a hundred items each before anything rendered, and
+     * again every quarter-minute, on mobile data they are paying for.
+     *
+     * The depth is the caller's decision because the two needs are genuinely
+     * different, not because one of them is wrong.
+     */
+    const limit = Math.max(1, options.pages ?? 1);
     const items: OrgInboxItem[] = [];
     let cursor: string | null = null;
 
-    for (let page = 0; page < 10; page += 1) {
+    for (let page = 0; page < limit; page += 1) {
       const query: string = cursor
         ? `/org/inbox?limit=100&cursor=${encodeURIComponent(cursor)}`
         : '/org/inbox?limit=100';
@@ -1114,6 +1164,98 @@ export class HttpApiClient implements ApiClient {
       body: { status: input.status, ...(input.note ? { note: input.note } : {}) },
       orgId,
     });
+  }
+
+  /**
+   * Ask an organisation to add you.
+   *
+   * **Deliberately no `orgId` option.** Every other `/org/*` call on this
+   * client passes one and the service refuses it without the header — but this
+   * route is not under `/org`, and the caller has no membership to scope by.
+   * Sending a header here would be claiming the very thing being asked for.
+   *
+   * Keyed on the organisation so a double tap sends one request, while asking
+   * a genuinely different organisation is not read as a replay of the first.
+   */
+  async requestMembership(input: {
+    orgId: string;
+    statedRole?: string;
+    note?: string;
+  }): Promise<void> {
+    await this.request<unknown>('/membership-requests', {
+      method: 'POST',
+      body: {
+        orgId: input.orgId,
+        ...(input.statedRole ? { statedRole: input.statedRole } : {}),
+        ...(input.note ? { note: input.note } : {}),
+      },
+      idempotencyKey: `membership-request:${input.orgId}`,
+    });
+  }
+
+  /**
+   * Who has asked to join, newest first.
+   *
+   * Read defensively: the service documents this response as a plain page and
+   * names the fields only in prose, so every one of them is coerced and a row
+   * without an id is dropped rather than rendered as a request nobody can
+   * decide.
+   */
+  async getMembershipRequests(orgId: string): Promise<OrgMembershipRequest[]> {
+    const page = await this.request<Page<Record<string, unknown>>>(
+      '/org/membership-requests?limit=100',
+      { orgId },
+    );
+    return (page.items ?? [])
+      .filter((r): r is Record<string, unknown> & { id: string } => typeof r.id === 'string')
+      .map((r) => ({
+        id: r.id,
+        displayName: typeof r.displayName === 'string' ? r.displayName : '',
+        email: typeof r.email === 'string' ? r.email : '',
+        statedRole: typeof r.statedRole === 'string' ? r.statedRole : null,
+        note: typeof r.note === 'string' ? r.note : null,
+        /*
+         * Anything but the two settled words is pending. Being wrong towards
+         * "still waiting" leaves a decided request in the queue, which somebody
+         * notices; being wrong the other way hides one that was never answered.
+         */
+        status:
+          r.status === 'approved' ? 'approved' : r.status === 'rejected' ? 'rejected' : 'pending',
+        requestedAtIso:
+          typeof r.createdAt === 'string'
+            ? r.createdAt
+            : typeof r.requestedAtIso === 'string'
+              ? r.requestedAtIso
+              : null,
+      }));
+  }
+
+  /**
+   * Settle one, which is what admits somebody to the organisation.
+   *
+   * `approved`, the word the wire uses. This project's own specification said
+   * `accepted` until it was corrected, and sending that would have been refused
+   * on every request.
+   */
+  async decideMembershipRequest(
+    orgId: string,
+    requestId: string,
+    decision: 'approved' | 'rejected',
+  ): Promise<void> {
+    await this.request<unknown>(
+      `/org/membership-requests/${encodeURIComponent(requestId)}/decide`,
+      {
+        method: 'POST',
+        body: { decision },
+        orgId,
+        /*
+         * Keyed on the request *and* the outcome, so a double tap decides once
+         * while a decline followed by a deliberate approve is still two
+         * decisions rather than a replay of the first.
+         */
+        idempotencyKey: `membership:${requestId}:${decision}`,
+      },
+    );
   }
 
   async getOrgMembers(orgId: string): Promise<OrgMember[]> {
@@ -1352,6 +1494,32 @@ export class HttpApiClient implements ApiClient {
   }
 }
 
+/**
+ * A reporter with a `verified` that is actually a boolean.
+ *
+ * **The field is new and the payloads are not.** `Reporter.verified` arrived
+ * with blogger verification; a report filed before it, a fixture, or a
+ * projection that has not caught up all send a reporter without it — and the
+ * type says `boolean`, so every screen would read `undefined` while TypeScript
+ * insisted otherwise. `undefined` is falsy, so nothing would visibly break;
+ * the badge would simply never appear and nobody would know why.
+ *
+ * Absent reads as **not** verified, deliberately and in that direction only. A
+ * byline shown as checked when it has not been is the one failure this whole
+ * feature exists to prevent, and a coercion that guessed the other way would
+ * manufacture it from a missing field.
+ */
+function normaliseReporter(raw: Reporter | { kind: string; [k: string]: unknown }): Reporter {
+  if (!raw || raw.kind !== 'user') return { kind: 'anonymous' };
+  return {
+    kind: 'user',
+    id: typeof raw.id === 'string' ? raw.id : '',
+    displayName: typeof raw.displayName === 'string' ? raw.displayName : '',
+    avatarUrl: typeof raw.avatarUrl === 'string' ? raw.avatarUrl : null,
+    verified: raw.verified === true,
+  };
+}
+
 // ─── organisation normalisation ────────────────────────────────────────────
 
 const ORG_MEMBER_ROLES: readonly string[] = ['owner', 'admin', 'analyst', 'dispatcher', 'viewer'];
@@ -1368,7 +1536,20 @@ interface RawLicenceFields {
   licensedAt?: string | null;
 }
 
+/**
+ * What `/org/dashboard` actually answers, read off the live spec.
+ *
+ * The flat counters this once declared — `inboxCount`, `publishedCount`,
+ * `openAssignments` — are not on the wire and never were, and neither is
+ * `subscription`. They stay declared as optional so an older or newer service
+ * that *does* send them is still read, but nothing may assume them.
+ */
 interface RawOrgDashboard {
+  counts?: {
+    byState?: Record<string, number>;
+    byCategory?: Record<string, number>;
+  };
+  /** Kept in case a deployment sends the flat form. Absent on this service. */
   inboxCount?: number;
   publishedCount?: number;
   openAssignments?: number;
@@ -1765,11 +1946,12 @@ function normaliseIncident(raw: RawIncident): Incident {
      * report on the page with it, so a single malformed row served an empty
      * feed. One anonymous row is a far smaller failure.
      */
-    reporter:
+    reporter: normaliseReporter(
       raw.reporter ??
-      (raw.publisher && raw.publisher.kind !== 'organisation'
-        ? raw.publisher
-        : { kind: 'anonymous' as const }),
+        (raw.publisher && raw.publisher.kind !== 'organisation'
+          ? raw.publisher
+          : { kind: 'anonymous' as const }),
+    ),
 
     /*
      * Never missing, for the same reason as the reporter above.

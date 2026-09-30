@@ -1,5 +1,11 @@
 import { useEffect, useSyncExternalStore } from 'react';
-import { peekPoster, requestPoster, subscribeToPosters, type Poster } from '@/lib/videoPoster';
+import {
+  peekPoster,
+  posterPending,
+  requestPoster,
+  subscribeToPosters,
+  type Poster,
+} from '@/lib/videoPoster';
 
 /**
  * The still frame for a report, or null while there is none.
@@ -17,7 +23,22 @@ export function useVideoPoster(input: {
   kind: string;
   url: string | undefined;
   posterUrl: string | undefined;
-}): Poster | null {
+}): {
+  /** The frame, once there is one. */
+  poster: Poster | null;
+  /**
+   * A frame is on its way — queued, or being cut right now.
+   *
+   * Returned alongside the frame because null alone cannot be drawn honestly.
+   * Cutting a frame means opening a player against a remote file and pulling
+   * its head down, one report at a time, with an eight-second ceiling; a row
+   * near the back of twenty waits a while. Told only "no frame", `Thumbnail`
+   * drew its no-picture state straight away and the real frame appeared over
+   * it later with no warning. With this it can pulse instead, and fall back
+   * only once nothing more is coming.
+   */
+  pending: boolean;
+} {
   /*
    * Only where there is a clip and nothing already stands in for it.
    *
@@ -30,11 +51,22 @@ export function useVideoPoster(input: {
   const poster = useSyncExternalStore(subscribeToPosters, () =>
     wanted ? peekPoster(input.id) : null,
   );
+  /*
+   * A second subscription rather than one returning `{ poster, pending }`.
+   *
+   * `useSyncExternalStore` compares snapshots by identity, so a getter that
+   * builds an object returns a new one every check and React re-renders
+   * without end. Two snapshots, each a value it already holds, is the shape
+   * that store wants.
+   */
+  const pending = useSyncExternalStore(subscribeToPosters, () =>
+    wanted ? posterPending(input.id) : false,
+  );
 
   useEffect(() => {
     if (!wanted || !input.url) return;
     requestPoster(input.id, input.url);
   }, [wanted, input.id, input.url]);
 
-  return poster;
+  return { poster, pending };
 }

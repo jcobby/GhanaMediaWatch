@@ -108,6 +108,17 @@ test('every organisation call names the organisation it is for', () => {
   const orgSection = client.slice(client.indexOf(ORG_START), client.indexOf(PERSONAL_START));
   const methods = [...orgSection.matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]!);
   expect(methods.length).toBeGreaterThan(5);
+
+  /*
+   * The section is org calls only, so membership in it *is* the rule.
+   *
+   * A non-scoped call that lives here would pass by being positioned rather
+   * than by being correct — so one is kept out of the section instead of
+   * exempted from the check. `requestMembership` posts to
+   * `/membership-requests`, deliberately outside `/org`, because the caller is
+   * asking to join and has no membership to scope by; it sits with the
+   * personal calls below and the inverse rule covers it there.
+   */
   for (const method of methods) {
     const signature = orgSection.slice(orgSection.indexOf(`${method}(`));
     expect([method, /^\w+\(\s*orgId: string/.test(signature)]).toEqual([method, true]);
@@ -121,15 +132,24 @@ test('every organisation call names the organisation it is for', () => {
    * them indistinguishable, and the org rule above would be satisfied by a
    * signature that sends the header for an account that has no right to one.
    */
+  /*
+   * Matched on the *parameter*, not on the word appearing anywhere.
+   *
+   * This read `/orgId/` across the whole signature, which conflated two
+   * different things the moment a method took one in its body:
+   * `requestMembership({ orgId, … })` names the organisation being *asked to
+   * join*. That is data — the thing the request is about — and it is the
+   * opposite of scope, since the caller is asking precisely because they are
+   * not a member. What the rule exists to forbid is a leading `orgId: string`,
+   * the shape that sends `X-Dawuro-Org` for an account with no right to it.
+   */
   const personalSection = client.slice(client.indexOf(PERSONAL_START));
   const personal = [...personalSection.matchAll(/^\s{2}(\w+)\(/gm)].map((m) => m[1]!);
   expect(personal.length).toBeGreaterThan(3);
+  const SCOPE_PARAM = new RegExp(String.raw`^\w+\(\s*orgId\s*[:?]`);
   for (const method of personal) {
     const signature = personalSection.slice(personalSection.indexOf(`${method}(`));
-    expect([method, /orgId/.test(signature.slice(0, signature.indexOf(')')))]).toEqual([
-      method,
-      false,
-    ]);
+    expect([method, SCOPE_PARAM.test(signature)]).toEqual([method, false]);
   }
 
   // And the header actually goes out.

@@ -2,6 +2,7 @@ import { memo, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, useWindowDimensions, View } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { Ionicons } from '@expo/vector-icons';
+import { useTranslation } from 'react-i18next';
 import { Pressable, Text } from '@/components/ui';
 import { useColors } from '@/lib/theme';
 import { formatRelativeTime } from '@/lib/format';
@@ -105,10 +106,26 @@ export const FeedLead = memo(function FeedLead({
   onPlaybackStarted?: () => void;
 }) {
   const c = useColors();
+  const { t } = useTranslation();
   const { width } = useWindowDimensions();
 
   const isVideo = incident.media.kind === 'video';
   const isAudio = incident.media.kind === 'audio';
+
+  /**
+   * Whose name leads this story, if anyone's.
+   *
+   * The same rule `FeedRow` applies, so the lead and the list below it never
+   * credit the same report differently: an organisation that released it, else
+   * a verified blogger, else nobody. An ordinary account is deliberately not
+   * named — a display name in this position reads as a masthead.
+   */
+  const credit =
+    incident.publisher.kind === 'organisation'
+      ? { name: incident.publisher.displayName, verified: incident.publisher.verified }
+      : incident.reporter.kind === 'user' && incident.reporter.verified
+        ? { name: incident.reporter.displayName, verified: true }
+        : null;
 
   /*
    * 16:9, measured rather than an aspect class. See `OVERLAY_BOTTOM_LEFT`.
@@ -257,7 +274,7 @@ export const FeedLead = memo(function FeedLead({
    */
   const still = incident.media.viewUrl || incident.media.posterUrl;
 
-  const poster = useVideoPoster({
+  const { poster, pending } = useVideoPoster({
     id: incident.id,
     kind: incident.media.kind,
     url: incident.media.url,
@@ -281,6 +298,7 @@ export const FeedLead = memo(function FeedLead({
             of the thing somebody filmed. See `lib/videoPoster`.
           */
           poster={poster}
+          pending={pending}
           category={incident.category}
           style={{ width, height: imageHeight }}
           glyphSize={44}
@@ -312,11 +330,11 @@ export const FeedLead = memo(function FeedLead({
             <View
               className="flex-row items-center gap-2 rounded-pill bg-black/60"
               style={{ paddingHorizontal: 14, paddingVertical: 8 }}
-              accessibilityLabel="Loading video"
+              accessibilityLabel={t('incident.bufferingVideo')}
             >
               <ActivityIndicator size="small" color={c.textOnDark} />
               <Text variant="caption" style={{ color: c.textOnDark }}>
-                Loading video
+                {t('incident.bufferingVideo')}
               </Text>
             </View>
           </View>
@@ -359,13 +377,16 @@ export const FeedLead = memo(function FeedLead({
         <View className="mt-2 flex-row items-center gap-2">
           {/*
             Who it is from, first. A lead released by a named organisation is
-            credited to it, and a reader weighs that before anything else.
+            credited to it, and a reader weighs that before anything else — and
+            a verified blogger is credited the same way, because a checked
+            byline is the same kind of claim at a smaller scale.
+
+            An ordinary account is still not named here: a display name is not a
+            masthead, and putting one in this position would read as one.
           */}
-          {incident.publisher.kind === 'organisation' ? (
+          {credit ? (
             <Text variant="body-sm" tone="secondary" className="font-sans-semibold" numberOfLines={1}>
-              {incident.publisher.verified
-                ? `${incident.publisher.displayName} ✓`
-                : incident.publisher.displayName}
+              {credit.verified ? `${credit.name} ✓` : credit.name}
               {'  •'}
             </Text>
           ) : null}

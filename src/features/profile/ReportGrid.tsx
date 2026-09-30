@@ -97,7 +97,7 @@ function ReportTile({ report, onOpen }: { report: AuthoredIncident; onOpen: () =
    */
   const still = report.media.thumbUrl || report.media.posterUrl;
 
-  const poster = useVideoPoster({
+  const { poster, pending } = useVideoPoster({
     id: report.id,
     kind: report.media.kind,
     url: report.media.url,
@@ -140,6 +140,7 @@ function ReportTile({ report, onOpen }: { report: AuthoredIncident; onOpen: () =
         <Thumbnail
           uri={still}
           poster={poster}
+          pending={pending}
           cacheKey={report.id}
           category={report.category}
           style={{ width: '100%', height: '100%' }}

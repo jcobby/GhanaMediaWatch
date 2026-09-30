@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Dimensions,
   ScrollView,
@@ -12,15 +12,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { Button, Pressable, Text } from '@/components/ui';
-import {
-  DawuroWordmark,
-  GnaWordmark,
-  GnaMark,
-  ProvidedBy,
-  SoftmastersLogo,
-} from '@/components/Brand';
+import { DawuroWordmark, GnaMark, ProvidedBy } from '@/components/Brand';
 import { accentGradient, colors } from '@/lib/theme';
 import { useAuthStore } from '@/stores/authStore';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 import { toast } from '@/stores/toastStore';
 
 /**
@@ -43,6 +38,17 @@ const NAV_COLUMN = 84;
 const HERO_TITLE = { fontSize: 42, lineHeight: 46, letterSpacing: -1.4 } as const;
 const SLIDE_TITLE = { fontSize: 34, lineHeight: 40, letterSpacing: -1 } as const;
 const BODY_SIZE = { fontSize: 19, lineHeight: 28 } as const;
+
+/**
+ * How long each slide holds before the introduction moves itself on.
+ *
+ * Long enough to read the longest body at a glance — "Built for the field" is
+ * six lines at this size — and short enough that somebody who is not reading
+ * still reaches the end. It stops on the last slide rather than looping: that
+ * one ends in a choice, and a screen that slides away from three buttons while
+ * somebody is deciding is worse than one that waits.
+ */
+const AUTO_ADVANCE_MS = 5000;
 
 const TITLE_SIZE: Record<string, typeof HERO_TITLE | typeof SLIDE_TITLE> = {
   dawuro: HERO_TITLE,
@@ -99,6 +105,17 @@ export function OnboardingScreen() {
     setIndex(Math.round(e.nativeEvent.contentOffset.x / width));
   };
 
+  /*
+   * Stop moving the moment somebody takes hold of it.
+   *
+   * A carousel that keeps advancing under a reader's thumb is the most
+   * irritating version of this pattern: they swipe back to re-read a slide and
+   * it slides away again five seconds later. Any deliberate act — a swipe, the
+   * Back control, a dot — hands the pacing over for good.
+   */
+  const [autoAdvance, setAutoAdvance] = useState(true);
+  const reducedMotion = useReducedMotion();
+
   /**
    * One way to move between slides, shared by Next, Back and the dots.
    *
@@ -107,9 +124,18 @@ export function OnboardingScreen() {
    * the same fact two owners, and they disagree the moment a scroll is
    * interrupted — the dots would say one thing and the page show another.
    */
-  const goTo = (i: number) => {
-    const clamped = Math.max(0, Math.min(SLIDES.length - 1, i));
-    scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
+  const goTo = useCallback(
+    (i: number) => {
+      const clamped = Math.max(0, Math.min(SLIDES.length - 1, i));
+      scrollRef.current?.scrollTo({ x: clamped * width, animated: true });
+    },
+    [width],
+  );
+
+  /** A move the reader made, which ends the automatic pacing. */
+  const goToManually = (i: number) => {
+    setAutoAdvance(false);
+    goTo(i);
   };
 
   const finish = async (destination: '/(auth)/sign-in' | '/(auth)/sign-up' | '/(tabs)') => {
@@ -128,6 +154,25 @@ export function OnboardingScreen() {
   };
 
   const isLast = index === SLIDES.length - 1;
+
+  /*
+   * The introduction reads itself, until somebody takes over.
+   *
+   * Keyed on `index` so the clock restarts with each slide rather than running
+   * free — a single interval drifts out of step the moment a scroll takes
+   * longer than it does, and starts skipping slides.
+   *
+   * Three things stop it, and each is a case where moving on is the wrong
+   * answer: the last slide, because it ends in a choice and sliding away from
+   * three buttons mid-decision is worse than waiting; any deliberate move by
+   * the reader; and a system preference for reduced motion, where an animation
+   * nobody asked for is exactly what that setting is about.
+   */
+  useEffect(() => {
+    if (!autoAdvance || isLast || reducedMotion) return;
+    const timer = setTimeout(() => goTo(index + 1), AUTO_ADVANCE_MS);
+    return () => clearTimeout(timer);
+  }, [autoAdvance, isLast, reducedMotion, index, goTo]);
 
   return (
     <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
@@ -152,7 +197,7 @@ export function OnboardingScreen() {
         <View style={{ width: NAV_COLUMN }}>
           {index > 0 ? (
             <Pressable
-              onPress={() => goTo(index - 1)}
+              onPress={() => goToManually(index - 1)}
               accessibilityRole="button"
               accessibilityLabel={t('common.back')}
               // A 56pt row and a full-height target: the old one was a 19pt
@@ -200,14 +245,52 @@ export function OnboardingScreen() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         onScroll={onScroll}
+        // A swipe is the clearest statement that somebody is reading at their
+        // own pace; `onScrollBeginDrag` fires on the touch, not on the settle.
+        onScrollBeginDrag={() => setAutoAdvance(false)}
         scrollEventThrottle={16}
         className="flex-1"
       >
         {SLIDES.map((slide) => (
-          <View
+          /*
+            Each slide scrolls if it has to, and otherwise sits centred.
+
+            `flexGrow: 1` with `justifyContent: 'center'` is what gives both:
+            short slides stay optically centred, and a slide taller than the
+            screen scrolls instead of clipping its last line. That was already
+            one slide away from happening — "Film, take a picture or stream
+            what is happening" runs to three lines of heading and nine of body,
+            which is 45pt past the bottom of an iPhone SE.
+
+            It also covers the case no amount of copy-trimming would: a reader
+            who has turned system text size up. That is the setting this app's
+            whole light palette exists for, and until now it would have cut the
+            safety line off the bottom of the slide that carries it.
+          */
+          <ScrollView
             key={slide.key}
             style={{ width }}
-            className="items-center justify-center gap-6 px-10"
+            contentContainerStyle={{
+              flexGrow: 1,
+              justifyContent: 'center',
+              paddingTop: 16,
+              /*
+                The opening slide sits high, not centred.
+
+                Centring it between the header and the dots left the whole
+                brand statement — mark, name, line, credit — floating in the
+                middle of the screen with a hand's width of empty canvas above
+                and below. Weighting the bottom padding pushes the optical
+                centre up, which is where a title page belongs: the eye starts
+                at the top of a page it is being introduced by.
+
+                Vertical padding lives here rather than in `py-4` on the class
+                list so there is no question which of the two wins.
+              */
+              paddingBottom: slide.key === 'dawuro' ? 108 : 16,
+            }}
+            contentContainerClassName="items-center gap-6 px-10"
+            showsVerticalScrollIndicator={false}
           >
             {/*
               The mark itself on the slide that introduces the name; a glyph on
@@ -223,7 +306,7 @@ export function OnboardingScreen() {
               is words alone.
             */}
             {slide.key === 'dawuro' ? (
-              <GnaMark size={132} />
+              <GnaMark size={176} />
             ) : (
               <LinearGradient
                 colors={[...accentGradient]}
@@ -271,41 +354,18 @@ export function OnboardingScreen() {
             </View>
 
             {/*
-              The sponsor credit, and the agency's own logo under it.
+              The credit, set apart from the sentence above it.
 
-              The mark at the top of this slide is Dawuro's — the app borrows
-              the agency's symbol as its own, which is the arrangement. That
-              leaves the Ghana News Agency named in the credit but not shown in
-              the form it publishes under, so its full lockup with the words
-              sits below the line that names it. The two are at deliberately
-              different scales: one is the product, the other is a credit.
+              The marks used to sit in a row of their own below this line; they
+              are in the line now, one against each name, which is what makes it
+              read as a credit to two organisations rather than a caption above
+              a logo bar. The extra space above is what keeps it a footer to the
+              slide instead of a third paragraph of it.
             */}
             {slide.key === 'dawuro' ? (
-              <View className="items-center gap-4">
-                <ProvidedBy size={16} />
-                {/*
-                  Both marks on one row, in the order the sentence names them,
-                  with a rule between so they read as two organisations rather
-                  than one wide logo.
-
-                  The agency's wordmark rather than its full lockup: the
-                  symbol is already the hero of this slide, and the lockup
-                  carries a second copy of the same drums a few inches below
-                  the first.
-
-                  Heights differ because the shapes do — the wordmark is about
-                  2:1, Softmasters' is a long 5.5:1 horizontal — so matching
-                  their *numbers* would leave one looking twice the weight of
-                  the other. 34 and 20 read as equal.
-                */}
-                <View className="flex-row items-center gap-4">
-                  <GnaWordmark height={34} />
-                  <View style={{ width: 1, height: 22, backgroundColor: 'rgba(14,16,36,0.14)' }} />
-                  <SoftmastersLogo height={20} />
-                </View>
-              </View>
+              <ProvidedBy size={19} style={{ marginTop: 14 }} />
             ) : null}
-          </View>
+          </ScrollView>
         ))}
       </ScrollView>
 
@@ -323,7 +383,7 @@ export function OnboardingScreen() {
         {SLIDES.map((slide, i) => (
           <Pressable
             key={slide.key}
-            onPress={() => goTo(i)}
+            onPress={() => goToManually(i)}
             accessibilityRole="button"
             accessibilityState={{ selected: i === index }}
             accessibilityLabel={t(`onboarding.${slide.key}.title`)}
@@ -353,7 +413,18 @@ export function OnboardingScreen() {
         The primary button used to say "Create an account" and open the *sign-in*
         screen, which sent every new user to a form they could not complete.
       */}
-      <View className="gap-3 px-6" style={{ paddingBottom: insets.bottom + 20 }}>
+      {/*
+        The last slide's block sits higher than the others.
+
+        It carries three choices rather than one Next, and pinned to the same
+        bottom margin the primary one ended up against the edge of the screen —
+        on a phone with a home indicator, under the reader's thumb rather than
+        in front of it.
+      */}
+      <View
+        className="gap-3 px-6"
+        style={{ paddingBottom: insets.bottom + (isLast ? 44 : 20) }}
+      >
         {isLast ? (
           <>
             <Button
@@ -384,7 +455,7 @@ export function OnboardingScreen() {
             label={t('common.next')}
             size="lg"
             fullWidth
-            onPress={() => goTo(index + 1)}
+            onPress={() => goToManually(index + 1)}
           />
         )}
       </View>

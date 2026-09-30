@@ -17,6 +17,14 @@ import { Text } from './Text';
 export interface SheetProps {
   visible: boolean;
   onClose: () => void;
+  /**
+   * A back control on the left of the title.
+   *
+   * Offered where the sheet is somewhere you went rather than something that
+   * appeared — a picker opened from a bar button reads as a place, and a lone
+   * X in the far corner is not where anybody looks to leave one.
+   */
+  onBack?: () => void;
   title?: string;
   /** Optional one-line subtitle under the title. */
   subtitle?: string;
@@ -50,7 +58,15 @@ export interface SheetProps {
  * report with a video in it to reach that size, which is exactly the sheet a
  * reporter opens to check on their own footage.
  */
-export function Sheet({ visible, onClose, title, subtitle, children, className }: SheetProps) {
+export function Sheet({
+  visible,
+  onClose,
+  onBack,
+  title,
+  subtitle,
+  children,
+  className,
+}: SheetProps) {
   const c = useColors();
   const insets = useSafeAreaInsets();
   const { height: screenH } = useWindowDimensions();
@@ -107,7 +123,22 @@ export function Sheet({ visible, onClose, title, subtitle, children, className }
           {title ? (
             <View className="mb-4 flex-row items-start gap-3">
               <View className="flex-1 gap-1">
-                <Text variant="title-md">{title}</Text>
+                <View className="flex-row items-center gap-2">
+                  {onBack ? (
+                    <Pressable
+                      onPress={onBack}
+                      accessibilityRole="button"
+                      accessibilityLabel="Back"
+                      hitSlop={10}
+                      // Inline: `-ml-1` appears nowhere else in `src`, and
+                      // NativeWind compiles only the classes it finds at boot.
+                      style={{ marginLeft: -4 }}
+                    >
+                      <Ionicons name="chevron-back" size={22} color={c.textSecondary} />
+                    </Pressable>
+                  ) : null}
+                  <Text variant="title-md">{title}</Text>
+                </View>
                 {subtitle ? (
                   <Text variant="body-sm" tone="muted">
                     {subtitle}

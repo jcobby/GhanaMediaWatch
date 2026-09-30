@@ -1,4 +1,5 @@
-import { View } from 'react-native';
+import { useMemo, useState } from 'react';
+import { TextInput, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, Sheet, Text } from '@/components/ui';
@@ -34,18 +35,69 @@ export function CountryPicker({
   onSelect: (country: Country) => void;
 }) {
   const { t } = useTranslation();
+  const c = useColors();
+  const [query, setQuery] = useState('');
 
-  const covered = COUNTRIES.filter((c) => c.covered);
-  const rest = COUNTRIES.filter((c) => !c.covered);
+  /*
+   * Matched on the name and on the code.
+   *
+   * Somebody looking for Côte d'Ivoire will type "cote" without the
+   * circumflex, and somebody who knows the list will type "CI" — both should
+   * work, and neither does with a bare `includes` on the display name.
+   */
+  const matches = useMemo(() => {
+    const needle = query.trim().toLowerCase();
+    if (!needle) return COUNTRIES;
+    const fold = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+    return COUNTRIES.filter(
+      (country) => fold(country.name).includes(fold(needle)) || country.code.toLowerCase() === needle,
+    );
+  }, [query]);
+
+  const covered = matches.filter((c) => c.covered);
+  const rest = matches.filter((c) => !c.covered);
 
   return (
     <Sheet
       visible={visible}
       onClose={onClose}
+      onBack={onClose}
       title={t('feed.countryTitle')}
       subtitle={t('feed.countrySubtitle')}
     >
       <View className="gap-1">
+        {/*
+          A search over six entries looks like overkill and is not: the list
+          grows one entry per country Dawuro covers, and a picker that needs
+          scrolling before it gains a field is one that gained the field late.
+        */}
+        <View
+          className="mb-2 flex-row items-center gap-2 rounded-lg bg-canvas-raise px-3"
+          style={{ height: 44 }}
+        >
+          <Ionicons name="search" size={16} color={c.textFaint} />
+          <TextInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('feed.countrySearch')}
+            placeholderTextColor={c.textFaint}
+            accessibilityLabel={t('feed.countrySearch')}
+            autoCorrect={false}
+            // No NativeWind equivalent that behaves the same on both platforms.
+            style={{ flex: 1, color: c.textPrimary, fontFamily: 'Inter_400Regular', fontSize: 15 }}
+          />
+          {query ? (
+            <Pressable onPress={() => setQuery('')} accessibilityLabel={t('common.clear')} hitSlop={10}>
+              <Ionicons name="close-circle" size={16} color={c.textFaint} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        {matches.length === 0 ? (
+          <Text variant="body-sm" tone="muted" className="py-4 text-center">
+            {t('feed.countryNoMatch')}
+          </Text>
+        ) : null}
         {covered.map((country) => (
           <CountryRow
             key={country.code}

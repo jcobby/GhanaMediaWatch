@@ -1,5 +1,11 @@
 import { useMemo } from 'react';
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQuery,
+  useQueryClient,
+  type UseMutationResult,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { api } from '@/api';
 import { useAuthStore } from '@/stores/authStore';
 import type { Page } from '@/types/api';
@@ -10,6 +16,7 @@ import type {
   OrgInboxItem,
   OrgIncidentStatus,
   OrgMember,
+  OrgMembershipRequest,
   OrgResponseAction,
   PublicationRequest,
 } from '@/types/org';
@@ -32,6 +39,7 @@ export const orgKeys = {
   inbox: (orgId: string) => ['org', orgId, 'inbox'] as const,
   assignments: (orgId: string) => ['org', orgId, 'assignments'] as const,
   members: (orgId: string) => ['org', orgId, 'members'] as const,
+  membershipRequests: (orgId: string) => ['org', orgId, 'membership-requests'] as const,
 };
 
 /** The organisation this phone is acting for, or null. */
@@ -49,6 +57,14 @@ export function useOrgDashboard(): UseQueryResult<OrgDashboard> {
   });
 }
 
+/**
+ * The queue: the newest page, refetched often.
+ *
+ * Deliberately one page deep. `useOrgLicences` below needs the whole history
+ * and says so; making every caller pay for that meant an officer with six
+ * hundred routed reports waited on six sequential requests before the inbox
+ * drew anything, and again every fifteen seconds.
+ */
 export function useOrgInbox(): UseQueryResult<Page<OrgInboxItem>> {
   const orgId = useOrgId();
   return useQuery({
@@ -83,7 +99,39 @@ export function useOrgLicences(): {
   error: unknown;
   refetch: () => void;
 } {
-  const query = useOrgInbox();
+  const orgId = useOrgId();
+  /*
+   * Its own query, and its own cache entry.
+   *
+   * A licence that has scrolled past the newest page is still a licence this
+   * organisation paid for, so this screen is the one that genuinely needs the
+   * cursor followed — bounded at ten pages. Sharing the inbox's query would
+   * either make that screen a sample again or make the queue slow for
+   * everybody; a separate key lets the two have different costs and different
+   * stale windows.
+   *
+   * A dedicated endpoint would still be better — it would let the service
+   * answer "what have we licensed" without reading everything routed to us —
+   * and when one lands only this hook changes.
+   */
+  const query = useQuery({
+    /*
+     * The inbox key with `all` appended, not a key of its own.
+     *
+     * react-query invalidates by prefix, so every
+     * `invalidateQueries({ queryKey: orgKeys.inbox(orgId) })` already in this
+     * file — licensing, status changes — refreshes this too. A sibling key
+     * would need each of those call sites updating, and the one that was
+     * forgotten would be the licences screen still showing a report as unbought
+     * after the officer paid for it.
+     */
+    queryKey: [...orgKeys.inbox(orgId ?? ''), 'all'] as const,
+    queryFn: () => api.getOrgInbox(orgId!, { pages: 10 }),
+    enabled: Boolean(orgId),
+    // A record rather than a queue: it changes when this organisation licenses
+    // something, which is an action taken in the app and already invalidates.
+    staleTime: 60_000,
+  });
   const items = query.data?.items;
 
   const licences = useMemo(() => {
@@ -138,6 +186,67 @@ export function useOrgAssignments(): UseQueryResult<OrgAssignment[]> {
     queryFn: () => api.getOrgAssignments(orgId!),
     enabled: Boolean(orgId),
     staleTime: 15_000,
+  });
+}
+
+/**
+ * Asking an organisation to add you.
+ *
+ * Lives here beside the deciding half rather than in a reporter-facing hook
+ * file, because the two are one flow and reading them apart is how the phone
+ * came to implement neither.
+ *
+ * No cache to invalidate: the request lands in the *organisation's* queue, not
+ * in anything this account can read back. The screen says so rather than
+ * implying a list somewhere will now show it.
+ */
+export function useRequestMembership(): UseMutationResult<
+  void,
+  Error,
+  { orgId: string; statedRole?: string; note?: string }
+> {
+  return useMutation({ mutationFn: (input) => api.requestMembership(input) });
+}
+
+/**
+ * People asking to join, and settling one.
+ *
+ * Kept fresher than the member list: a member list changes when somebody is
+ * hired, a request queue changes when somebody is waiting on an answer, and
+ * the second is the one an operator opened the screen for.
+ */
+export function useMembershipRequests(): UseQueryResult<OrgMembershipRequest[]> {
+  const orgId = useOrgId();
+  return useQuery({
+    queryKey: orgKeys.membershipRequests(orgId ?? ''),
+    queryFn: () => api.getMembershipRequests(orgId!),
+    enabled: Boolean(orgId),
+    staleTime: 30_000,
+  });
+}
+
+export function useDecideMembership(): UseMutationResult<
+  void,
+  Error,
+  { requestId: string; decision: 'approved' | 'rejected' }
+> {
+  const orgId = useOrgId();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ requestId, decision }) =>
+      api.decideMembershipRequest(orgId!, requestId, decision),
+    onSuccess: () => {
+      if (!orgId) return;
+      /*
+       * Both lists, because approving is the one decision that moves somebody
+       * between them. Refreshing only the queue leaves a new colleague absent
+       * from the team list until something else happens to invalidate it, and
+       * "I approved them and they are not there" is indistinguishable from a
+       * failure.
+       */
+      void queryClient.invalidateQueries({ queryKey: orgKeys.membershipRequests(orgId) });
+      void queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) });
+    },
   });
 }
 

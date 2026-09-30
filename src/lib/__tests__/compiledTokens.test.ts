@@ -158,6 +158,22 @@ test('every colour class used in the app actually compiles', () => {
    * Colour classes are the ones worth pinning: a missing size collapses a box
    * and somebody sees it, while a missing colour renders as *a* colour and
    * reads as a deliberate choice.
+   *
+   * **What this test does not catch, so that nobody relies on it to.** The bug
+   * above was not an invalid class — `text-text-on-dark` resolves perfectly
+   * well in `tailwind.config.js`. It was NativeWind's boot behaviour: the
+   * stylesheet is compiled from the class names present in `src` *when Metro
+   * starts*, so the first-ever use of any class produces no rule until a
+   * restart. By the time this test reads the source, the class is in it and the
+   * build includes it — put `text-text-on-dark` back in `TONE_CLASS` today and
+   * everything here still passes. Verified, not assumed.
+   *
+   * So what this rule actually guarantees is narrower and still worth having:
+   * every colour class the app names resolves to a real token, catching a typo
+   * or a token deleted from the config. The defence against the boot trap is
+   * two other things — `expo start --clear` after adding a class that has never
+   * been used, and the inline-style backstop in `Text.tsx` that sets the colour
+   * directly rather than trusting the class to have compiled.
    */
   const defined = new Set<string>();
   const SELECTOR = new RegExp(String.raw`\.((?:[A-Za-z0-9_-]|\\.)+)`, 'g');
@@ -169,14 +185,38 @@ test('every colour class used in the app actually compiles', () => {
   /** `text-*`, `bg-*` and `border-*` against a named token, no modifier. */
   const COLOUR = /^(?:text|bg|border)-[a-z][a-z0-9-]*$/;
 
+  /*
+   * **Every string literal, not only the ones after `className=`.**
+   *
+   * The anchored scan this replaced could see a quote immediately following
+   * `className=` and nothing else — so it was blind to more than half the
+   * colour classes in the app, and blind in particular to the one place the bug
+   * it documents actually lived. `text-text-on-dark` was in `TONE_CLASS` in
+   * `Text.tsx`, a plain object literal, and reintroducing it there passed this
+   * test. So did `STRENGTH_CLASS` in `SignUpScreen.tsx`, and so did every
+   * conditional written as `className={
+  on ? '…' : '…'}`, because the
+   * newline after the brace defeated the pattern.
+   *
+   * 22 classes were visible before; 50 are now. The trade is deliberate and it
+   * is the same one `unusedKeys` makes: over-counting costs a false failure
+   * that a glance settles, while under-counting costs a colour that silently
+   * renders black — which is what happened, twice, on the buttons.
+   *
+   * Comments are stripped first, or a class named in prose as the example of
+   * what went wrong is reported as a use of it.
+   */
+  const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/(^|[^:])\/\/[^\n]*/g, '$1 ');
+
   const used = new Map<string, string>();
   (function walk(dir: string) {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
       const f = path.join(dir, e.name);
       if (e.isDirectory()) walk(f);
       else if (/\.tsx?$/.test(e.name) && !f.includes('__tests__')) {
-        const src = fs.readFileSync(f, 'utf8');
-        for (const m of src.matchAll(/className=\{?["'`]([^"'`]*)["'`]/g)) {
+        const src = stripComments(fs.readFileSync(f, 'utf8'));
+        for (const m of src.matchAll(/['"`]([^'"`\n]*)['"`]/g)) {
           for (const cls of m[1]!.split(/\s+/)) {
             if (COLOUR.test(cls) && !used.has(cls)) used.set(cls, f);
           }
@@ -185,7 +225,9 @@ test('every colour class used in the app actually compiles', () => {
     }
   })(path.join(ROOT, 'src'));
 
-  expect(used.size).toBeGreaterThan(20);
+  // Was 20 when only `className=` was read; the widened scan sees far more, and
+  // a floor well above the old one is what proves the widening still works.
+  expect(used.size).toBeGreaterThan(40);
 
   const missing = [...used]
     .filter(([cls]) => !defined.has(cls))

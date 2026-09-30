@@ -117,6 +117,26 @@ export function peekPoster(incidentId: string): Poster | null {
 }
 
 /**
+ * Whether a frame is still coming for this report.
+ *
+ * **Without this, a video row showed its final state from the first frame.**
+ * `peekPoster` answers null three different ways — untried, queued behind
+ * nineteen other rows, or tried and failed — and `Thumbnail` could only read
+ * that as "there is no picture", so it drew the category field immediately and
+ * a frame popped in over it seconds later. Nothing on screen ever said work was
+ * happening, which is precisely the complaint: you cannot see that it is
+ * loading.
+ *
+ * `known` holds an entry only once a report has settled, on both the success
+ * and the failure path. So an absent entry is the honest "still coming", and
+ * a boolean is safe as a `useSyncExternalStore` snapshot where a fresh object
+ * would re-render forever.
+ */
+export function posterPending(incidentId: string): boolean {
+  return !known.has(incidentId);
+}
+
+/**
  * Ask for a report's frame. Returns immediately; the frame arrives later.
  *
  * Safe to call on every render — a report already known, queued or running is

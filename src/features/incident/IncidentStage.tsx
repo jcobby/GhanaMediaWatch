@@ -4,6 +4,7 @@ import { useEvent } from 'expo';
 import { Image } from 'expo-image';
 import { Ionicons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useTranslation } from 'react-i18next';
 import { Text } from '@/components/ui';
 import { MIN_PLAUSIBLE_MEDIA_BYTES } from '@/lib/constants';
 import { useColors } from '@/lib/theme';
@@ -83,6 +84,7 @@ export function IncidentStage({
   failed: boolean;
 }) {
   const c = useColors();
+  const { t } = useTranslation();
   const isVideo = incident.media.kind === 'video';
 
   /*
@@ -202,7 +204,7 @@ export function IncidentStage({
         <View className="absolute inset-0 items-center justify-center gap-3 bg-black px-10">
           <ActivityIndicator color={c.textOnDark} />
           <Text variant="caption" onMedia tone="muted" className="text-center">
-            Loading the footage
+            {t('incident.bufferingFootage')}
           </Text>
         </View>
       );

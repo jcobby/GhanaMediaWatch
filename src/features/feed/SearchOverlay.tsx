@@ -49,6 +49,7 @@ export function SearchOverlay({
   organisationIncidents,
   onOpenIncident,
   onClose,
+  presentation = 'modal',
 }: {
   /**
    * One organisation's reports when its homepage is open, `null` on GNA's.
@@ -60,6 +61,24 @@ export function SearchOverlay({
   organisationIncidents: Incident[] | null;
   onOpenIncident: (incident: Incident) => void;
   onClose: () => void;
+  /**
+   * Whether this is presented over something, or is somewhere you went.
+   *
+   * **A tap on a result opened nothing, and this is why.** Everything here was
+   * wrapped in a `<Modal>`, which is right when the masthead's magnifier lifts
+   * search over the feed and wrong when search *is* the tab. A React Native
+   * modal renders above the navigator, so `router.push('/incident/…')` did
+   * happen — the report opened, mounted, and sat underneath a modal that was
+   * still covering the screen. Nothing errored, nothing moved, and the only
+   * symptom was a row that did not respond.
+   *
+   * The dismissal is the other half. In a modal the overlay must come down
+   * before the push or it covers what it opened; on a tab there is nothing to
+   * dismiss, and closing means `router.replace('/(tabs)')` — so the old handler
+   * replaced the route one line before pushing onto it, and the two
+   * navigations cancelled.
+   */
+  presentation?: 'modal' | 'screen';
 }) {
   const c = useColors();
   const { t } = useTranslation();
@@ -96,9 +115,23 @@ export function SearchOverlay({
     [pool, q],
   );
 
-  return (
-    <Modal visible animationType="slide" statusBarTranslucent onRequestClose={onClose}>
-      <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
+  /*
+   * Opening a result, which is not the same act in the two presentations.
+   *
+   * As a modal the overlay has to come down first or it covers the report it
+   * just opened. As a tab there is nothing over anything: the push lands on the
+   * root stack, the search screen stays mounted underneath with its query and
+   * its scroll position, and coming back returns to the results rather than to
+   * a fresh empty field. Calling `onClose` here would replace that route a line
+   * before pushing onto it.
+   */
+  const openIncident = (chosen: Incident) => {
+    if (presentation === 'modal') onClose();
+    onOpenIncident(chosen);
+  };
+
+  const body = (
+    <View className="flex-1 bg-canvas" style={{ paddingTop: insets.top }}>
         <View className="flex-row items-center gap-1 px-2 py-2">
           <Pressable
             onPress={onClose}
@@ -177,10 +210,7 @@ export function SearchOverlay({
                   <FeedRow
                     key={incident.id}
                     incident={incident}
-                    onOpen={(chosen) => {
-                      onClose();
-                      onOpenIncident(chosen);
-                    }}
+                    onOpen={openIncident}
                   />
                 ))}
               </>
@@ -208,10 +238,7 @@ export function SearchOverlay({
                 <FeedRow
                   key={incident.id}
                   incident={incident}
-                  onOpen={(chosen) => {
-                    onClose();
-                    onOpenIncident(chosen);
-                  }}
+                  onOpen={openIncident}
                 />
               ))}
               {/* Said under results too, so a short list is not read as the whole of it. */}
@@ -221,7 +248,19 @@ export function SearchOverlay({
             </>
           )}
         </ScrollView>
-      </View>
+    </View>
+  );
+
+  /*
+   * The modal is the wrapper, not the screen. Presented over the feed it needs
+   * one; reached as a tab it must not have one, or it sits above the navigator
+   * and hides whatever it opens.
+   */
+  return presentation === 'modal' ? (
+    <Modal visible animationType="slide" statusBarTranslucent onRequestClose={onClose}>
+      {body}
     </Modal>
+  ) : (
+    body
   );
 }

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { TextInput, View, type TextInputProps } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { Glass, Pressable, Text } from '@/components/ui';
@@ -8,6 +8,19 @@ interface AuthFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
   error?: string;
   secure?: boolean;
+  /**
+   * Bring this field above the keyboard when it takes focus.
+   *
+   * From `useKeyboardReveal`, and passed in rather than called here because the
+   * hook needs the screen's `ScrollView` — this component does not know which
+   * list it is in, and should not.
+   *
+   * Optional, so a field outside a scroll view is unaffected. Every field on
+   * both auth forms passes it: the sign-up form is four fields plus a checkbox
+   * and a button, so on a small phone the password and confirm boxes are
+   * exactly where the keyboard lands.
+   */
+  reveal?: (target: TextInput | null) => void;
 }
 
 /**
@@ -17,9 +30,10 @@ interface AuthFieldProps extends Omit<TextInputProps, 'style'> {
  * that only colours the border red tells a screen-reader user nothing about
  * what went wrong.
  */
-export function AuthField({ label, error, secure = false, ...rest }: AuthFieldProps) {
+export function AuthField({ label, error, secure = false, reveal, ...rest }: AuthFieldProps) {
   const c = useColors();
   const [hidden, setHidden] = useState(secure);
+  const field = useRef<TextInput>(null);
 
   return (
     <View className="gap-1.5">
@@ -35,6 +49,7 @@ export function AuthField({ label, error, secure = false, ...rest }: AuthFieldPr
         }
       >
         <TextInput
+          ref={field}
           secureTextEntry={hidden}
           placeholderTextColor={c.textFaint}
           accessibilityLabel={label}
@@ -48,6 +63,10 @@ export function AuthField({ label, error, secure = false, ...rest }: AuthFieldPr
             fontSize: 16,
           }}
           {...rest}
+          onFocus={(event) => {
+            reveal?.(field.current);
+            rest.onFocus?.(event);
+          }}
         />
         {secure ? (
           <Pressable

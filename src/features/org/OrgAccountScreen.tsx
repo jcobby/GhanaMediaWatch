@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { ScrollView, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -8,7 +9,12 @@ import { Badge, Button, Glass, Skeleton, Text } from '@/components/ui';
 import { SettingRow } from '@/components/SettingRow';
 import { TAB_SCROLL_CLEARANCE } from '@/components/RoleTabBar';
 import { AccountSettings } from '@/features/profile/AccountSettings';
-import { useOrgDashboard, useOrgMembers } from '@/hooks/useOrg';
+import {
+  useDecideMembership,
+  useMembershipRequests,
+  useOrgDashboard,
+  useOrgMembers,
+} from '@/hooks/useOrg';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from '@/stores/toastStore';
 import { describeApiError } from '@/lib/apiErrorCopy';
@@ -41,6 +47,42 @@ export function OrgAccountScreen() {
 
   const { data: dashboard, isPending, isError, error, refetch } = useOrgDashboard();
   const { data: members } = useOrgMembers();
+  const { data: requests } = useMembershipRequests();
+  const decideMembership = useDecideMembership();
+  const [deciding, setDeciding] = useState<string | null>(null);
+
+  /*
+   * Only what is still waiting. A request already settled is history, and this
+   * screen is a queue — leaving decided rows in it means an operator reads the
+   * same names every time they open their organisation.
+   */
+  const pending = (requests ?? []).filter((r) => r.status === 'pending');
+
+  /**
+   * Settle one, and say which way it went.
+   *
+   * The toast names the person rather than saying "Saved": approving admits
+   * somebody to an organisation that receives footage filed by the public, and
+   * an operator who cannot tell whether it went through does it again.
+   */
+  const decide = async (requestId: string, who: string, decision: 'approved' | 'rejected') => {
+    setDeciding(requestId);
+    try {
+      await decideMembership.mutateAsync({ requestId, decision });
+      if (decision === 'approved') {
+        toast.success(t('org.requestApprovedTitle'), t('org.requestApprovedBody', { name: who }));
+      } else {
+        toast.success(t('org.requestDeclinedTitle'), t('org.requestDeclinedBody', { name: who }));
+      }
+    } catch (cause) {
+      toast.error(
+        t('org.requestFailedTitle'),
+        cause instanceof Error ? cause.message : t('common.unknownErrorHelp'),
+      );
+    } finally {
+      setDeciding(null);
+    }
+  };
 
   const subscription = dashboard?.subscription ?? null;
   const tier = subscription?.tier ?? null;
@@ -194,6 +236,89 @@ export function OrgAccountScreen() {
           {t('org.billingAtDesk')}
         </Text>
       </View>
+
+      {/*
+        People asking to join, above the team they are asking to join.
+
+        **The phone could not answer this at all.** `GET
+        /org/membership-requests` and its decide endpoint have existed
+        throughout and no screen here read either, so an operator running their
+        organisation from a phone — which is every operator, now that the
+        organisation has its own shell — had to find a desktop to admit a
+        colleague. The console has had the same queue for as long.
+
+        Above the member list rather than below it, and only when somebody is
+        waiting: a request is work, a member list is reference, and reference
+        does not go first. It disappears entirely when the queue is empty,
+        because a permanent "Nobody is waiting" is furniture.
+      */}
+      {pending.length > 0 ? (
+        <View className="gap-1.5 px-4 pb-4">
+          <Text variant="label" tone="muted" className="px-1">
+            {t('org.requests')}
+          </Text>
+          <Glass elevation="low" className="gap-0 rounded-lg">
+            <View className="border-b border-hairline/[0.08] px-4 py-3">
+              <Text variant="caption" tone="muted">
+                {t('org.requestsHelp')}
+              </Text>
+            </View>
+            {pending.map((request) => {
+              const who = request.displayName || request.email || request.id;
+              const busy = deciding === request.id;
+              return (
+                <View
+                  key={request.id}
+                  className="gap-3 border-b border-hairline/[0.08] px-4 py-4"
+                >
+                  <View className="flex-row items-start gap-3">
+                    <Ionicons name="person-add-outline" size={20} color={c.textMuted} />
+                    <View className="flex-1 gap-0.5">
+                      <Text variant="body" className="font-sans-medium">
+                        {who}
+                      </Text>
+                      {request.email && request.displayName ? (
+                        <Text variant="caption" tone="muted" numberOfLines={1}>
+                          {request.email}
+                        </Text>
+                      ) : null}
+                      {/*
+                        What they say they do, marked as a claim. The service
+                        calls it `statedRole` for the same reason: it is the
+                        applicant's word, and the decision being made is
+                        precisely whether to believe it.
+                      */}
+                      <Text variant="caption" tone={request.statedRole ? 'secondary' : 'faint'}>
+                        {request.statedRole ?? t('org.requestNoRole')}
+                      </Text>
+                      {request.note ? (
+                        <Text variant="caption" tone="muted" className="mt-1">
+                          {request.note}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                  <View className="flex-row gap-2">
+                    <Button
+                      label={t('org.requestApprove')}
+                      size="sm"
+                      loading={busy}
+                      onPress={() => void decide(request.id, who, 'approved')}
+                    />
+                    <Button
+                      label={t('org.requestDecline')}
+                      size="sm"
+                      variant="glass"
+                      disabled={busy}
+                      onPress={() => void decide(request.id, who, 'rejected')}
+                    />
+                  </View>
+                </View>
+              );
+            })}
+          </Glass>
+        </View>
+      ) : null}
 
       {/* The people */}
       <View className="gap-1.5 px-4 pb-4">

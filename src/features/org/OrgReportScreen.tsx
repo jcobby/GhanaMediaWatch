@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Alert, ScrollView, TextInput, useWindowDimensions, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { licenceRefusal } from '@/lib/licensing';
 import { useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
@@ -176,6 +177,12 @@ export function OrgReportScreen({ incidentId }: { incidentId: string }) {
    * licence is free and finds it on the invoice has been misled by this screen.
    */
   const price = plan ? (isUnlimited(plan) ? null : downloadCharge(plan)) : undefined;
+  /*
+   * Whether licensing is refused by the report's own state, and which words
+   * say so. Null when it is on offer. One helper rather than a condition here,
+   * so the inbox row and this screen cannot disagree about what is buyable.
+   */
+  const blocked = report ? licenceRefusal(report.vettingState) : null;
 
   const failure = describeApiError(error, t, {
     title: t('org.inboxErrorTitle'),
@@ -436,8 +443,39 @@ export function OrgReportScreen({ incidentId }: { incidentId: string }) {
           </Glass>
         </View>
 
-        {/* Licensing, and what it pays. */}
+        {/*
+          Licensing, and what it pays — or why it is not on offer.
+
+          **The button used to be shown on everything and the service refused
+          it.** An integrity-flagged report answered with "Not available on this
+          account — contact your organisation's administrator", which is an
+          account-permissions message for a fact about the *report*: it sent an
+          operator to an administrator who could not have helped, about a
+          refusal that was correct. A control that cannot work should say so
+          before it is pressed, in its own words.
+
+          The reason is deliberately general. The specific check that failed is
+          for an authorised reviewer — the editorial desk shows it — and a
+          licensee is told that it is flagged and not which signal it was.
+        */}
         {!report.licensed ? (
+          blocked ? (
+            <View className="gap-3 px-4 pb-4">
+              <Glass elevation="low" className="gap-2 rounded-lg p-4">
+                <View className="flex-row items-center gap-2">
+                  <Ionicons name="alert-circle-outline" size={18} color={c.warning} />
+                  <Text variant="body" className="font-sans-medium">
+                    {blocked === 'rejected' ? t('org.blockedRejected') : t('org.blockedRestricted')}
+                  </Text>
+                </View>
+                <Text variant="body-sm" tone="muted">
+                  {blocked === 'rejected'
+                    ? t('org.blockedRejectedBody')
+                    : t('org.blockedRestrictedBody')}
+                </Text>
+              </Glass>
+            </View>
+          ) : (
           <View className="gap-3 px-4 pb-4">
             <Glass elevation="low" className="gap-2 rounded-lg p-4">
               <Text variant="body" className="font-sans-medium">
@@ -460,6 +498,7 @@ export function OrgReportScreen({ incidentId }: { incidentId: string }) {
               leading={<Ionicons name="ribbon-outline" size={18} color={c.textOnDark} />}
             />
           </View>
+          )
         ) : null}
 
         <View className="gap-3 px-4">
@@ -664,6 +703,27 @@ export function OrgReportScreen({ incidentId }: { incidentId: string }) {
               onChange={setEditorNote}
               placeholder={t('org.editorNotePlaceholder')}
             />
+
+            {/*
+              Where the way back is, said before the one-way door.
+              
+              The phone can ask an editor to run a report and cannot take it
+              down again — `/org/incidents/{id}/unpublish` is called from the
+              web console and from nowhere here. That asymmetry is defensible:
+              withdrawing something already public is takedown-adjacent and
+              belongs on a surface with a reason field and an audit trail. What
+              is not defensible is finding out afterwards, which is an officer
+              scrolling four tabs for a control that was never on this device.
+              
+              Said here rather than after the fact, because this sheet is the
+              last moment before the request goes.
+            */}
+            <View className="flex-row items-start gap-2.5 rounded-lg bg-canvas-raise p-3.5">
+              <Ionicons name="information-circle-outline" size={16} color={c.textMuted} />
+              <Text variant="caption" tone="muted" className="flex-1">
+                {t('org.withdrawNote')}
+              </Text>
+            </View>
             {/* The desk is required — the service rejects a publish without one
                 and invents none, so it is chosen here rather than defaulted. */}
             {NEWS_SECTIONS.map((section) => (

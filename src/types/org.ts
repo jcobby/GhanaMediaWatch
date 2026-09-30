@@ -117,9 +117,26 @@ export interface OrgSubscriptionDetail {
 
 /** `GET /org/dashboard` — the three counts and the plan behind them. */
 export interface OrgDashboard {
-  inboxCount: number;
-  publishedCount: number;
-  openAssignments: number;
+  /**
+   * Null when the service did not establish it, never 0.
+   *
+   * **These read 0 on every organisation and always had.** The client asked
+   * `/org/dashboard` for `inboxCount`, `publishedCount` and `openAssignments`;
+   * the endpoint returns `counts.byState`, `counts.byCategory`, `dailyTrend`
+   * and `recentHighPriority`, and none of those three fields has ever been on
+   * the wire. Reading an absent field gave `undefined`, a numeric coercion
+   * turned it into 0, and the tiles presented that as a figure — so an
+   * organisation with a report waiting saw "0 INBOX" above a list containing
+   * it.
+   *
+   * A count that could not be established is `null` and draws as an em dash.
+   * The distinction matters here more than most: 0 and "we do not know" look
+   * identical on a tile and mean opposite things to somebody deciding whether
+   * to open the app.
+   */
+  inboxCount: number | null;
+  publishedCount: number | null;
+  openAssignments: number | null;
   subscription: OrgSubscriptionDetail | null;
 }
 
@@ -167,4 +184,29 @@ export interface PublicationRequest {
   /** Required. The service rejects a publish with no desk and invents none. */
   section: NewsSection;
   note?: string;
+}
+
+/**
+ * Somebody asking to be added to an organisation's team.
+ *
+ * `GET /org/membership-requests` lists them; `POST .../{id}/decide` settles
+ * one. Both have existed on the service throughout and the phone read neither,
+ * so an operator who manages their organisation from a phone — which is every
+ * operator, now that the organisation has its own shell — had to find a desktop
+ * to answer somebody asking to join.
+ *
+ * `approved`, not `accepted`. The wire has never used the second word; only
+ * this project's own specification did, and it has been corrected.
+ */
+export interface OrgMembershipRequest {
+  id: string;
+  /** Who is asking. Blank when the service has no name for them. */
+  displayName: string;
+  email: string;
+  /** What they say they do there, pending the organisation confirming it. */
+  statedRole: string | null;
+  /** Anything they wrote to help a reviewer place them. */
+  note: string | null;
+  status: 'pending' | 'approved' | 'rejected';
+  requestedAtIso: string | null;
 }

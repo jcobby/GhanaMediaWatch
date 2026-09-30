@@ -156,13 +156,30 @@ export function FeedBar({
             <Flag design={country.flag} size={24} />
           </Pressable>
         ) : null}
-        <Pressable
-          onPress={onOpenSearch}
-          accessibilityLabel={t('search.reportsTitle')}
-          className="h-11 w-11 items-center justify-center rounded-pill"
-        >
-          <Ionicons name="search" size={23} color="#FFFFFF" />
-        </Pressable>
+        {/*
+          The magnifier stays only where the tab cannot reach.
+
+          Search moved into the tab bar, and a second entry point to the same
+          unscoped search — one in the tab bar, one three centimetres above it
+          in the masthead — is a duplicate that costs a reader a decision every
+          time they want to look something up.
+
+          It is not a duplicate on an organisation's homepage. That one is
+          scoped to that organisation's reports, and the tab deliberately is
+          not: a tab belongs to nobody and searches everything. Removing it
+          there would take away the only way to search inside an organisation,
+          which is the version of this search people actually need when they
+          are standing on an institution's page.
+        */}
+        {organisation ? (
+          <Pressable
+            onPress={onOpenSearch}
+            accessibilityLabel={t('search.reportsTitle')}
+            className="h-11 w-11 items-center justify-center rounded-pill"
+          >
+            <Ionicons name="search" size={23} color="#FFFFFF" />
+          </Pressable>
+        ) : null}
         <Pressable
           onPress={onOpenInstitutions}
           accessibilityLabel={t('search.institutionsTitle')}

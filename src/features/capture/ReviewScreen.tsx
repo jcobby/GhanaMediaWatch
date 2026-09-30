@@ -26,6 +26,7 @@ import { useAuthStore } from '@/stores/authStore';
 import { CapturePreview } from './CapturePreview';
 import { PosterPicker } from './PosterPicker';
 import { ConsentFields, SeverityField } from './ContextFields';
+import { useKeyboardReveal } from '@/hooks/useKeyboardReveal';
 import { submitCapture } from './submitCapture';
 import { DestinationPicker } from './DestinationPicker';
 import { EarningsEstimate } from './EarningsEstimate';
@@ -73,6 +74,8 @@ export function ReviewScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const scroll = useRef<ScrollView>(null);
+  const descriptionField = useRef<TextInput>(null);
+  const reveal = useKeyboardReveal(scroll);
 
   const {
     pending,
@@ -434,6 +437,7 @@ export function ReviewScreen() {
               </Text>
               <Glass elevation="low" className="rounded-lg p-3">
                 <TextInput
+                  ref={descriptionField}
                   value={description}
                   onChangeText={setDescription}
                   placeholder={t('review.descriptionPlaceholder')}
@@ -441,7 +445,17 @@ export function ReviewScreen() {
                   multiline
                   numberOfLines={4}
                   maxLength={500}
-                  onFocus={() => setDescribing(true)}
+                  /*
+                    Brought into view, not merely made reachable. The keyboard
+                    lands on top of this box, and `KeyboardAvoidingView` only
+                    resizes the scroll area — it does not move what is already
+                    underneath. A reporter tapped here and typed into a field
+                    they could not see.
+                  */
+                  onFocus={() => {
+                    setDescribing(true);
+                    reveal(descriptionField.current);
+                  }}
                   onBlur={() => setDescribing(false)}
                   style={{
                     // No NativeWind equivalent survives multiline on both platforms.

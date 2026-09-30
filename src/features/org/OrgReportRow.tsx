@@ -2,6 +2,7 @@ import { View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTranslation } from 'react-i18next';
 import { Badge, Pressable, Text } from '@/components/ui';
+import { licenceRefusal } from '@/lib/licensing';
 import { Thumbnail } from '@/components/Thumbnail';
 import { useVideoPoster } from '@/hooks/useVideoPoster';
 import { categoryHue, useColors } from '@/lib/theme';
@@ -34,7 +35,7 @@ export function OrgReportRow({
   // The service's 320px copy where it has one; the poster is a full-size file
   // and this is a 56px square.
   const still = report.media.thumbUrl || report.media.posterUrl;
-  const poster = useVideoPoster({
+  const { poster, pending } = useVideoPoster({
     id: report.id,
     kind: report.media.kind,
     url: report.media.url,
@@ -43,6 +44,8 @@ export function OrgReportRow({
 
   const place = report.location.label;
   const when = formatRelativeTime(report.licensedAt ?? report.publishedAt);
+  // Same rule the detail screen gates its button on, so the two cannot differ.
+  const refusal = licenceRefusal(report.vettingState);
 
   return (
     <Pressable
@@ -67,6 +70,7 @@ export function OrgReportRow({
         <Thumbnail
           uri={still}
           poster={poster}
+          pending={pending}
           cacheKey={report.id}
           category={report.category}
           style={{ width: '100%', height: '100%' }}
@@ -118,8 +122,27 @@ export function OrgReportRow({
       </View>
 
       <View className="items-end gap-1.5">
+        {/*
+          "New" on a report that cannot be bought is the list telling a lie the
+          next screen has to correct.
+
+          An operator scans this column to decide what to open. A flagged or
+          rejected report badged "New" reads as available, so the refusal is
+          only discovered after the tap — which is the same fault as offering
+          the licence button and letting the service answer, one screen
+          earlier. The state is on the report already; the row just has to say
+          it.
+
+          Deliberately short and deliberately general. The specific check that
+          failed is for an authorised reviewer, and a row has no room for it
+          anyway; "In review" is what an operator can act on — it may clear.
+        */}
         {report.licensed ? (
           <Badge label={t('org.licensed')} tone="success" />
+        ) : refusal === 'rejected' ? (
+          <Badge label={t('org.badgeRejected')} tone="danger" />
+        ) : refusal === 'restricted' ? (
+          <Badge label={t('org.badgeInReview')} tone="warning" />
         ) : (
           <Badge label={t('org.new')} tone="accent" />
         )}

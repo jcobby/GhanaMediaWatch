@@ -762,32 +762,52 @@ export function CameraStage({ fix, confidence, accuracyM }: CameraStageProps) {
 
         {!recording ? (
           <Glass context="media" elevation="mid" className="flex-row rounded-pill p-1">
-            {(['photo', 'video', 'audio', 'live'] as const).map((m) => (
-              <Pressable
-                key={m}
-                onPress={() => {
-                  if (m === 'live') {
-                    setLiveSheet(true);
-                    return;
+            {(['photo', 'video', 'audio', 'live'] as const).map((m) => {
+              /*
+                Live is shown as not yet available, before it is tapped.
+
+                It sat in this row looking exactly like the three modes that
+                work, and only after tapping did a sheet explain there is no
+                live streaming — the service has no ingest endpoint, no
+                playback URL and no session of any kind (BACKEND_SPEC §17).
+                That is a control which looks like a choice and is an
+                announcement, and the reader finds out by being refused.
+
+                Dimmed and hinted rather than removed or disabled. Removed, and
+                nobody learns it is coming; `disabled`, and the sheet that
+                explains why can never be opened. So the pill still opens the
+                sheet — it just stops promising first.
+              */
+              const unavailable = m === 'live';
+              return (
+                <Pressable
+                  key={m}
+                  onPress={() => {
+                    if (m === 'live') {
+                      setLiveSheet(true);
+                      return;
+                    }
+                    setMode(m);
+                  }}
+                  accessibilityLabel={t(`capture.${m}`)}
+                  accessibilityHint={unavailable ? t('capture.liveTitle') : undefined}
+                  accessibilityState={{ selected: mode === m }}
+                  style={unavailable ? { opacity: 0.45 } : undefined}
+                  className={
+                    mode === m ? 'rounded-pill bg-glass/25 px-4 py-2' : 'rounded-pill px-4 py-2'
                   }
-                  setMode(m);
-                }}
-                accessibilityLabel={t(`capture.${m}`)}
-                accessibilityState={{ selected: mode === m }}
-                className={
-                  mode === m ? 'rounded-pill bg-glass/25 px-4 py-2' : 'rounded-pill px-4 py-2'
-                }
-              >
-                <Text
-                  variant="body-sm"
-                  onMedia
-                  tone={mode === m ? 'primary' : 'muted'}
-                  className="font-sans-semibold"
                 >
-                  {t(`capture.${m}`)}
-                </Text>
-              </Pressable>
-            ))}
+                  <Text
+                    variant="body-sm"
+                    onMedia
+                    tone={mode === m ? 'primary' : 'muted'}
+                    className="font-sans-semibold"
+                  >
+                    {t(`capture.${m}`)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </Glass>
         ) : null}
 

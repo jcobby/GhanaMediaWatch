@@ -540,8 +540,10 @@
     "backHome": "Back to Dawuro",
     "comments": "Comments",
     "country": "Country",
+    "countryNoMatch": "No country matches that.",
     "countryNotYet": "Not yet covered",
     "countryNotYetHelp": "We hold no reports from these yet. Nothing here is switched off — there is simply nothing to show.",
+    "countrySearch": "Search countries",
     "countrySubtitle": "Dawuro covers Ghana today.",
     "countryTitle": "Choose a country",
     "distanceAway": "{{distance}} away",
@@ -602,7 +604,7 @@
   "onboarding": {
     "anonymous": {
       "title": "Report anonymously",
-      "body": "Publish without a profile. A device identifier is still recorded so abuse can be traced — we will not pretend otherwise."
+      "body": "Publish without registering. We protect your identity."
     },
     "continueWithout": "Continue without an account",
     "createAccount": "Create an account",
@@ -612,7 +614,7 @@
     },
     "field": {
       "title": "Built for the field",
-      "body": "The camera waits for an accurate GPS fix, so your footage carries proof of where it was taken. No signal? It saves to your phone and sends itself when you are back."
+      "body": "Your report carries proof of where and when it was taken. No signal? It saves to your phone and sends automatically when you are connected."
     },
     "gps": {
       "title": "Verified location, every time",
@@ -624,16 +626,16 @@
       "body": "Capture anywhere. Reports are saved on your phone and upload themselves the moment you are back online."
     },
     "reaches": {
-      "title": "It reaches someone who can act",
+      "title": "It reaches someone who can act or is interested",
       "body": "Your report goes to the organisations whose job it is — the Assembly, NADMO, the utility. You can see which ones have it, and what each of them did about it."
     },
     "what": {
-      "title": "Film what is happening",
-      "body": "A blocked drain, a fire, a pole down across the path. If you can film it safely, you can report it — but never put yourself or anyone else in danger to get it. If someone needs help, call 112 first. Filming is not help."
+      "title": "Film, take a picture or stream what is happening",
+      "body": "A public interest issue or something worth seeing — a fire, an emergency, a disaster, security, entertainment. If you can capture it safely, report it. Never put yourself or anyone else in danger, and if someone needs help call 112 first. Filming is not help."
     },
     "dawuro": {
       "title": "Dawuro",
-      "body": "A robust, transparent and trusted voice of the citizen."
+      "body": "A transparent and trusted public voice for the citizen."
     }
   },
   "org": {
@@ -648,7 +650,13 @@
       "on_scene": "On scene"
     },
     "backToInbox": "Back to inbox",
+    "badgeInReview": "In review",
+    "badgeRejected": "Rejected",
     "billingAtDesk": "Invoices, seats and plan changes are handled in the web console.",
+    "blockedRejected": "Cannot be licensed",
+    "blockedRejectedBody": "This report failed review and will not become available.",
+    "blockedRestricted": "Cannot be licensed yet",
+    "blockedRestrictedBody": "One of the technical checks on this capture needs review, so it is not available to license. An editor has to clear it first — it may become available.",
     "dispatch": "Dispatch",
     "dispatchAction": "Send someone",
     "dispatchErrorTitle": "Couldn't load dispatches",
@@ -717,6 +725,16 @@
     "renews": "Renews",
     "reportGoneBody": "The reporter may have withdrawn it, or it is no longer routed to you.",
     "reportGoneTitle": "That report isn't here",
+    "requestApprove": "Approve",
+    "requestApprovedBody": "{{name}} can now see what is routed to you.",
+    "requestApprovedTitle": "Added to your team",
+    "requestDecline": "Decline",
+    "requestDeclinedBody": "{{name}} was not added. They can ask again.",
+    "requestDeclinedTitle": "Declined",
+    "requestFailedTitle": "Nothing was recorded",
+    "requestNoRole": "No role given",
+    "requests": "Asking to join",
+    "requestsHelp": "They named your organisation as their employer. Approving puts them in your team.",
     "respondAction": "Reply to the reporter",
     "respondFailedBody": "Nothing was sent. Check your connection and try again.",
     "respondFailedTitle": "Couldn't send your reply",
@@ -773,7 +791,8 @@
     "timeHidden": "Hidden by the reporter",
     "title": "Your organisation",
     "unknownValue": "Not stated",
-    "updatedAgo": "Updated {{ago}} ago"
+    "updatedAgo": "Updated {{ago}} ago",
+    "withdrawNote": "Once it runs, taking it back down is done from the web console — not from here."
   },
   "outbox": {
     "allSent": "Everything has been sent",
@@ -1060,6 +1079,8 @@
     "anonymousDefaultHelp": "Name hidden. Device ID still recorded.",
     "appearance": "Appearance",
     "appearanceHelp": "Dark suits filming at night and matches the camera screens. Light is easier in daylight.",
+    "earnings": "Earnings",
+    "getVerified": "Get verified",
     "language": "Language",
     "legal": "About and legal",
     "notifications": "Notifications",
@@ -1074,8 +1095,7 @@
     },
     "title": "Settings",
     "wifiOnly": "Videos on Wi-Fi only",
-    "wifiOnlyHelp": "Photos still send on mobile data.",
-    "getVerified": "Get verified"
+    "wifiOnlyHelp": "Photos still send on mobile data."
   },
   "surveys": {
     "addOption": "Add option",
@@ -1168,11 +1188,11 @@
   },
   "tabs": {
     "capture": "Report",
-    "earn": "Earn",
     "home": "Home",
     "map": "Map",
     "outbox": "Sending",
-    "profile": "Profile"
+    "profile": "Profile",
+    "search": "Search"
   },
   "vetting": {
     "pending_review": "In review",
@@ -1181,12 +1201,17 @@
     "restricted": "Restricted"
   },
   "app": {
+    "gna": "GNA",
     "name": "Dawuro",
-    "providedBy": "Sponsored by the Ghana News Agency, powered by Softmasters"
+    "poweredBy": "Powered by",
+    "softmasters": "Softmasters",
+    "sponsoredBy": "Sponsored by"
   },
   "incident": {
     "attachmentUnavailable": "Attachment could not be opened",
-    "attachmentUnavailableBody": "The file may have been removed, or no app on this phone can open it."
+    "attachmentUnavailableBody": "The file may have been removed, or no app on this phone can open it.",
+    "bufferingFootage": "Loading the footage",
+    "bufferingVideo": "Loading video"
   },
   "slides": {
     "label": "Slides",
@@ -1198,6 +1223,19 @@
     "tapToAdvance": "Tap to move on"
   },
   "organisations": {
+    "askBody": "They decide. Nothing routed to them reaches you until somebody there approves it.",
+    "askFailedTitle": "Nothing was sent",
+    "askNote": "Anything that helps them place you",
+    "askNotePlaceholder": "Optional",
+    "askRole": "What you do there",
+    "askRolePlaceholder": "Reporter, editor, desk officer",
+    "askSend": "Send request",
+    "askSentBody": "It is in their team screen. Somebody there decides it.",
+    "askSentTitle": "Asked {{name}}",
+    "askTitle": "Ask to join {{name}}",
+    "askToJoin": "Ask to join",
+    "loadingBody": "One moment.",
+    "loadingTitle": "Loading organisations…",
     "missingBody": "It may have left the platform since this link was made.",
     "missingTitle": "Organisation not found",
     "noMatchBody": "Try the sector instead — assembly, media, utility.",
@@ -1206,6 +1244,8 @@
     "noReportsTitle": "Nothing published yet",
     "noSurveysBody": "When this organisation asks something of reporters, it appears here.",
     "noSurveysTitle": "No surveys",
+    "noneYetBody": "Agencies and newsrooms appear here once they sign up. Until then, reports you file go to the public feed.",
+    "noneYetTitle": "No organisations have joined yet",
     "reportCount": "{{count}} published",
     "search": "Search organisations",
     "searchPlaceholder": "Search by name or sector",
@@ -1224,16 +1264,12 @@
       "about": "About"
     },
     "title": "Organisations",
+    "unavailableBody": "This phone could not reach the service. Try again when you have a connection.",
+    "unavailableTitle": "Could not load organisations",
     "unverified": "Not yet verified",
     "verified": "Verified institution",
     "watches": "What reaches them",
-    "watchesHelp": "Reports in these categories are routed here automatically.",
-    "loadingTitle": "Loading organisations…",
-    "loadingBody": "One moment.",
-    "unavailableTitle": "Could not load organisations",
-    "unavailableBody": "This phone could not reach the service. Try again when you have a connection.",
-    "noneYetTitle": "No organisations have joined yet",
-    "noneYetBody": "Agencies and newsrooms appear here once they sign up. Until then, reports you file go to the public feed."
+    "watchesHelp": "Reports in these categories are routed here automatically."
   },
   "section": {
     "africa": "Africa News",

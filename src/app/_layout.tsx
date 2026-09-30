@@ -167,7 +167,17 @@ export default function RootLayout() {
                 and one bar that changed shape by account type would be four
                 conditionals in the tab layout for the rest of its life.
               */}
-              <Stack.Screen name="(org)" />
+              {/*
+                No back gesture off it, either.
+
+                The guard in `(tabs)/_layout.tsx` is what makes this correct —
+                it catches a deep link or any future route as well. This is what
+                makes it *feel* correct: without it an operator swipes, sees a
+                frame of the reporter app, and is bounced back, which reads as a
+                glitch rather than as a boundary. There is nothing behind this
+                shell to go back to; it is where the account lives.
+              */}
+              <Stack.Screen name="(org)" options={{ gestureEnabled: false }} />
               <Stack.Screen name="inbox/[id]" options={{ presentation: 'card' }} />
               {/* The application a pending organisation works through. Outside
                   `(org)` because that shell is four tabs it may not use yet. */}

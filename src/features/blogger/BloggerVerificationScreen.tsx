@@ -199,7 +199,19 @@ export function BloggerVerificationScreen() {
     );
   };
 
-  const canSubmit = readyToSubmit(application);
+  /*
+   * Both readings, and the stricter one wins.
+   *
+   * `readyToSubmit` is the client's view of its own step set; `missingDocuments`
+   * is the service's, and it is the one whose opinion decides whether a submit
+   * is accepted. Offering a Send button the server will refuse is worse than
+   * showing one more outstanding item, so where they disagree the application
+   * is not ready.
+   *
+   * Until now only the first was consulted and `serviceSaysComplete` had no
+   * caller at all — a helper written for exactly this and then not wired up.
+   */
+  const canSubmit = readyToSubmit(application) && application.missingDocuments.length === 0;
 
   /**
    * Which document is uploading, rather than whether any is.

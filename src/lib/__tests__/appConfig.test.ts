@@ -41,7 +41,26 @@ test('every native ground is the ground the app launches into', () => {
    * over-scroll gutter, and for the moment between splash teardown and first
    * render — the white flash that keeps being reported as "it went light".
    */
-  const ground = lightColors.canvas.toLowerCase();
+  /*
+   * Read off `BootScreen` rather than named here.
+   *
+   * This pinned `lightColors.canvas` directly, which quietly turned a property
+   * into a decision: the rule is "the native ground equals the first frame the
+   * app paints", and naming one token asserts *which* token that frame uses.
+   * When the launch screen moved to white — so the tile reads as a white card
+   * on a white page — this failed for being out of date rather than for
+   * anything being wrong, while still passing if someone changed the boot
+   * screen's ground and left `app.json` behind, which is the actual bug.
+   *
+   * Resolving the token the component uses keeps the rule and drops the
+   * decision, so the two can never drift in either direction.
+   */
+  const boot = fs.readFileSync(path.join(ROOT, 'src/components/BootScreen.tsx'), 'utf8');
+  const token = /backgroundColor: c\.(\w+)/.exec(boot)?.[1] as keyof typeof lightColors;
+  expect(token).toBeDefined();
+  expect(lightColors[token]).toBeDefined();
+
+  const ground = String(lightColors[token]).toLowerCase();
   expect(app.backgroundColor.toLowerCase()).toBe(ground);
   expect(app.splash.backgroundColor.toLowerCase()).toBe(ground);
 });

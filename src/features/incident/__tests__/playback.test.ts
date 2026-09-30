@@ -242,7 +242,18 @@ test('buffering is said out loud rather than shown as black', () => {
    */
   const stage = code(STAGE);
   expect(stage).toMatch(/status\?\.status === 'loading' \|\| status\?\.status === 'idle'/);
-  expect(stage).toMatch(/Loading the footage/);
+  /*
+   * Through i18n, not typed into the JSX.
+   *
+   * Both buffering messages were English string literals in the markup — the
+   * only two left in the app — so they stayed English whatever the reader had
+   * chosen, and they were invisible to the orphan check that guards every
+   * other piece of copy.
+   */
+  expect(stage).toMatch(/\{t\('incident\.bufferingFootage'\)\}/);
+  const en = require('@/i18n/locales/en.json');
+  expect(en.incident.bufferingFootage).toBe('Loading the footage');
+  expect(en.incident.bufferingVideo).toBe('Loading video');
 });
 
 test('a stream that fails is still heard', () => {

@@ -1,6 +1,5 @@
 import {
   BLOGGER_STEPS,
-  BLOGGER_STEP_IDS,
   type BloggerApplication,
   type BloggerStepState,
 } from '@/types/bloggerVerification';
@@ -140,23 +139,4 @@ export function normaliseVerification(raw: unknown): BloggerApplication {
     rejectionReason: str(root.rejectionReason),
     screeningClear: typeof root.screeningClear === 'boolean' ? root.screeningClear : null,
   };
-}
-
-/**
- * Whether the service considers this application finished.
- *
- * Its own `missingDocuments` rather than the client's view of the same
- * question. The two should agree; where they do not, the service is the one
- * whose opinion decides whether submission is accepted, and showing a blogger
- * a "Send" button it will refuse is worse than showing them one item they
- * thought they had already done.
- */
-export function serviceSaysComplete(application: BloggerApplication): boolean {
-  return (
-    application.missingDocuments.length === 0 &&
-    BLOGGER_STEP_IDS.every((id) => {
-      const status = application.steps[id]?.status;
-      return status === 'submitted' || status === 'approved';
-    })
-  );
 }

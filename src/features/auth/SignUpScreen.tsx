@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Controller, useForm, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -17,6 +17,7 @@ import { toGhanaMsisdn } from '@/lib/momo';
 import { leaveOrGoHome } from '@/lib/leaveOrGoHome';
 import { api } from '@/api';
 import { AuthField } from './AuthField';
+import { useKeyboardReveal } from '@/hooks/useKeyboardReveal';
 import { GoogleButton } from './GoogleButton';
 import {
   ACCOUNT_KINDS,
@@ -50,6 +51,13 @@ export function SignUpScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  /*
+   * The keyboard lands on the lower half of this form, and
+   * `KeyboardAvoidingView` only makes those fields reachable by scrolling — it
+   * does not move the one being typed into. See `useKeyboardReveal`.
+   */
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useKeyboardReveal(scroll);
   const register = useAuthStore((s) => s.register);
   const [submitting, setSubmitting] = useState(false);
 
@@ -223,6 +231,7 @@ export function SignUpScreen() {
       className="flex-1 bg-canvas"
     >
       <ScrollView
+        ref={scroll}
         contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: insets.bottom + 24 }}
         contentContainerClassName="gap-6 px-6"
         keyboardShouldPersistTaps="handled"
@@ -315,175 +324,198 @@ export function SignUpScreen() {
 
         {step === 'details' ? (
           <>
-        <View className="gap-4">
-          {isOrganisation ? (
-            <>
-              <Controller
-                control={control}
-                name="organisationName"
-                render={({ field: { onChange, onBlur, value } }) => (
-                  <AuthField
-                    label={t('auth.organisationName')}
-                    value={value ?? ''}
-                    onChangeText={onChange}
-                    onBlur={onBlur}
-                    error={formState.errors.organisationName?.message}
-                    placeholder={t('auth.organisationNamePlaceholder')}
-                    autoCapitalize="words"
-                    maxLength={80}
+            {/*
+          The other way in, offered before the form rather than under it.
+
+          It sat at the foot of the step, below eight fields and a password
+          meter — which is to say it was offered to people who had already done
+          the thing it saves them. Above the form it is a choice; below it, it
+          is a reproach.
+
+          **A plain reporter only, and the other two are not an oversight.**
+          `/auth/google` takes an identity and nothing else: no organisation, no
+          `accountKind`, and it answers with tokens alone — no flag saying
+          whether the account was just created. So it can only ever make a plain
+          reporter. Under the blogger card it produced one with no verification
+          application and no payout number, with nothing on screen saying so.
+          Restoring it for bloggers needs item **X** in BACKEND-REQUESTS.md.
+        */}
+            {kind === 'reporter' ? <GoogleButton first /> : null}
+
+            <View className="gap-4">
+              {isOrganisation ? (
+                <>
+                  <Controller
+                    control={control}
+                    name="organisationName"
+                    render={({ field: { onChange, onBlur, value } }) => (
+                      <AuthField
+                        reveal={reveal}
+                        label={t('auth.organisationName')}
+                        value={value ?? ''}
+                        onChangeText={onChange}
+                        onBlur={onBlur}
+                        error={formState.errors.organisationName?.message}
+                        placeholder={t('auth.organisationNamePlaceholder')}
+                        autoCapitalize="words"
+                        maxLength={80}
+                      />
+                    )}
                   />
-                )}
-              />
-              {/*
+                  {/*
                 Sector, as chips rather than a picker. Seven values, and the one
                 a person wants is usually visible without opening anything.
               */}
-              <View className="gap-2">
-                <Text variant="label" tone="muted">
-                  {t('auth.organisationSector')}
-                </Text>
-                <View className="flex-row flex-wrap gap-2">
-                  {ORGANISATION_SECTORS.map((value) => (
-                    <Chip
-                      key={value}
-                      label={t(`sector.${value}`)}
-                      selected={sector === value}
-                      onPress={() => setValue('organisationSector', value)}
-                    />
-                  ))}
-                </View>
-              </View>
-            </>
-          ) : null}
-          <Controller
-            control={control}
-            name="displayName"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <AuthField
-                // For an organisation this is the person signing up, not the
-                // institution — the institution has its own field above.
-                label={isOrganisation ? t('auth.yourName') : t('auth.displayName')}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={formState.errors.displayName?.message}
-                placeholder={
-                  isOrganisation
-                    ? t('auth.yourNamePlaceholder')
-                    : t('auth.displayNamePlaceholder')
-                }
-                autoCapitalize="words"
-                autoComplete="name"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="email"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <AuthField
-                label={t('auth.email')}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={formState.errors.email?.message}
-                placeholder="you@example.com"
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoComplete="email"
-              />
-            )}
-          />
-          <Controller
-            control={control}
-            name="password"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <View className="gap-2">
-                <AuthField
-                  label={t('auth.password')}
-                  value={value}
-                  onChangeText={onChange}
-                  onBlur={onBlur}
-                  error={formState.errors.password?.message}
-                  placeholder={t('auth.passwordPlaceholder')}
-                  secure
-                  autoCapitalize="none"
-                  autoComplete="new-password"
-                />
-                {value.length > 0 ? (
-                  <View className="flex-row items-center gap-2">
-                    <View className="h-1 flex-1 flex-row gap-1">
-                      {[0, 1, 2, 3].map((i) => (
-                        <View
-                          key={i}
-                          className={
-                            i <= strength
-                              ? `h-1 flex-1 rounded-pill ${STRENGTH_CLASS[strength]}`
-                              : 'h-1 flex-1 rounded-pill bg-canvas-raise'
-                          }
+                  <View className="gap-2">
+                    <Text variant="label" tone="muted">
+                      {t('auth.organisationSector')}
+                    </Text>
+                    <View className="flex-row flex-wrap gap-2">
+                      {ORGANISATION_SECTORS.map((value) => (
+                        <Chip
+                          key={value}
+                          label={t(`sector.${value}`)}
+                          selected={sector === value}
+                          onPress={() => setValue('organisationSector', value)}
                         />
                       ))}
                     </View>
-                    <Text variant="caption" tone="muted">
-                      {t(`auth.strength.${STRENGTH_LABEL[strength]}`)}
-                    </Text>
                   </View>
-                ) : null}
-              </View>
-            )}
-          />
-          <Controller
-            control={control}
-            name="confirmPassword"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <AuthField
-                label={t('auth.confirmPassword')}
-                value={value}
-                onChangeText={onChange}
-                onBlur={onBlur}
-                error={formState.errors.confirmPassword?.message}
-                placeholder={t('auth.confirmPasswordPlaceholder')}
-                secure
-                autoCapitalize="none"
-                autoComplete="new-password"
+                </>
+              ) : null}
+              <Controller
+                control={control}
+                name="displayName"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <AuthField
+                    reveal={reveal}
+                    // For an organisation this is the person signing up, not the
+                    // institution — the institution has its own field above.
+                    label={isOrganisation ? t('auth.yourName') : t('auth.displayName')}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={formState.errors.displayName?.message}
+                    placeholder={
+                      isOrganisation
+                        ? t('auth.yourNamePlaceholder')
+                        : t('auth.displayNamePlaceholder')
+                    }
+                    autoCapitalize="words"
+                    autoComplete="name"
+                  />
+                )}
               />
-            )}
-          />
-        </View>
+              <Controller
+                control={control}
+                name="email"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <AuthField
+                    reveal={reveal}
+                    label={t('auth.email')}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={formState.errors.email?.message}
+                    placeholder="you@example.com"
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                  />
+                )}
+              />
+              <Controller
+                control={control}
+                name="password"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <View className="gap-2">
+                    <AuthField
+                      reveal={reveal}
+                      label={t('auth.password')}
+                      value={value}
+                      onChangeText={onChange}
+                      onBlur={onBlur}
+                      error={formState.errors.password?.message}
+                      placeholder={t('auth.passwordPlaceholder')}
+                      secure
+                      autoCapitalize="none"
+                      autoComplete="new-password"
+                    />
+                    {value.length > 0 ? (
+                      <View className="flex-row items-center gap-2">
+                        <View className="h-1 flex-1 flex-row gap-1">
+                          {[0, 1, 2, 3].map((i) => (
+                            <View
+                              key={i}
+                              className={
+                                i <= strength
+                                  ? `h-1 flex-1 rounded-pill ${STRENGTH_CLASS[strength]}`
+                                  : 'h-1 flex-1 rounded-pill bg-canvas-raise'
+                              }
+                            />
+                          ))}
+                        </View>
+                        <Text variant="caption" tone="muted">
+                          {t(`auth.strength.${STRENGTH_LABEL[strength]}`)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+                )}
+              />
+              <Controller
+                control={control}
+                name="confirmPassword"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <AuthField
+                    reveal={reveal}
+                    label={t('auth.confirmPassword')}
+                    value={value}
+                    onChangeText={onChange}
+                    onBlur={onBlur}
+                    error={formState.errors.confirmPassword?.message}
+                    placeholder={t('auth.confirmPasswordPlaceholder')}
+                    secure
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                  />
+                )}
+              />
+            </View>
 
-        <Controller
-          control={control}
-          name="acceptedTerms"
-          render={({ field: { onChange } }) => (
-            <Pressable
-              onPress={() => onChange(!accepted)}
-              accessibilityRole="checkbox"
-              accessibilityState={{ checked: accepted }}
-              accessibilityLabel={t('auth.acceptTerms')}
-              className="flex-row items-start gap-3"
-            >
-              <View
-                className={
-                  accepted
-                    ? 'h-5 w-5 items-center justify-center rounded-xs bg-accent'
-                    : 'h-5 w-5 items-center justify-center rounded-xs border border-hairline/30'
-                }
-              >
-                {accepted ? <Ionicons name="checkmark" size={13} color={c.textOnDark} /> : null}
-              </View>
-              <Text variant="body-sm" tone="muted" className="flex-1">
-                {t('auth.acceptTerms')}
+            <Controller
+              control={control}
+              name="acceptedTerms"
+              render={({ field: { onChange } }) => (
+                <Pressable
+                  onPress={() => onChange(!accepted)}
+                  accessibilityRole="checkbox"
+                  accessibilityState={{ checked: accepted }}
+                  accessibilityLabel={t('auth.acceptTerms')}
+                  className="flex-row items-start gap-3"
+                >
+                  <View
+                    className={
+                      accepted
+                        ? 'h-5 w-5 items-center justify-center rounded-xs bg-accent'
+                        : 'h-5 w-5 items-center justify-center rounded-xs border border-hairline/30'
+                    }
+                  >
+                    {accepted ? <Ionicons name="checkmark" size={13} color={c.textOnDark} /> : null}
+                  </View>
+                  <Text variant="body-sm" tone="muted" className="flex-1">
+                    {t('auth.acceptTerms')}
+                  </Text>
+                </Pressable>
+              )}
+            />
+            {formState.errors.acceptedTerms ? (
+              <Text variant="caption" tone="danger" accessibilityLiveRegion="polite">
+                {formState.errors.acceptedTerms.message}
               </Text>
-            </Pressable>
-          )}
-        />
-        {formState.errors.acceptedTerms ? (
-          <Text variant="caption" tone="danger" accessibilityLiveRegion="polite">
-            {formState.errors.acceptedTerms.message}
-          </Text>
-        ) : null}
+            ) : null}
 
-        {/*
+            {/*
           The last step for an organisation, the second of three for a reporter.
 
           `trigger` on the fields this step owns, rather than `handleSubmit`:
@@ -492,48 +524,32 @@ export function SignUpScreen() {
           — an error on a field that is not on screen, which reads as the
           button being broken.
         */}
-        <Button
-          label={isOrganisation ? t('auth.createAccount') : t('common.continue')}
-          size="lg"
-          fullWidth
-          loading={submitting}
-          trailing={
-            isOrganisation ? undefined : (
-              <Ionicons name="arrow-forward" size={18} color={c.textOnDark} />
-            )
-          }
-          onPress={() => {
-            if (isOrganisation) {
-              void handleSubmit(onSubmit)();
-              return;
-            }
-            void trigger(['displayName', 'email', 'password', 'confirmPassword', 'acceptedTerms'])
-              .then((ok) => {
-                if (ok) setStep('payout');
-              });
-          }}
-        />
-
-        {/*
-          Offered to a plain reporter only, and to neither of the other two.
-
-          `/auth/google` takes an identity and nothing else: no organisation, no
-          `accountKind`, and it answers with tokens alone — no flag saying
-          whether the account was just created. So it can only ever make a plain
-          reporter.
-
-          For an institution that was always obvious. For a blogger it was not,
-          and it was worse: the card said "A blogger", the button sat directly
-          under it, and tapping it produced a reporter with no verification
-          application and no payout number — the two things the whole choice
-          exists to set up — with nothing on screen ever saying so. A shortcut
-          that quietly produces the wrong kind of account is worse than no
-          shortcut, and it is worst when the label above it promised otherwise.
-
-          Restoring it for bloggers needs `accountKind` on `/auth/google`, which
-          is item **X** in the console repo's `BACKEND-REQUESTS.md`.
-        */}
-        {kind === 'reporter' ? <GoogleButton /> : null}
+            <Button
+              label={isOrganisation ? t('auth.createAccount') : t('common.continue')}
+              size="lg"
+              fullWidth
+              loading={submitting}
+              trailing={
+                isOrganisation ? undefined : (
+                  <Ionicons name="arrow-forward" size={18} color={c.textOnDark} />
+                )
+              }
+              onPress={() => {
+                if (isOrganisation) {
+                  void handleSubmit(onSubmit)();
+                  return;
+                }
+                void trigger([
+                  'displayName',
+                  'email',
+                  'password',
+                  'confirmPassword',
+                  'acceptedTerms',
+                ]).then((ok) => {
+                  if (ok) setStep('payout');
+                });
+              }}
+            />
           </>
         ) : null}
 
@@ -557,6 +573,7 @@ export function SignUpScreen() {
               render={({ field: { onChange, onBlur, value } }) => (
                 <View className="gap-2">
                   <AuthField
+                    reveal={reveal}
                     label={t('auth.payoutLabel')}
                     value={value ?? ''}
                     onChangeText={onChange}

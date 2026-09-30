@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, View } from 'react-native';
 import { Controller, useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -14,6 +14,7 @@ import { toast } from '@/stores/toastStore';
 import { hapticUnlock } from '@/lib/haptics';
 import { homeRouteFor } from '@/lib/homeRoute';
 import { AuthField } from './AuthField';
+import { useKeyboardReveal } from '@/hooks/useKeyboardReveal';
 import { GoogleButton } from './GoogleButton';
 import { DemoAccountSheet } from './DemoAccountSheet';
 import { isLiveBackend } from '@/api';
@@ -24,6 +25,13 @@ export function SignInScreen() {
   const { t } = useTranslation();
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  /*
+   * The keyboard lands on the lower half of this form, and
+   * `KeyboardAvoidingView` only makes those fields reachable by scrolling — it
+   * does not move the one being typed into. See `useKeyboardReveal`.
+   */
+  const scroll = useRef<ScrollView>(null);
+  const reveal = useKeyboardReveal(scroll);
   const signIn = useAuthStore((s) => s.signIn);
   const [submitting, setSubmitting] = useState(false);
   const [demoOpen, setDemoOpen] = useState(false);
@@ -80,6 +88,7 @@ export function SignInScreen() {
       className="flex-1 bg-canvas"
     >
       <ScrollView
+        ref={scroll}
         contentContainerStyle={{ paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24 }}
         contentContainerClassName="gap-6 px-6"
         keyboardShouldPersistTaps="handled"
@@ -116,6 +125,7 @@ export function SignInScreen() {
             name="email"
             render={({ field: { onChange, onBlur, value } }) => (
               <AuthField
+                reveal={reveal}
                 label={t('auth.email')}
                 value={value}
                 onChangeText={onChange}
@@ -134,6 +144,7 @@ export function SignInScreen() {
             name="password"
             render={({ field: { onChange, onBlur, value } }) => (
               <AuthField
+                reveal={reveal}
                 label={t('auth.password')}
                 value={value}
                 onChangeText={onChange}

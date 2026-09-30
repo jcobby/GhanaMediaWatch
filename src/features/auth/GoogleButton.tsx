@@ -33,7 +33,21 @@ import { toast } from '@/stores/toastStore';
  * from "not configured". So in development it is always on screen, and tapping
  * it unconfigured says exactly which variable is missing.
  */
-export function GoogleButton({ onDone }: { onDone?: () => void }) {
+export function GoogleButton({
+  onDone,
+  first = false,
+}: {
+  onDone?: () => void;
+  /**
+   * Offered before the form rather than after it.
+   *
+   * Moves the rule below the button instead of above, because the word "or"
+   * only reads as a choice when there is something on both sides of it — at the
+   * top of a screen with the divider first, it is a rule with nothing above it
+   * and a button that looks like the answer to a question nobody asked.
+   */
+  first?: boolean;
+}) {
   const c = useColors();
   const { t } = useTranslation();
   const router = useRouter();
@@ -91,17 +105,21 @@ export function GoogleButton({ onDone }: { onDone?: () => void }) {
     }
   };
 
+  /* A rule with the word in it, so the button on the other side of it reads as
+     the other way in rather than as another step of the form. */
+  const divider = (
+    <View className="flex-row items-center gap-3">
+      <View className="h-px flex-1 bg-hairline/[0.12]" />
+      <Text variant="caption" tone="faint">
+        {t('auth.or')}
+      </Text>
+      <View className="h-px flex-1 bg-hairline/[0.12]" />
+    </View>
+  );
+
   return (
     <View className="gap-3">
-      {/* A rule with the word in it, so the button below reads as the other way
-          in rather than as another step of the form above. */}
-      <View className="flex-row items-center gap-3">
-        <View className="h-px flex-1 bg-hairline/[0.12]" />
-        <Text variant="caption" tone="faint">
-          {t('auth.or')}
-        </Text>
-        <View className="h-px flex-1 bg-hairline/[0.12]" />
-      </View>
+      {first ? null : divider}
       <Button
         label={t('auth.continueWithGoogle')}
         variant="glass"
@@ -111,6 +129,7 @@ export function GoogleButton({ onDone }: { onDone?: () => void }) {
         onPress={() => void run()}
         leading={<Ionicons name="logo-google" size={18} color={c.textPrimary} />}
       />
+      {first ? divider : null}
       {/*
         Said at a glance, not only on tap, and only in development. Otherwise
         the button looks finished and the missing configuration is a surprise

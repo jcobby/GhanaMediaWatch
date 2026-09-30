@@ -1176,7 +1176,10 @@ Three rules the server MUST enforce:
 ### 8.5 Employees joining
 
 ```ts
-export type MembershipStatus = 'pending' | 'accepted' | 'rejected';
+// `approved`, not `accepted` — read off the live `MembershipRequest` schema on
+// 30 September. This said `accepted` and the wire has never used that word, so
+// anything built from this document sent a status the service rejects.
+export type MembershipStatus = 'pending' | 'approved' | 'rejected';
 
 export interface MembershipRequest {
   id: string;
@@ -1193,6 +1196,8 @@ export interface MembershipRequest {
   note: string | null;
 }
 ```
+
+**`POST /membership-requests` is live** — it takes `orgId` (required) plus optional `displayName`, `email`, `statedRole` and `note`, answers 201 with the pending request, and 409 when there is already one. Its own summary names its caller: *"Signed-in outsider path for the console /join page."* The console's `/join` page still states that no such endpoint exists and offers only invite redemption, because that was true when it was written; the request half of this flow is built on the service and unreachable from either client.
 
 Employees sign themselves up and name their employer; **the organisation decides whether that is true.** Self-service in both directions would let anyone claim to work for the Electoral Commission and start receiving election footage. Acceptance is always an act by someone already inside who holds `manage_members`.
 
@@ -1915,6 +1920,17 @@ Unauthenticated. Reader-facing. Returns `PublicOrganisation`, never `BusinessAcc
 | GET | `/surveys` | user |
 | POST | `/surveys/{id}/responses` | user |
 
+### Live streaming — **all new, none built**, §17
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| POST | `/live/sessions` | user — opens a session, returns ingest credentials |
+| POST | `/live/sessions/{id}/heartbeat` | user — position and clock while streaming |
+| POST | `/live/sessions/{id}/end` | user |
+| GET | `/live/sessions/{id}` | public — playback URL and state |
+| GET | `/live` | public — what is streaming now |
+| POST | `/platform/live/{id}/cut` | `platform_owner` — stop a stream |
+
 ---
 
 ## 14. Invariants — the must-never list
@@ -2049,6 +2065,68 @@ These need a decision from the product side before or during implementation. The
 8. **Reporter deanonymisation risk.** A timestamp plus coordinates plus a distinctive scene can identify an "anonymous" reporter. Is there a policy on suppressing detail for high-risk categories such as `galamsey` and `corruption`?
 9. **Rate limits.** The figures in §2.8 are starting points, not measurements.
 10. **`reportId` collisions.** Confirm the persistence-with-uniqueness approach in §3.7.
+12. **Who may go live, and who watches it?** §17. Live is the one surface where unreviewed material reaches the public with the platform's name on it, and §4.4's editorial flow cannot help — it adjudicates a finished artefact. Three decisions are needed before a line of it is built: which account kinds may open a session (suggested: verified bloggers and institution employees only, never anonymous); whether there is a delay buffer and how long; and who is on duty to cut a stream, at what hours. A product that cannot answer the third should not ship the first.
+13. **Does live change the safety position?** §17.6. A recorded clip uploads after the fact and can be sent anonymously. A live stream broadcasts a reporter's position continuously and in real time, to anyone with the link, while they are still standing there. The introduction already tells people not to endanger themselves; live makes that warning materially harder to honour, and the product has not decided whether that is acceptable for categories such as `galamsey`, `corruption` and `security`.
+
+---
+
+## 17. Live streaming — **requested, not built**
+
+**Nothing exists for this.** The spec at `/v1/openapi.json` was read on 29 September: 147 paths, and not one of them mentions live, stream, ingest, RTMP, HLS or WebRTC. The only `"live"` on the wire is a survey's status enum. This section is the ask, not a description.
+
+The phone already shows a **Live** control in the capture mode selector. It opens a sheet that says live streaming is not switched on yet and offers to record a video instead. That is deliberate and should stay until every part below exists — a control that opens a dead stream is worse than one that explains itself.
+
+### 17.1 What has to exist, and in what order
+
+Live is not an endpoint. It is four things, and the app can only be built after the first two:
+
+1. **A media server.** Ingest from a phone, transcode, serve playback. This is infrastructure, not application code — realistically a managed service (Cloudflare Stream, Mux, LiveKit, Ant Media) rather than something self-run, because the alternative is operating a transcoding fleet.
+2. **The endpoints in §17.3**, which are a thin layer over that server: they mint credentials, hold the provenance, and never touch video bytes.
+3. **A native client module.** Neither `expo-camera` nor `expo-video` can publish a stream. It takes `react-native-webrtc` for WHIP, or the vendor's own SDK. **Consequence for the project: live cannot run in Expo Go at all, and needs a development build.** Everything else in this app currently does not.
+4. **Playback**, which is the easy half — `expo-video` plays HLS today, so a viewer needs only a URL.
+
+### 17.2 Protocols
+
+**Ingest: WHIP**, with RTMP as the fallback. WHIP is WebRTC over a plain HTTP POST — sub-second glass-to-glass, which is what "send the nearest unit while you are still there" actually requires. RTMP is universally supported and runs 5–15 seconds behind; on a Ghanaian mobile network that is often the difference between a stream that holds and one that does not, so it is worth keeping.
+
+**Playback: HLS**, because it is what `expo-video` and every browser handle without a second player. Low-latency HLS if the provider offers it. A monitoring room that needs true real time should be given a WebRTC egress URL separately; the public feed does not need it.
+
+### 17.3 The endpoints
+
+```
+POST /live/sessions                  -> LiveSession   (ingest credentials)
+POST /live/sessions/{id}/heartbeat   -> 204           (position + clock, every 10s)
+POST /live/sessions/{id}/end         -> Incident      (the stream becomes a report)
+GET  /live/sessions/{id}             -> LiveSession   (public; playback URL, state)
+GET  /live                           -> LiveSession[] (public; what is on now)
+POST /platform/live/{id}/cut         -> 204           (operator stops it)
+```
+
+`POST /live/sessions` takes the same context a capture does — category, coordinates, accuracy, device clock, `captureIntent` — and returns:
+
+```json
+{ "id": "lvs_…", "state": "awaiting_ingest",
+  "ingest": { "protocol": "whip", "url": "https://…", "token": "…", "expiresAtIso": "…" },
+  "playbackUrl": null, "startedAtIso": null, "viewerCount": 0 }
+```
+
+`state` moves `awaiting_ingest` → `live` → `ended` | `cut` | `abandoned`. `playbackUrl` is null until the server sees bytes. **The ingest token is single-use and short-lived** — a token that outlives the session is a stranger broadcasting under a verified reporter's name.
+
+### 17.4 Provenance, which is the whole product
+
+§4 is Dawuro's claim: it can say where a file came from and how far anyone has got in checking it. A live stream must carry the same chain or it undermines the claim on the most visible surface the app has.
+
+- **The heartbeat is not optional.** Every 10 seconds: coordinates, accuracy, device clock. It is the moving equivalent of a capture stamp, and a session whose heartbeats stop is `abandoned`, not `live`.
+- **Assurance is lower for live and must be displayed as lower.** Nothing has been reviewed. A stream carries at most the `device` tier of §4.2 and must never appear as corroborated while it is running.
+- **The recording is the artefact.** `end` returns a real `Incident` whose media is the recorded stream, which then enters the ordinary editorial flow. Without this, a live stream is the one thing on Dawuro that leaves no reviewable record — and a platform whose case rests on provenance cannot have a surface that produces none.
+
+### 17.5 Moderation
+
+**A stream cannot be reviewed before it is seen**, and §4.4 has no answer for that because it adjudicates finished material. So the controls are structural rather than editorial: who may open a session at all (§16.12), a delay buffer if there is one, `POST /platform/live/{id}/cut`, and a viewer report path that reaches somebody who is awake. This is a staffing commitment before it is an engineering one.
+
+### 17.6 Safety
+
+The introduction tells reporters not to put themselves or anyone else in danger. A recorded clip can be uploaded later, from somewhere else, anonymously. **A live stream publishes a reporter's position, continuously, while they are still standing in it.** For `galamsey`, `corruption` and `security` that is a materially different exposure from anything else this app asks of people, and it is a product decision rather than a technical one — see §16.13. Whatever is decided, the phone must say plainly what going live reveals, before the first frame and not in a settings page.
 
 ---
 

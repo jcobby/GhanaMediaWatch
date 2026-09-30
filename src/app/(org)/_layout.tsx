@@ -49,6 +49,14 @@ export default function OrgTabsLayout() {
    */
   if (pending) return <Redirect href="/onboarding/organisation" />;
 
+  /*
+   * A badge only for a figure the service actually gave.
+   *
+   * `?? 0` was right when the count was typed as a number and wrong the moment
+   * it could be null: an unknown count would read as "nothing waiting", which
+   * is the one thing a badge must never say by default — an operator who is
+   * told there is no work does not go looking for it.
+   */
   const waiting = dashboard?.inboxCount ?? 0;
 
   return (

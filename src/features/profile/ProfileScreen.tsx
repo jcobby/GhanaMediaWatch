@@ -378,6 +378,20 @@ export function ProfileScreen() {
               <SettingRow icon="server-outline" label={t('settings.storage')} value="248 MB" />
               <SettingRow icon="document-text-outline" label={t('settings.legal')} />
               {/*
+                Earnings, which used to be a tab of its own.
+
+                A thing you check rather than a thing you do, and it belongs
+                with the account it is attached to — the commission ledger, the
+                payout number and the account are one subject. The route is
+                unchanged, so a deep link and a push notification both still
+                land where they did.
+              */}
+              <SettingRow
+                icon="wallet-outline"
+                label={t('settings.earnings')}
+                onPress={() => router.push('/(tabs)/earn')}
+              />
+              {/*
                 A blogger's verification, and only a blogger's.
 
                 This is the only route to it, deliberately. An unverified

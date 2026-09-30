@@ -24,6 +24,7 @@ import type {
   OrgInboxItem,
   OrgIncidentStatus,
   OrgMember,
+  OrgMembershipRequest,
   OrgResponseAction,
   PublicationRequest,
 } from '@/types/org';
@@ -492,7 +493,15 @@ export interface ApiClient {
    * Carries `licensed` and `licensedAt` per item, which is what makes a
    * licences list possible on a client at all.
    */
-  getOrgInbox(orgId: string): Promise<Page<OrgInboxItem>>;
+  /**
+   * Reports routed to this organisation, newest first.
+   *
+   * `pages` is how many cursor pages to follow, defaulting to one. The inbox
+   * wants the newest and nothing else; the licences screen derives a record of
+   * everything bought and needs the history, so it asks for the depth rather
+   * than every caller paying for it.
+   */
+  getOrgInbox(orgId: string, options?: { pages?: number }): Promise<Page<OrgInboxItem>>;
 
   /** One routed or licensed report, with freshly signed media. */
   getOrgIncident(orgId: string, incidentId: string): Promise<OrgInboxItem>;
@@ -558,6 +567,20 @@ export interface ApiClient {
 
   /** The organisation's people — who a report can be dispatched to. */
   getOrgMembers(orgId: string): Promise<OrgMember[]>;
+
+  /**
+   * People asking to join this organisation, and settling one.
+   *
+   * Both endpoints have existed throughout and no client on the phone read
+   * either, so an organisation run from a phone could not answer somebody
+   * asking to join it.
+   */
+  getMembershipRequests(orgId: string): Promise<OrgMembershipRequest[]>;
+  decideMembershipRequest(
+    orgId: string,
+    requestId: string,
+    decision: 'approved' | 'rejected',
+  ): Promise<void>;
 
   // ─── becoming an organisation ────────────────────────────────────────────
   /*
@@ -640,6 +663,22 @@ export interface ApiClient {
   ): Promise<void>;
   /** Send the whole verification for review. */
   submitVerification(): Promise<BloggerApplication>;
+
+  /**
+   * Ask an organisation to add you to their team.
+   *
+   * **Below the organisation section deliberately.** Every method above takes
+   * an `orgId` because the service refuses `/org/*` without the scope header.
+   * This is not one of those: `POST /membership-requests` sits outside `/org`
+   * precisely because the caller has no membership yet, and sending a scope
+   * header would claim the thing being asked for. It belongs with the personal
+   * calls, where the rule is the inverse — no organisation, because there
+   * isn't one.
+   *
+   * The `orgId` in the body is the organisation being *asked*, which is data,
+   * not scope.
+   */
+  requestMembership(input: { orgId: string; statedRole?: string; note?: string }): Promise<void>;
 }
 
 /** Narrowed here so the client interface does not re-export the whole union. */
